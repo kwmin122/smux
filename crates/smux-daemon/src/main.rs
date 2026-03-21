@@ -273,6 +273,39 @@ async fn handle_client(
                 send_message(&mut stream, &DaemonMessage::SessionList { sessions }).await?;
             }
 
+            ClientMessage::Intervene {
+                session_id,
+                target,
+                message,
+            } => {
+                let handle = {
+                    let s = state.lock().await;
+                    s.sessions.get(&session_id).cloned()
+                };
+
+                match handle {
+                    Some(h) => {
+                        // For v0.2, forward the intervention as an AgentOutput event on
+                        // the session broadcast so attached clients can see it, and log
+                        // which agent was targeted.
+                        let _ = h.event_tx.send(DaemonMessage::AgentOutput {
+                            role: format!("intervene:{target}"),
+                            content: message,
+                        });
+                        send_message(&mut stream, &DaemonMessage::Ok).await?;
+                    }
+                    None => {
+                        send_message(
+                            &mut stream,
+                            &DaemonMessage::Error {
+                                message: format!("session not found: {session_id}"),
+                            },
+                        )
+                        .await?;
+                    }
+                }
+            }
+
             ClientMessage::RewindSession { session_id, round } => {
                 let handle = {
                     let s = state.lock().await;
@@ -380,7 +413,45 @@ fn spawn_session(
             max_tokens: 0,
         };
 
-        let mut orchestrator = Orchestrator::new(planner_adapter, verifier_adapter, config);
+        // VG-008: Wire event streaming from orchestrator to daemon broadcast.
+        let (event_tx, mut event_rx) =
+            tokio::sync::mpsc::channel::<smux_core::orchestrator::OrchestratorEvent>(256);
+        let broadcast_tx = handle.event_tx.clone();
+        let round_counter = handle.current_round.clone();
+
+        // Spawn a task that forwards orchestrator events to the broadcast channel.
+        tokio::spawn(async move {
+            use smux_core::orchestrator::OrchestratorEvent;
+            while let Some(event) = event_rx.recv().await {
+                match &event {
+                    OrchestratorEvent::RoundStarted { round } => {
+                        *round_counter.lock().await = *round;
+                    }
+                    OrchestratorEvent::PlannerOutput { round: _, content } => {
+                        let _ = broadcast_tx.send(DaemonMessage::AgentOutput {
+                            role: "planner".into(),
+                            content: content.clone(),
+                        });
+                    }
+                    OrchestratorEvent::VerifierOutput { round: _, content } => {
+                        let _ = broadcast_tx.send(DaemonMessage::AgentOutput {
+                            role: "verifier".into(),
+                            content: content.clone(),
+                        });
+                    }
+                    OrchestratorEvent::RoundComplete { round, verdict } => {
+                        let summary = format!("{verdict:?}");
+                        let _ = broadcast_tx.send(DaemonMessage::RoundComplete {
+                            round: *round,
+                            verdict_summary: summary,
+                        });
+                    }
+                }
+            }
+        });
+
+        let mut orchestrator =
+            Orchestrator::new(planner_adapter, verifier_adapter, config).with_event_sink(event_tx);
         let outcome = orchestrator.run().await;
 
         let summary = match &outcome {

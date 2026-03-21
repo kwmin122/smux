@@ -28,6 +28,12 @@ pub enum ClientMessage {
     ListSessions,
     /// Rewind a session to a specific round.
     RewindSession { session_id: String, round: u32 },
+    /// Send an intervention message to a specific agent in a session.
+    Intervene {
+        session_id: String,
+        target: String,
+        message: String,
+    },
     /// Gracefully shut down the daemon.
     Shutdown,
 }

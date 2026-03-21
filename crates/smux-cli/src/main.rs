@@ -46,6 +46,9 @@ enum Commands {
         session_id: String,
     },
 
+    /// Detach from the currently attached session
+    Detach,
+
     /// Rewind a session to a specific round
     Rewind {
         /// Session ID to rewind
@@ -208,6 +211,39 @@ async fn main() {
                 Ok(DaemonMessage::Ok) => {
                     println!("smux: attached to session {session_id}");
                     stream_until_complete(&mut stream).await;
+                }
+                Ok(DaemonMessage::Error { message }) => {
+                    eprintln!("smux: error — {message}");
+                    std::process::exit(1);
+                }
+                Ok(other) => {
+                    eprintln!("smux: unexpected response — {other:?}");
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("smux: receive error — {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        Commands::Detach => {
+            let mut stream = match connect_to_daemon().await {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("error: could not connect to daemon: {e}");
+                    std::process::exit(1);
+                }
+            };
+
+            if let Err(e) = send_message(&mut stream, &ClientMessage::DetachSession).await {
+                eprintln!("error: failed to send detach message: {e}");
+                std::process::exit(1);
+            }
+
+            match recv_message::<DaemonMessage>(&mut stream).await {
+                Ok(DaemonMessage::Ok) => {
+                    println!("smux: detached from session");
                 }
                 Ok(DaemonMessage::Error { message }) => {
                     eprintln!("smux: error — {message}");

@@ -248,6 +248,121 @@ async fn context_passing_includes_prior_rounds() {
     );
 }
 
+// VG-008: Test that OrchestratorEvent events are emitted via the event sink
+#[tokio::test]
+async fn event_sink_receives_events() {
+    use smux_core::orchestrator::OrchestratorEvent;
+
+    let planner = FakeAdapter::new(vec!["Here is my plan.".into()]);
+    let verifier = FakeAdapter::new(vec![
+        r#"{"verdict":"APPROVED","reason":"looks good","confidence":0.9}"#.into(),
+    ]);
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<OrchestratorEvent>(64);
+
+    let mut orch = Orchestrator::new(
+        Box::new(planner),
+        Box::new(verifier),
+        config("Test events", 5),
+    )
+    .with_event_sink(tx);
+
+    let outcome = orch.run().await;
+    assert!(matches!(outcome, OrchestratorOutcome::Approved { .. }));
+
+    // Collect all events from the channel.
+    let mut events = Vec::new();
+    while let Ok(e) = rx.try_recv() {
+        events.push(e);
+    }
+
+    // Expect: RoundStarted(1), PlannerOutput(1), VerifierOutput(1), RoundComplete(1)
+    assert!(
+        events.len() >= 4,
+        "expected at least 4 events, got {}",
+        events.len()
+    );
+    assert!(
+        matches!(&events[0], OrchestratorEvent::RoundStarted { round: 1 }),
+        "first event should be RoundStarted(1), got {:?}",
+        events[0]
+    );
+    assert!(
+        matches!(
+            &events[1],
+            OrchestratorEvent::PlannerOutput { round: 1, .. }
+        ),
+        "second event should be PlannerOutput(1), got {:?}",
+        events[1]
+    );
+    assert!(
+        matches!(
+            &events[2],
+            OrchestratorEvent::VerifierOutput { round: 1, .. }
+        ),
+        "third event should be VerifierOutput(1), got {:?}",
+        events[2]
+    );
+    assert!(
+        matches!(
+            &events[3],
+            OrchestratorEvent::RoundComplete { round: 1, .. }
+        ),
+        "fourth event should be RoundComplete(1), got {:?}",
+        events[3]
+    );
+}
+
+// VG-008: Test multi-round event emission
+#[tokio::test]
+async fn event_sink_multi_round() {
+    use smux_core::orchestrator::OrchestratorEvent;
+
+    let planner = FakeAdapter::new(vec!["plan v1".into(), "plan v2".into()]);
+    let verifier = FakeAdapter::new(vec![
+        r#"{"verdict":"REJECTED","category":"weak_test","reason":"no tests","confidence":0.7}"#
+            .into(),
+        r#"{"verdict":"APPROVED","reason":"tests added","confidence":0.95}"#.into(),
+    ]);
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<OrchestratorEvent>(64);
+
+    let mut orch = Orchestrator::new(
+        Box::new(planner),
+        Box::new(verifier),
+        config("Multi-round events", 5),
+    )
+    .with_event_sink(tx);
+
+    let outcome = orch.run().await;
+    assert!(matches!(
+        outcome,
+        OrchestratorOutcome::Approved { round: 2, .. }
+    ));
+
+    let mut events = Vec::new();
+    while let Ok(e) = rx.try_recv() {
+        events.push(e);
+    }
+
+    // 2 rounds x 4 events = 8 events total
+    assert!(
+        events.len() >= 8,
+        "expected at least 8 events for 2 rounds, got {}",
+        events.len()
+    );
+    // Verify round 2 events exist
+    let round2_starts: Vec<_> = events
+        .iter()
+        .filter(|e| matches!(e, OrchestratorEvent::RoundStarted { round: 2 }))
+        .collect();
+    assert_eq!(
+        round2_starts.len(),
+        1,
+        "should have exactly one RoundStarted(2)"
+    );
+}
+
 // VG-001: Test error path — adapter failure returns OrchestratorOutcome::Error
 #[tokio::test]
 async fn adapter_error_returns_outcome_error() {

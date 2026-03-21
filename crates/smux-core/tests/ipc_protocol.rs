@@ -57,6 +57,18 @@ fn client_message_rewind_round_trip() {
 }
 
 #[test]
+fn client_message_intervene_round_trip() {
+    let msg = ClientMessage::Intervene {
+        session_id: "sess-42".into(),
+        target: "planner".into(),
+        message: "focus on error handling".into(),
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    let decoded: ClientMessage = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, msg);
+}
+
+#[test]
 fn client_message_shutdown_round_trip() {
     let msg = ClientMessage::Shutdown;
     let json = serde_json::to_string(&msg).unwrap();

@@ -10,6 +10,22 @@ use crate::context::{DEFAULT_MAX_TOKENS, build_planner_feedback, build_verifier_
 use crate::stop;
 use crate::types::{AgentEvent, SessionConfig, VerifyResult};
 
+/// Events emitted by the orchestrator during execution.
+///
+/// Consumers (e.g. the daemon) can subscribe to these to forward live output
+/// to attached clients.
+#[derive(Debug, Clone)]
+pub enum OrchestratorEvent {
+    /// A new round has started.
+    RoundStarted { round: u32 },
+    /// The planner produced output for the given round.
+    PlannerOutput { round: u32, content: String },
+    /// The verifier produced output for the given round.
+    VerifierOutput { round: u32, content: String },
+    /// A round completed with the given verdict.
+    RoundComplete { round: u32, verdict: VerifyResult },
+}
+
 /// Configuration for an orchestrator run.
 #[derive(Debug, Clone)]
 pub struct OrchestratorConfig {
@@ -41,6 +57,8 @@ pub struct Orchestrator {
     planner: Box<dyn AgentAdapter>,
     verifier: Box<dyn AgentAdapter>,
     config: OrchestratorConfig,
+    /// Optional channel to emit live events during orchestration.
+    event_sink: Option<tokio::sync::mpsc::Sender<OrchestratorEvent>>,
 }
 
 impl Orchestrator {
@@ -54,6 +72,20 @@ impl Orchestrator {
             planner,
             verifier,
             config,
+            event_sink: None,
+        }
+    }
+
+    /// Set an optional event sink for live event streaming.
+    pub fn with_event_sink(mut self, sink: tokio::sync::mpsc::Sender<OrchestratorEvent>) -> Self {
+        self.event_sink = Some(sink);
+        self
+    }
+
+    /// Emit an event to the sink (if configured). Errors are silently ignored.
+    async fn emit(&self, event: OrchestratorEvent) {
+        if let Some(sink) = &self.event_sink {
+            let _ = sink.send(event).await;
         }
     }
 
@@ -104,6 +136,7 @@ impl Orchestrator {
 
         for round in 1..=self.config.max_rounds {
             tracing::info!(round, "starting round");
+            self.emit(OrchestratorEvent::RoundStarted { round }).await;
 
             // ── Step 1-2: Send task/feedback to planner and collect output ──
             let planner_output = match send_and_collect(&mut self.planner, &planner_prompt).await {
@@ -120,6 +153,12 @@ impl Orchestrator {
                 planner_output_len = planner_output.len(),
                 "planner responded"
             );
+
+            self.emit(OrchestratorEvent::PlannerOutput {
+                round,
+                content: planner_output.clone(),
+            })
+            .await;
 
             // ── Step 3-5: Build verifier prompt and collect verdict ──
             let verifier_prompt =
@@ -141,9 +180,21 @@ impl Orchestrator {
                 "verifier responded"
             );
 
+            self.emit(OrchestratorEvent::VerifierOutput {
+                round,
+                content: verifier_output.clone(),
+            })
+            .await;
+
             // ── Step 6: Parse verdict ──
             let verdict = stop::detect(&verifier_output);
             tracing::info!(round, ?verdict, "verdict detected");
+
+            self.emit(OrchestratorEvent::RoundComplete {
+                round,
+                verdict: verdict.clone(),
+            })
+            .await;
 
             match &verdict {
                 // ── Step 7: Approved -> done ──

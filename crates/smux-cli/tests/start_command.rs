@@ -71,3 +71,22 @@ fn attach_requires_session_id() {
         .assert()
         .failure();
 }
+
+#[test]
+fn detach_subcommand_is_accepted() {
+    // `smux detach` should be recognized as a valid subcommand.
+    // It will fail at runtime because no daemon is running, but the
+    // argument parsing should succeed (exit due to connection error, not
+    // unknown subcommand). We verify it doesn't fail with "unrecognized
+    // subcommand" by checking stderr doesn't contain "unrecognized".
+    let output = Command::cargo_bin("smux")
+        .unwrap()
+        .arg("detach")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("unrecognized subcommand"),
+        "detach should be a recognized subcommand, got: {stderr}"
+    );
+}
