@@ -45,16 +45,11 @@ pub fn create_worktree(repo_root: &Path, session_id: &str) -> Result<PathBuf, Sm
         })?;
     }
 
-    git(
-        &[
-            "worktree",
-            "add",
-            worktree_path.to_str().unwrap_or_default(),
-            "-b",
-            &branch,
-        ],
-        repo_root,
-    )?;
+    let wt_str = worktree_path
+        .to_str()
+        .ok_or_else(|| SmuxError::Git("worktree path contains non-UTF-8 characters".into()))?;
+
+    git(&["worktree", "add", wt_str, "-b", &branch], repo_root)?;
 
     Ok(worktree_path)
 }
@@ -69,15 +64,11 @@ pub fn remove_worktree(
 ) -> Result<(), SmuxError> {
     let branch = format!("smux/{session_id}");
 
-    git(
-        &[
-            "worktree",
-            "remove",
-            worktree_path.to_str().unwrap_or_default(),
-            "--force",
-        ],
-        repo_root,
-    )?;
+    let wt_str = worktree_path
+        .to_str()
+        .ok_or_else(|| SmuxError::Git("worktree path contains non-UTF-8 characters".into()))?;
+
+    git(&["worktree", "remove", wt_str, "--force"], repo_root)?;
 
     git(&["branch", "-D", &branch], repo_root)?;
 
@@ -96,7 +87,7 @@ pub fn commit_round(
 ) -> Result<String, SmuxError> {
     git(&["add", "-A"], worktree_path)?;
 
-    let message = format!("smux: round {round} -- {verdict_summary}");
+    let message = format!("smux: round {round} — {verdict_summary}");
     git(&["commit", "-m", &message, "--allow-empty"], worktree_path)?;
 
     head_sha(worktree_path)

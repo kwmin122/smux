@@ -25,6 +25,10 @@ pub struct RoundSnapshot {
     /// List of files changed in this round.
     pub files_changed: Vec<String>,
     /// ISO 8601 timestamp of when this round was committed.
+    ///
+    /// Spec calls for `DateTime<Utc>` (chrono). v0.1 uses String to avoid
+    /// adding the chrono dependency. Format is always "YYYY-MM-DDTHH:MM:SSZ".
+    /// Upgrade to chrono::DateTime<Utc> in v0.2 if type-safe parsing is needed.
     pub timestamp: String,
 }
 

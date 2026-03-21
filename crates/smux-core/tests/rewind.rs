@@ -109,3 +109,86 @@ fn load_nonexistent_round_fails() {
     let result = store.load_round(99);
     assert!(result.is_err(), "loading a non-existent round should fail");
 }
+
+// VG-005: Integrated git rewind + metadata restore flow
+#[test]
+fn rewind_git_then_load_round_metadata() {
+    use std::fs;
+    use std::process::Command;
+
+    // Set up a temp git repo
+    let tmp = tempfile::TempDir::new().unwrap();
+    let repo = tmp.path();
+    let run_git = |args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "git {} failed", args.join(" "));
+    };
+    run_git(&["init"]);
+    run_git(&["config", "user.email", "test@smux.dev"]);
+    run_git(&["config", "user.name", "smux-test"]);
+    fs::write(repo.join("init.txt"), "init").unwrap();
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "initial"]);
+
+    // Create worktree
+    let wt = smux_core::git_worktree::create_worktree(repo, "e2e-rewind").unwrap();
+
+    // Store for session metadata
+    let store_tmp = tempfile::TempDir::new().unwrap();
+    let store = SessionStore::with_base_dir(store_tmp.path().to_path_buf());
+
+    // Round 1: write file, commit, save metadata
+    fs::write(wt.join("data.txt"), "round-1").unwrap();
+    let sha1 = smux_core::git_worktree::commit_round(&wt, 1, "R1 approved").unwrap();
+    let snap1 = RoundSnapshot {
+        round: 1,
+        commit_sha: sha1.clone(),
+        planner_context_path: PathBuf::from("/tmp/p1.json"),
+        verifier_context_path: PathBuf::from("/tmp/v1.json"),
+        verdict: VerifyResult::Approved {
+            reason: "round 1 ok".into(),
+            confidence: 0.9,
+        },
+        files_changed: vec!["data.txt".into()],
+        timestamp: "2026-03-21T12:00:01Z".into(),
+    };
+    store.save_round(&snap1).unwrap();
+
+    // Round 2: modify file, commit, save metadata
+    fs::write(wt.join("data.txt"), "round-2").unwrap();
+    let sha2 = smux_core::git_worktree::commit_round(&wt, 2, "R2 rejected").unwrap();
+    let snap2 = RoundSnapshot {
+        round: 2,
+        commit_sha: sha2,
+        planner_context_path: PathBuf::from("/tmp/p2.json"),
+        verifier_context_path: PathBuf::from("/tmp/v2.json"),
+        verdict: VerifyResult::Rejected {
+            reason: "mitigation".into(),
+            category: smux_core::types::RejectCategory::Mitigation,
+            confidence: 0.8,
+        },
+        files_changed: vec!["data.txt".into()],
+        timestamp: "2026-03-21T12:00:02Z".into(),
+    };
+    store.save_round(&snap2).unwrap();
+
+    // Verify round 2 state
+    assert_eq!(fs::read_to_string(wt.join("data.txt")).unwrap(), "round-2");
+
+    // REWIND: git to round 1 + load round 1 metadata
+    smux_core::git_worktree::rewind_to(&wt, &sha1).unwrap();
+    let loaded = store.load_round(1).unwrap();
+
+    // Assert both git state and metadata are consistent
+    assert_eq!(fs::read_to_string(wt.join("data.txt")).unwrap(), "round-1");
+    assert_eq!(loaded.commit_sha, sha1);
+    assert_eq!(loaded.round, 1);
+    match &loaded.verdict {
+        VerifyResult::Approved { reason, .. } => assert_eq!(reason, "round 1 ok"),
+        other => panic!("expected Approved, got {other:?}"),
+    }
+}

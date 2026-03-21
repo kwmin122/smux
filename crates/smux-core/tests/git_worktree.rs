@@ -239,3 +239,28 @@ fn create_worktree_fails_without_git_repo() {
     let result = git_worktree::create_worktree(non_repo, "no-repo");
     assert!(result.is_err(), "should fail in a non-git directory");
 }
+
+// VG-004: rewind with invalid SHA returns error
+#[test]
+fn rewind_to_invalid_sha_fails() {
+    let tmp = init_tmp_repo();
+    let repo = tmp.path();
+    let wt = git_worktree::create_worktree(repo, "bad-sha").unwrap();
+
+    let result = git_worktree::rewind_to(&wt, "0000000000000000000000000000000000000000");
+    assert!(result.is_err(), "rewind to nonexistent SHA should fail");
+}
+
+// VG-006: duplicate worktree creation returns error
+#[test]
+fn create_worktree_duplicate_session_fails() {
+    let tmp = init_tmp_repo();
+    let repo = tmp.path();
+
+    let _wt = git_worktree::create_worktree(repo, "dup-test").unwrap();
+    let result = git_worktree::create_worktree(repo, "dup-test");
+    assert!(
+        result.is_err(),
+        "creating worktree with same session_id should fail (branch already exists)"
+    );
+}
