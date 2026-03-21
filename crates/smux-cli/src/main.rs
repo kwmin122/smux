@@ -5,6 +5,7 @@ use std::process::Stdio;
 use clap::{Parser, Subcommand};
 use tokio::net::UnixStream;
 
+use smux_core::config::{SmuxConfig, default_config_path};
 use smux_core::ipc::{
     ClientMessage, DaemonMessage, IpcError, default_socket_path, recv_message, send_message,
 };
@@ -22,20 +23,23 @@ enum Commands {
     Start {
         /// Planner provider (e.g. claude, codex)
         #[arg(long)]
-        planner: String,
+        planner: Option<String>,
 
         /// Verifier provider (e.g. claude, codex)
         #[arg(long)]
-        verifier: String,
+        verifier: Option<String>,
 
         /// Task description
         #[arg(long)]
         task: String,
 
-        /// Maximum planner-verifier rounds (default: 5)
-        #[arg(long, default_value_t = 5)]
-        max_rounds: u32,
+        /// Maximum planner-verifier rounds
+        #[arg(long)]
+        max_rounds: Option<u32>,
     },
+
+    /// Initialize config file at ~/.smux/config.toml
+    Init,
 
     /// List active sessions
     List,
@@ -80,12 +84,44 @@ async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Init => {
+            let config_path = default_config_path();
+            if config_path.exists() {
+                eprintln!("smux: config already exists at {}", config_path.display());
+                eprintln!("smux: delete it first if you want to regenerate");
+                std::process::exit(1);
+            }
+
+            match SmuxConfig::save_default(&config_path) {
+                Ok(()) => {
+                    println!("smux: created config at {}", config_path.display());
+                }
+                Err(e) => {
+                    eprintln!("smux: failed to create config: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+
         Commands::Start {
             planner,
             verifier,
             task,
             max_rounds,
         } => {
+            // Load config; CLI flags override config values.
+            let config = match SmuxConfig::load() {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("smux: warning: failed to load config, using defaults: {e}");
+                    SmuxConfig::default()
+                }
+            };
+
+            let planner = planner.unwrap_or(config.agents.planner.default.clone());
+            let verifier = verifier.unwrap_or(config.agents.verifier.default.clone());
+            let max_rounds = max_rounds.unwrap_or(config.defaults.max_rounds);
+
             // Ensure daemon is running.
             if let Err(e) = ensure_daemon_running().await {
                 eprintln!("error: could not start daemon: {e}");

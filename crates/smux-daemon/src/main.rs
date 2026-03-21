@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::{Mutex, broadcast};
 
+use smux_core::config::SmuxConfig;
 use smux_core::ipc::{
     ClientMessage, DaemonMessage, IpcError, SessionInfo, default_pid_path, default_socket_path,
     recv_message, send_message,
@@ -59,13 +60,16 @@ struct SessionHandle {
 pub struct DaemonState {
     sessions: HashMap<String, Arc<SessionHandle>>,
     shutdown: bool,
+    #[allow(dead_code)]
+    config: SmuxConfig,
 }
 
 impl DaemonState {
-    fn new() -> Self {
+    fn new(config: SmuxConfig) -> Self {
         Self {
             sessions: HashMap::new(),
             shutdown: false,
+            config,
         }
     }
 }
@@ -115,7 +119,14 @@ pub async fn run_daemon(socket_path: &PathBuf) -> Result<(), Box<dyn std::error:
     tokio::fs::write(&pid_path, std::process::id().to_string()).await?;
     tracing::info!(pid_path = %pid_path.display(), pid = std::process::id(), "PID file written");
 
-    let state = Arc::new(Mutex::new(DaemonState::new()));
+    // Load config at startup.
+    let config = SmuxConfig::load().unwrap_or_else(|e| {
+        tracing::warn!(?e, "failed to load config, using defaults");
+        SmuxConfig::default()
+    });
+    tracing::info!("config loaded (max_rounds={})", config.defaults.max_rounds);
+
+    let state = Arc::new(Mutex::new(DaemonState::new(config)));
 
     // Spawn Ctrl-C handler.
     let state_signal = state.clone();

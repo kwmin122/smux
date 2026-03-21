@@ -6,21 +6,35 @@
 use assert_cmd::Command;
 
 #[test]
-fn start_requires_planner_arg() {
-    Command::cargo_bin("smux")
+fn start_accepts_omitted_planner() {
+    // With config support, --planner is optional (defaults from config).
+    // The command should be parsed successfully (it may fail at runtime
+    // because the daemon isn't available, but argument parsing succeeds).
+    let output = Command::cargo_bin("smux")
         .unwrap()
         .args(["start", "--verifier", "codex", "--task", "test"])
-        .assert()
-        .failure();
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("required"),
+        "planner should be optional, got: {stderr}"
+    );
 }
 
 #[test]
-fn start_requires_verifier_arg() {
-    Command::cargo_bin("smux")
+fn start_accepts_omitted_verifier() {
+    // With config support, --verifier is optional (defaults from config).
+    let output = Command::cargo_bin("smux")
         .unwrap()
         .args(["start", "--planner", "claude", "--task", "test"])
-        .assert()
-        .failure();
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("required"),
+        "verifier should be optional, got: {stderr}"
+    );
 }
 
 #[test]

@@ -1,6 +1,7 @@
 //! smux-core — session model, adapter traits, and orchestration logic for smux.
 
 pub mod adapter;
+pub mod config;
 pub mod context;
 pub mod git_worktree;
 pub mod ipc;
