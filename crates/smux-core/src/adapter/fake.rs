@@ -83,14 +83,14 @@ impl AgentAdapter for FakeAdapter {
         Ok(TurnHandle { turn_index })
     }
 
-    fn stream_events(&self) -> AgentEventStream<'_> {
+    fn stream_events(&self) -> Result<AgentEventStream<'_>, AdapterError> {
         let rx = self
             .current_rx
             .lock()
             .unwrap()
             .take()
-            .expect("send_turn must be called before stream_events");
-        Box::pin(ReceiverStream::new(rx))
+            .ok_or(AdapterError::NoTurns)?;
+        Ok(Box::pin(ReceiverStream::new(rx)))
     }
 
     async fn snapshot_state(&self) -> Result<SessionSnapshot, AdapterError> {

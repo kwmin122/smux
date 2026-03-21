@@ -35,7 +35,10 @@ pub trait AgentAdapter: Send + Sync {
     async fn send_turn(&mut self, prompt: &str) -> Result<TurnHandle, AdapterError>;
 
     /// Return a stream of events for the most recently submitted turn.
-    fn stream_events(&self) -> AgentEventStream<'_>;
+    ///
+    /// Returns `AdapterError::NoTurns` if no turn is active (e.g. before
+    /// `send_turn` or after the stream has already been consumed).
+    fn stream_events(&self) -> Result<AgentEventStream<'_>, AdapterError>;
 
     /// Capture the adapter's internal state as an opaque snapshot.
     async fn snapshot_state(&self) -> Result<SessionSnapshot, AdapterError>;

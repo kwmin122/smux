@@ -86,14 +86,18 @@ pub enum VerifyResult {
 }
 
 /// Why a verification was rejected.
+///
+/// These categories match the verifier verdict contract in the design spec.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RejectCategory {
-    /// The output is factually wrong or off-topic.
-    Incorrect,
-    /// The output is incomplete.
-    Incomplete,
-    /// The output violates a safety or policy constraint.
-    PolicyViolation,
-    /// Catch-all for other rejection reasons.
-    Other,
+    /// Workaround — not a root-cause fix.
+    Mitigation,
+    /// Test coverage is insufficient for the change.
+    WeakTest,
+    /// The change introduces a regression.
+    Regression,
+    /// The implementation is incomplete.
+    IncompleteImpl,
+    /// The change has a security vulnerability.
+    SecurityIssue,
 }

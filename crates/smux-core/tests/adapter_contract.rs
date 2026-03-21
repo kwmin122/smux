@@ -66,7 +66,7 @@ async fn send_one_turn_and_receive_turn_complete() {
     let handle = adapter.send_turn("prompt").await.unwrap();
     assert_eq!(handle.turn_index, 0);
 
-    let events: Vec<AgentEvent> = adapter.stream_events().collect().await;
+    let events: Vec<AgentEvent> = adapter.stream_events().unwrap().collect().await;
     assert_eq!(events.len(), 2, "should get Chunk + TurnComplete");
 
     match &events[0] {
@@ -89,7 +89,7 @@ async fn send_multiple_turns_matches_canned_data() {
         let handle = adapter.send_turn(&format!("q{i}")).await.unwrap();
         assert_eq!(handle.turn_index, i as u64);
 
-        let events: Vec<AgentEvent> = adapter.stream_events().collect().await;
+        let events: Vec<AgentEvent> = adapter.stream_events().unwrap().collect().await;
         match &events[1] {
             AgentEvent::TurnComplete(text) => assert_eq!(text, expected),
             other => panic!("turn {i}: expected TurnComplete, got {other:?}"),
@@ -103,12 +103,43 @@ async fn send_turn_past_canned_responses_fails() {
     adapter.start_session(session_config()).await.unwrap();
 
     adapter.send_turn("first").await.unwrap();
-    let _ = adapter.stream_events().collect::<Vec<_>>().await;
+    let _ = adapter.stream_events().unwrap().collect::<Vec<_>>().await;
 
     let result = adapter.send_turn("second").await;
     assert!(
         result.is_err(),
         "should fail when canned responses exhausted"
+    );
+}
+
+// ── stream_events lifecycle errors ────────────────────────────────────
+
+#[tokio::test]
+async fn stream_events_without_send_turn_fails() {
+    let mut adapter = FakeAdapter::new(vec!["a".into()]);
+    adapter.start_session(session_config()).await.unwrap();
+
+    let result = adapter.stream_events();
+    assert!(
+        result.is_err(),
+        "stream_events before send_turn should fail"
+    );
+}
+
+#[tokio::test]
+async fn stream_events_consumed_twice_fails() {
+    let mut adapter = FakeAdapter::new(vec!["a".into()]);
+    adapter.start_session(session_config()).await.unwrap();
+    adapter.send_turn("q").await.unwrap();
+
+    // First consume succeeds
+    let _ = adapter.stream_events().unwrap().collect::<Vec<_>>().await;
+
+    // Second consume should fail (stream already taken)
+    let result = adapter.stream_events();
+    assert!(
+        result.is_err(),
+        "stream_events called twice should fail on second call"
     );
 }
 
@@ -120,7 +151,7 @@ async fn snapshot_returns_serializable_data() {
     adapter.start_session(session_config()).await.unwrap();
 
     adapter.send_turn("q").await.unwrap();
-    let _ = adapter.stream_events().collect::<Vec<_>>().await;
+    let _ = adapter.stream_events().unwrap().collect::<Vec<_>>().await;
 
     let snapshot = adapter.snapshot_state().await.unwrap();
     assert_eq!(snapshot.adapter_type, "fake");
@@ -138,9 +169,9 @@ async fn restore_state_resets_to_prior_position() {
 
     // Consume two turns.
     adapter.send_turn("q1").await.unwrap();
-    let _ = adapter.stream_events().collect::<Vec<_>>().await;
+    let _ = adapter.stream_events().unwrap().collect::<Vec<_>>().await;
     adapter.send_turn("q2").await.unwrap();
-    let _ = adapter.stream_events().collect::<Vec<_>>().await;
+    let _ = adapter.stream_events().unwrap().collect::<Vec<_>>().await;
 
     // Snapshot at index 2.
     let snap_at_2 = adapter.snapshot_state().await.unwrap();
@@ -156,7 +187,7 @@ async fn restore_state_resets_to_prior_position() {
     let handle = adapter.send_turn("q again").await.unwrap();
     assert_eq!(handle.turn_index, 1);
 
-    let events: Vec<AgentEvent> = adapter.stream_events().collect().await;
+    let events: Vec<AgentEvent> = adapter.stream_events().unwrap().collect().await;
     match &events[1] {
         AgentEvent::TurnComplete(text) => assert_eq!(text, "b"),
         other => panic!("expected TurnComplete('b'), got {other:?}"),
@@ -167,7 +198,7 @@ async fn restore_state_resets_to_prior_position() {
     let handle = adapter.send_turn("q3").await.unwrap();
     assert_eq!(handle.turn_index, 2);
 
-    let events: Vec<AgentEvent> = adapter.stream_events().collect().await;
+    let events: Vec<AgentEvent> = adapter.stream_events().unwrap().collect().await;
     match &events[1] {
         AgentEvent::TurnComplete(text) => assert_eq!(text, "c"),
         other => panic!("expected TurnComplete('c'), got {other:?}"),
