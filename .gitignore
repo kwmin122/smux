@@ -1,1 +1,5 @@
 .superpowers/
+
+# Rust
+/target
+Cargo.lock

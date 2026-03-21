@@ -1,0 +1,16 @@
+[package]
+name = "smux-cli"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "smux"
+path = "src/main.rs"
+
+[dependencies]
+smux-core = { path = "../smux-core" }
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+assert_cmd = "2"
