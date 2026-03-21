@@ -35,8 +35,9 @@ pub struct ClaudeHeadlessAdapter {
     turn_index: u64,
     /// Receiver for the most recent turn's event stream.
     current_rx: Arc<Mutex<Option<mpsc::Receiver<AgentEvent>>>>,
-    /// Handle to the running child process (if any), for termination.
-    child_handle: Option<tokio::process::Child>,
+    /// Shared handle to the running child process (if any), for termination.
+    /// Shared with the streaming task so terminate() can kill it mid-turn.
+    child_handle: Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>,
 }
 
 impl ClaudeHeadlessAdapter {
@@ -48,8 +49,8 @@ impl ClaudeHeadlessAdapter {
             system_prompt: String::new(),
             transcript: Vec::new(),
             turn_index: 0,
+            child_handle: Arc::new(tokio::sync::Mutex::new(None)),
             current_rx: Arc::new(Mutex::new(None)),
-            child_handle: None,
         }
     }
 
@@ -122,8 +123,11 @@ impl AgentAdapter for ClaudeHeadlessAdapter {
 
         let (tx, rx) = mpsc::channel::<AgentEvent>(64);
 
-        // Spawn a task to read stdout line-by-line and forward as events.
-        let mut child_for_wait = child;
+        // Store child in shared handle so terminate() can kill it mid-turn.
+        // stdout is already taken, so the child only has stderr + process handle.
+        *self.child_handle.lock().await = Some(child);
+
+        let child_handle = Arc::clone(&self.child_handle);
         tokio::spawn(async move {
             let reader = BufReader::new(stdout);
             let mut lines = reader.lines();
@@ -137,15 +141,19 @@ impl AgentAdapter for ClaudeHeadlessAdapter {
                 let _ = tx.send(AgentEvent::Chunk(line)).await;
             }
 
-            // Wait for the process to exit.
-            let exit_code = match child_for_wait.wait().await {
-                Ok(status) => status.code(),
-                Err(_) => None,
+            // stdout closed → process likely done. Take child to wait for exit.
+            let exit_code = if let Some(mut child) = child_handle.lock().await.take() {
+                match child.wait().await {
+                    Ok(status) => status.code(),
+                    Err(_) => None,
+                }
+            } else {
+                // terminate() already killed it
+                None
             };
 
             let _ = tx.send(AgentEvent::TurnComplete(full_output)).await;
             let _ = tx.send(AgentEvent::ProcessExited(exit_code)).await;
-            // tx drops here, closing the stream.
         });
 
         // Record in transcript.
@@ -201,10 +209,9 @@ impl AgentAdapter for ClaudeHeadlessAdapter {
     }
 
     async fn terminate(&mut self) -> Result<(), AdapterError> {
-        if let Some(ref mut child) = self.child_handle {
+        if let Some(mut child) = self.child_handle.lock().await.take() {
             let _ = child.kill().await;
         }
-        self.child_handle = None;
         self.session_started = false;
         *self.current_rx.lock().unwrap() = None;
         Ok(())
