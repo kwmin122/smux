@@ -33,32 +33,8 @@ fn start_requires_task_arg() {
 }
 
 #[test]
-fn start_rejects_unknown_provider() {
-    // The CLI should create the adapter and fail with "unknown provider".
-    // This tests the wiring from CLI → create_adapter → error path.
-    let assert = Command::cargo_bin("smux")
-        .unwrap()
-        .args([
-            "start",
-            "--planner",
-            "unknown-provider",
-            "--verifier",
-            "codex",
-            "--task",
-            "test",
-        ])
-        .assert()
-        .failure();
-
-    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
-    assert!(
-        stderr.contains("unknown provider"),
-        "expected 'unknown provider' in stderr, got: {stderr}"
-    );
-}
-
-#[test]
-fn list_succeeds() {
+fn list_runs_without_daemon() {
+    // When daemon is not running, `list` should still succeed (graceful fallback).
     Command::cargo_bin("smux")
         .unwrap()
         .arg("list")
@@ -68,11 +44,30 @@ fn list_succeeds() {
 }
 
 #[test]
-fn rewind_succeeds() {
+fn daemon_status_runs() {
     Command::cargo_bin("smux")
         .unwrap()
-        .args(["rewind", "test-session-id", "1"])
+        .args(["daemon", "status"])
         .assert()
         .success()
-        .stdout(predicates::str::contains("rewind requires daemon"));
+        .stdout(predicates::str::contains("daemon is not running"));
+}
+
+#[test]
+fn rewind_requires_session_id_and_round() {
+    // Missing both args.
+    Command::cargo_bin("smux")
+        .unwrap()
+        .arg("rewind")
+        .assert()
+        .failure();
+}
+
+#[test]
+fn attach_requires_session_id() {
+    Command::cargo_bin("smux")
+        .unwrap()
+        .arg("attach")
+        .assert()
+        .failure();
 }

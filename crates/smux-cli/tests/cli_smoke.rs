@@ -8,3 +8,12 @@ fn shows_help() {
         .assert()
         .success();
 }
+
+#[test]
+fn daemon_subcommand_help() {
+    Command::cargo_bin("smux")
+        .unwrap()
+        .args(["daemon", "--help"])
+        .assert()
+        .success();
+}

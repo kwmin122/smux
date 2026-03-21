@@ -1,0 +1,21 @@
+[package]
+name = "smux-daemon"
+version = "0.2.0"
+edition = "2024"
+
+[[bin]]
+name = "smux-daemon"
+path = "src/main.rs"
+
+[dependencies]
+smux-core = { path = "../smux-core" }
+tokio = { version = "1", features = ["net", "rt-multi-thread", "macros", "signal", "process", "sync", "io-util", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+dirs = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"
