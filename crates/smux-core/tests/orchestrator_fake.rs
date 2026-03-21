@@ -247,3 +247,65 @@ async fn context_passing_includes_prior_rounds() {
         "round 2 verifier prompt should include R1 reason"
     );
 }
+
+// VG-001: Test error path — adapter failure returns OrchestratorOutcome::Error
+#[tokio::test]
+async fn adapter_error_returns_outcome_error() {
+    // Planner has a response but verifier has NONE → verifier will fail on send_turn
+    let planner = FakeAdapter::new(vec!["my plan".into()]);
+    let verifier = FakeAdapter::new(vec![]); // no canned responses → error
+
+    let config = OrchestratorConfig {
+        task: "test error path".into(),
+        max_rounds: 5,
+        max_tokens: 4000,
+    };
+
+    let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);
+    let outcome = orch.run().await;
+
+    match &outcome {
+        OrchestratorOutcome::Error { message } => {
+            assert!(
+                !message.is_empty(),
+                "error message should be non-empty: {message}"
+            );
+        }
+        other => panic!("expected Error, got {other:?}"),
+    }
+}
+
+// VG-002: Test double-NeedsInfo fallback — verifier returns NeedsInfo twice → synthetic Rejected
+#[tokio::test]
+async fn double_needs_info_falls_back_to_rejected() {
+    // Planner: responds twice (for 2 rounds if needed)
+    // Verifier: two responses with no verdict → NeedsInfo twice
+    let planner = FakeAdapter::new(vec!["plan v1".into(), "plan v2".into()]);
+    let verifier = FakeAdapter::new(vec![
+        "I'm not sure about this.".into(), // Round 1: no verdict → NeedsInfo
+        "Still not sure.".into(),          // Re-ask: still NeedsInfo → synthetic Rejected
+        // Round 2: planner gets feedback, but we need a verifier response for round 2
+        r#"{"verdict":"APPROVED","reason":"ok now","confidence":0.9}"#.into(),
+    ]);
+
+    let config = OrchestratorConfig {
+        task: "test double needs-info".into(),
+        max_rounds: 5,
+        max_tokens: 4000,
+    };
+
+    let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);
+    let outcome = orch.run().await;
+
+    // Should eventually reach APPROVED in round 2 after the double-NeedsInfo in round 1
+    // was handled as a synthetic rejection
+    match &outcome {
+        OrchestratorOutcome::Approved { round, .. } => {
+            assert_eq!(
+                *round, 2,
+                "should approve at round 2 after synthetic rejection in R1"
+            );
+        }
+        other => panic!("expected Approved at round 2, got {other:?}"),
+    }
+}
