@@ -11,7 +11,7 @@ use smux_core::ipc::{
 };
 
 #[derive(Parser)]
-#[command(name = "smux", about = "AI-multiplexed terminal sessions")]
+#[command(name = "smux", version, about = "AI-multiplexed terminal sessions")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
