@@ -142,6 +142,7 @@ impl Orchestrator {
             let planner_output = match send_and_collect(&mut self.planner, &planner_prompt).await {
                 Ok(output) => output,
                 Err(e) => {
+                    tracing::error!(round, error = %e, "planner adapter failed");
                     return OrchestratorOutcome::Error {
                         message: format!("planner error in round {round}: {e}"),
                     };
@@ -164,10 +165,18 @@ impl Orchestrator {
             let verifier_prompt =
                 build_verifier_prompt(round, &planner_output, &prior_rounds, max_tokens);
 
+            tracing::debug!(
+                round,
+                prompt_tokens = crate::context::estimate_tokens(&verifier_prompt),
+                max_tokens,
+                "context passed to verifier"
+            );
+
             let verifier_output = match send_and_collect(&mut self.verifier, &verifier_prompt).await
             {
                 Ok(output) => output,
                 Err(e) => {
+                    tracing::error!(round, error = %e, "verifier adapter failed");
                     return OrchestratorOutcome::Error {
                         message: format!("verifier error in round {round}: {e}"),
                     };
@@ -212,6 +221,7 @@ impl Orchestrator {
                 }
                 // ── Step 9: NeedsInfo -> re-ask verifier once ──
                 VerifyResult::NeedsInfo { question } => {
+                    tracing::warn!(round, %question, "verifier returned NeedsInfo, re-asking");
                     let re_ask_prompt = format!(
                         "Please provide a clear verdict. Your previous response did not contain one.\n\
                          Question that arose: {question}\n\n\
@@ -223,6 +233,7 @@ impl Orchestrator {
                         match send_and_collect(&mut self.verifier, &re_ask_prompt).await {
                             Ok(output) => output,
                             Err(e) => {
+                                tracing::error!(round, error = %e, "verifier re-ask failed");
                                 return OrchestratorOutcome::Error {
                                     message: format!("verifier re-ask error in round {round}: {e}"),
                                 };
@@ -268,6 +279,10 @@ impl Orchestrator {
             }
         }
 
+        tracing::info!(
+            rounds_completed = self.config.max_rounds,
+            "max rounds reached without approval"
+        );
         OrchestratorOutcome::MaxRoundsReached {
             rounds_completed: self.config.max_rounds,
         }
@@ -308,19 +323,24 @@ async fn collect_stream(stream: crate::adapter::AgentEventStream<'_>) -> Result<
 
     while let Some(event) = stream.next().await {
         match event {
-            AgentEvent::Chunk(text) => {
-                chunks.push_str(&text);
+            AgentEvent::Chunk(ref text) => {
+                tracing::debug!(chunk_len = text.len(), "stream chunk received");
+                chunks.push_str(text);
             }
             AgentEvent::TurnComplete(text) => {
+                tracing::debug!(len = text.len(), "turn complete");
                 complete = Some(text);
             }
             AgentEvent::Error(e) => {
+                tracing::error!(error = %e, "agent stream error");
                 return Err(format!("agent error: {e}"));
             }
             AgentEvent::ProcessExited(code) => {
+                tracing::debug!(?code, "agent process exited");
                 if let Some(c) = code
                     && c != 0
                 {
+                    tracing::error!(code = c, "agent process exited with non-zero code");
                     return Err(format!("agent process exited with code {c}"));
                 }
             }

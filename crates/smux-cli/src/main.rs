@@ -81,6 +81,16 @@ enum DaemonAction {
 
 #[tokio::main]
 async fn main() {
+    // Initialize tracing. Use SMUX_LOG env var for filter (e.g. SMUX_LOG=debug).
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_env("SMUX_LOG")
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .compact()
+        .with_target(false)
+        .init();
+
     let cli = Cli::parse();
 
     match cli.command {

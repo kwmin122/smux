@@ -97,6 +97,12 @@ impl AgentAdapter for CodexHeadlessAdapter {
         }
 
         let full_prompt = self.build_full_prompt(prompt);
+        tracing::info!(
+            provider = "codex",
+            prompt_len = full_prompt.len(),
+            turn = self.turn_index,
+            "sending turn"
+        );
 
         let mut child = Command::new("npx")
             .args([
@@ -136,14 +142,25 @@ impl AgentAdapter for CodexHeadlessAdapter {
                     full_output.push('\n');
                 }
                 full_output.push_str(&line);
+                tracing::debug!(provider = "codex", line_len = line.len(), "stream chunk");
                 let _ = tx.send(AgentEvent::Chunk(line)).await;
             }
 
             // stdout closed → process likely done. Take child to wait for exit.
             let exit_code = if let Some(mut child) = child_handle.lock().await.take() {
                 match child.wait().await {
-                    Ok(status) => status.code(),
-                    Err(_) => None,
+                    Ok(status) => {
+                        if let Some(code) = status.code()
+                            && code != 0
+                        {
+                            tracing::error!(provider = "codex", code, "process exited with error");
+                        }
+                        status.code()
+                    }
+                    Err(e) => {
+                        tracing::error!(provider = "codex", error = %e, "failed to wait on process");
+                        None
+                    }
                 }
             } else {
                 None // terminate() already killed it

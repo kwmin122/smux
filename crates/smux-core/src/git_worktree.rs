@@ -51,6 +51,13 @@ pub fn create_worktree(repo_root: &Path, session_id: &str) -> Result<PathBuf, Sm
 
     git(&["worktree", "add", wt_str, "-b", &branch], repo_root)?;
 
+    tracing::info!(
+        session_id,
+        path = %worktree_path.display(),
+        branch = %branch,
+        "worktree created"
+    );
+
     Ok(worktree_path)
 }
 
@@ -72,6 +79,12 @@ pub fn remove_worktree(
 
     git(&["branch", "-D", &branch], repo_root)?;
 
+    tracing::info!(
+        session_id,
+        path = %worktree_path.display(),
+        "worktree removed"
+    );
+
     Ok(())
 }
 
@@ -90,13 +103,20 @@ pub fn commit_round(
     let message = format!("smux: round {round} — {verdict_summary}");
     git(&["commit", "-m", &message, "--allow-empty"], worktree_path)?;
 
-    head_sha(worktree_path)
+    let sha = head_sha(worktree_path)?;
+    tracing::info!(round, sha = %sha, verdict_summary, "round committed");
+    Ok(sha)
 }
 
 /// Rewind the worktree to a specific commit.
 ///
 /// Runs: `git -C <worktree> reset --hard <sha> && git -C <worktree> clean -fd`
 pub fn rewind_to(worktree_path: &Path, commit_sha: &str) -> Result<(), SmuxError> {
+    tracing::info!(
+        sha = %commit_sha,
+        path = %worktree_path.display(),
+        "rewinding worktree"
+    );
     git(&["reset", "--hard", commit_sha], worktree_path)?;
     git(&["clean", "-fd"], worktree_path)?;
     Ok(())

@@ -11,6 +11,8 @@ use std::sync::Arc;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::{Mutex, broadcast};
 
+use tracing_subscriber::fmt::writer::MakeWriterExt;
+
 use smux_core::config::SmuxConfig;
 use smux_core::ipc::{
     ClientMessage, DaemonMessage, IpcError, SessionInfo, default_pid_path, default_socket_path,
@@ -80,11 +82,20 @@ impl DaemonState {
 
 #[tokio::main]
 async fn main() {
+    // Set up file-based logging to ~/.smux/logs/daemon.log alongside stderr.
+    let log_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".smux/logs");
+    let _ = std::fs::create_dir_all(&log_dir);
+    let file_appender = tracing_appender::rolling::never(&log_dir, "daemon.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    let env_filter = tracing_subscriber::EnvFilter::try_from_env("SMUX_LOG")
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
     tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
+        .with_env_filter(env_filter)
+        .with_writer(std::io::stderr.and(non_blocking))
         .init();
 
     let socket_path = std::env::var("SMUX_SOCKET")

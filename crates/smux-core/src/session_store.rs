@@ -53,6 +53,7 @@ impl SessionStore {
 
     /// Save a round snapshot to disk.
     pub fn save_round(&self, snapshot: &RoundSnapshot) -> Result<(), SmuxError> {
+        tracing::debug!(round = snapshot.round, path = %self.round_path(snapshot.round).display(), "saving round snapshot");
         std::fs::create_dir_all(self.rounds_dir()).map_err(|e| {
             SmuxError::Storage(format!(
                 "failed to create rounds dir {}: {e}",
@@ -71,6 +72,7 @@ impl SessionStore {
 
     /// Load a specific round snapshot from disk.
     pub fn load_round(&self, round: u32) -> Result<RoundSnapshot, SmuxError> {
+        tracing::debug!(round, "loading round snapshot");
         let path = self.round_path(round);
         let data = std::fs::read_to_string(&path).map_err(|e| {
             SmuxError::Storage(format!("failed to read round file {}: {e}", path.display()))
@@ -112,6 +114,7 @@ impl SessionStore {
 
     /// Save session metadata to disk.
     pub fn save_session_meta(&self, meta: &SessionMeta) -> Result<(), SmuxError> {
+        tracing::debug!(path = %self.session_meta_path().display(), "saving session metadata");
         std::fs::create_dir_all(&self.base_dir).map_err(|e| {
             SmuxError::Storage(format!(
                 "failed to create session dir {}: {e}",
@@ -130,6 +133,7 @@ impl SessionStore {
 
     /// Load session metadata from disk.
     pub fn load_session_meta(&self) -> Result<SessionMeta, SmuxError> {
+        tracing::debug!(path = %self.session_meta_path().display(), "loading session metadata");
         let path = self.session_meta_path();
         let data = std::fs::read_to_string(&path).map_err(|e| {
             SmuxError::Storage(format!(

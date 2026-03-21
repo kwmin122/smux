@@ -99,6 +99,12 @@ impl AgentAdapter for ClaudeHeadlessAdapter {
         }
 
         let full_prompt = self.build_full_prompt(prompt);
+        tracing::info!(
+            provider = "claude",
+            prompt_len = full_prompt.len(),
+            turn = self.turn_index,
+            "sending turn"
+        );
 
         let mut child = Command::new("npx")
             .args([
@@ -138,14 +144,25 @@ impl AgentAdapter for ClaudeHeadlessAdapter {
                     full_output.push('\n');
                 }
                 full_output.push_str(&line);
+                tracing::debug!(provider = "claude", line_len = line.len(), "stream chunk");
                 let _ = tx.send(AgentEvent::Chunk(line)).await;
             }
 
             // stdout closed → process likely done. Take child to wait for exit.
             let exit_code = if let Some(mut child) = child_handle.lock().await.take() {
                 match child.wait().await {
-                    Ok(status) => status.code(),
-                    Err(_) => None,
+                    Ok(status) => {
+                        if let Some(code) = status.code()
+                            && code != 0
+                        {
+                            tracing::error!(provider = "claude", code, "process exited with error");
+                        }
+                        status.code()
+                    }
+                    Err(e) => {
+                        tracing::error!(provider = "claude", error = %e, "failed to wait on process");
+                        None
+                    }
                 }
             } else {
                 // terminate() already killed it
