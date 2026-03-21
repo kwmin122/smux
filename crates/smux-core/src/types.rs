@@ -72,17 +72,21 @@ pub enum AgentEvent {
 }
 
 /// Result of a verification step.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Shape matches the verifier verdict contract in the design spec:
+/// `{"verdict": "APPROVED"|"REJECTED", "category": "...", "reason": "...", "confidence": 0.0-1.0}`
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VerifyResult {
     /// The output passes verification.
-    Approved,
+    Approved { reason: String, confidence: f64 },
     /// The output is rejected for the given reason and category.
     Rejected {
         reason: String,
         category: RejectCategory,
+        confidence: f64,
     },
     /// More information is needed before a verdict can be made.
-    NeedsInfo(String),
+    NeedsInfo { question: String },
 }
 
 /// Why a verification was rejected.
