@@ -73,7 +73,7 @@ trait AgentAdapter: Send + Sync {
     async fn send_turn(&mut self, prompt: &str) -> Result<TurnHandle>;
 
     /// 진행 중인 응답의 이벤트 스트림 (token-by-token 또는 chunk)
-    fn stream_events(&self) -> impl Stream<Item = AgentEvent>;
+    fn stream_events(&self) -> Pin<Box<dyn Stream<Item = AgentEvent> + Send + '_>>;
 
     /// 현재 대화 상태를 직렬화 (rewind 복원용)
     async fn snapshot_state(&self) -> Result<SessionSnapshot>;
@@ -380,7 +380,7 @@ Tauri v2의 multi-webview 기능으로 각 패널이 별도 WebView.
 > 대신 **worktree 브랜치에 라운드마다 실제 commit**을 만든다.
 > 이렇게 하면:
 > - dirty 파일 포함 전체 상태가 정확히 보존됨
-> - `git checkout <commit>` 한 줄로 완전 복원
+> - `git reset --hard <commit> && git clean -fd`로 완전 복원
 > - worktree 브랜치이므로 main에 영향 없음
 > - `git log`로 라운드 히스토리 바로 확인
 
