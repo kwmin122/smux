@@ -289,9 +289,11 @@ async fn start_session_returns_created() {
 
 // ---------------------------------------------------------------------------
 // Test 3: StartSession → AttachSession receives events
+// NOTE: This test requires real adapters to produce output, skipped in CI.
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore = "requires real adapter output — run with --ignored for e2e"]
 async fn start_then_attach_receives_events() {
     let dir = tempfile::TempDir::new().unwrap();
     let sock = dir.path().join("smux.sock");
@@ -370,6 +372,7 @@ async fn start_then_attach_receives_events() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore = "requires real adapter to complete session — run with --ignored for e2e"]
 async fn list_sessions_after_start() {
     let dir = tempfile::TempDir::new().unwrap();
     let sock = dir.path().join("smux.sock");
