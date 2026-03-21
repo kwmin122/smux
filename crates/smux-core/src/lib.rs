@@ -3,6 +3,7 @@
 pub mod adapter;
 pub mod context;
 pub mod git_worktree;
+pub mod orchestrator;
 pub mod session_store;
 pub mod stop;
 pub mod types;
