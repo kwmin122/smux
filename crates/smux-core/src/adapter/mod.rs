@@ -1,7 +1,10 @@
 //! Agent adapter trait and implementations.
 
+pub mod claude;
+pub mod codex;
 pub mod fake;
 
+use std::path::PathBuf;
 use std::pin::Pin;
 
 use async_trait::async_trait;
@@ -65,4 +68,18 @@ pub enum AdapterError {
     Io(#[from] std::io::Error),
     #[error("{0}")]
     Other(String),
+}
+
+/// Create an adapter for the given provider name.
+///
+/// Supported providers: `"claude"`, `"codex"`.
+pub fn create_adapter(
+    provider: &str,
+    working_dir: PathBuf,
+) -> Result<Box<dyn AgentAdapter>, AdapterError> {
+    match provider {
+        "claude" => Ok(Box::new(claude::ClaudeHeadlessAdapter::new(working_dir))),
+        "codex" => Ok(Box::new(codex::CodexHeadlessAdapter::new(working_dir))),
+        _ => Err(AdapterError::Other(format!("unknown provider: {provider}"))),
+    }
 }
