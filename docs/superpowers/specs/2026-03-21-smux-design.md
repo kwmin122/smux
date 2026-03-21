@@ -61,37 +61,75 @@ smux가 두 에이전트 사이에서 **자동으로 컨텍스트를 전달**하
 3. **PTY** (최후 수단): 대화형 CLI만 가능, ANSI 파싱 필요, idle detection 불안정
 
 ```rust
-/// Provider별 최적 I/O 경로를 선택하는 adapter
+/// Provider별 capability를 선언하고, session lifecycle를 관리하는 adapter
 trait AgentAdapter: Send + Sync {
-    /// 에이전트에게 프롬프트를 보내고 완전한 응답을 받는다
-    async fn send_and_receive(&mut self, prompt: &str) -> Result<AgentResponse>;
+    /// 이 adapter가 지원하는 capability 목록
+    fn capabilities(&self) -> AdapterCapabilities;
 
-    /// 에이전트가 현재 응답 중인지 확인
-    fn is_responding(&self) -> bool;
+    /// 세션 시작 (선택적 이전 대화 컨텍스트 주입)
+    async fn start_session(&mut self, config: SessionConfig) -> Result<()>;
+
+    /// 하나의 턴을 전송하고, 이벤트 스트림으로 응답을 받는다
+    async fn send_turn(&mut self, prompt: &str) -> Result<TurnHandle>;
+
+    /// 진행 중인 응답의 이벤트 스트림 (token-by-token 또는 chunk)
+    fn stream_events(&self) -> impl Stream<Item = AgentEvent>;
+
+    /// 현재 대화 상태를 직렬화 (rewind 복원용)
+    async fn snapshot_state(&self) -> Result<SessionSnapshot>;
+
+    /// 직렬화된 상태에서 세션 복원 (rewind 후 재시작)
+    async fn restore_state(&mut self, snapshot: SessionSnapshot) -> Result<()>;
 
     /// 세션 종료
     async fn terminate(&mut self) -> Result<()>;
 }
 
-struct AgentResponse {
-    content: String,          // 순수 텍스트 응답
-    raw_output: String,       // 원본 (ANSI 포함)
-    duration: Duration,       // 응답 시간
-    token_estimate: usize,    // 토큰 추정치
+struct AdapterCapabilities {
+    persistent_session: bool,  // SDK: true, headless: false, PTY: true
+    streaming: bool,           // SDK: true, headless: false, PTY: true
+    native_snapshot: bool,     // SDK: true (대화 ID), headless: false, PTY: false
 }
 
-// Provider별 구현
-struct ClaudeSdkAdapter { /* claude-code-sdk 사용 */ }
-struct HeadlessCliAdapter { /* -p flag로 매번 새 프로세스 */ }
-struct PtyAdapter { /* PTY fallback */ }
+struct SessionConfig {
+    system_prompt: String,
+    working_directory: PathBuf,
+    prior_transcript: Option<Vec<Turn>>,  // rewind 복원 시 이전 대화
+}
 
-/// config에서 provider를 읽어 적절한 adapter 생성
+enum AgentEvent {
+    Chunk { text: String },           // 스트리밍 청크
+    TurnComplete { response: String, token_estimate: usize },
+    Error { message: String },
+    ProcessExited { code: i32 },
+}
+
+struct SessionSnapshot {
+    adapter_type: String,
+    /// SDK adapter: 대화 ID나 내부 상태
+    /// PTY adapter: canonical transcript (전체 턴 기록)
+    /// Headless adapter: 이전 턴의 prompt/response 목록
+    state: Vec<u8>,  // adapter별 opaque 직렬화
+}
+```
+
+> **Persistent session을 지원하지 않는 adapter (headless CLI)는 canonical transcript를 기반으로 다음 턴을 재구성한다.**
+> 즉 restore_state()가 호출되면 snapshot 안의 이전 대화를 시스템 프롬프트에 요약 삽입하여 문맥을 복원한다.
+> SDK adapter (Claude)는 네이티브 대화 세션을 유지하므로 대화 ID만 저장/복원하면 된다.
+> PTY adapter는 canonical transcript를 새 프로세스에 순차 재전송한다.
+
+```rust
+// Provider별 구현
+struct ClaudeSdkAdapter { /* claude-code-sdk: persistent session, native snapshot */ }
+struct HeadlessCliAdapter { /* -p flag: 매 턴 새 프로세스, transcript 기반 복원 */ }
+struct PtyAdapter { /* PTY: persistent session, transcript 기반 복원 */ }
+
 fn create_adapter(provider: &str) -> Box<dyn AgentAdapter> {
     match provider {
         "claude" => Box::new(ClaudeSdkAdapter::new()),
-        "codex"  => Box::new(PtyAdapter::new("codex")),  // SDK 없음, PTY 필요
+        "codex"  => Box::new(PtyAdapter::new("codex")),
         "gemini" => Box::new(HeadlessCliAdapter::new("gemini")),
-        custom   => Box::new(PtyAdapter::new(custom)),    // 미지 CLI는 PTY
+        custom   => Box::new(PtyAdapter::new(custom)),
     }
 }
 ```
@@ -362,45 +400,65 @@ struct RoundSnapshot {
 1. 매 라운드 종료 시:
    - `git add -A && git commit -m "smux: round N — {verdict}"` (worktree 브랜치)
    - 대화 컨텍스트를 `~/.smux/sessions/<id>/rounds/` 에 JSON 저장
-2. `[r]` 키 → 라운드 목록 → 선택 → `git reset --hard <commit>` + 컨텍스트 JSON 로드
-3. 복원된 라운드부터 새 에이전트 프로세스로 핑퐁 재개 (이전 컨텍스트 주입)
+   - adapter의 `snapshot_state()`로 세션 스냅샷 저장
+2. `[r]` 키 → 라운드 목록 → 선택 → 아래 복원 절차 실행
+3. 복원된 라운드부터 새 에이전트 프로세스로 핑퐁 재개 (`restore_state()`)
 4. 이후 라운드의 커밋은 `git reflog`에 남아 복구 가능
 
+**Rewind 복원 절차 (정확한 순서):**
+```bash
+# 1. tracked 파일을 지정 커밋으로 복원
+git reset --hard <commit>
+
+# 2. untracked 파일 제거 (이후 라운드에서 생긴 산출물)
+git clean -fd
+# -f: force, -d: 디렉토리 포함
+# .gitignore에 매칭되는 파일은 보존 (빌드 캐시 등)
+```
+
+> **설계 결정: `git clean -fd` (not `-fdx`)**
+>
+> `-fdx`는 .gitignore 파일까지 삭제한다 (node_modules, .env 등).
+> smux는 `-fd`를 기본값으로 쓴다 — ignored artifact는 보존.
+> config에서 `rewind_clean_ignored = true`로 `-fdx` 동작 선택 가능.
+
 **Rewind가 실제로 하는 일:**
-- 파일 시스템: worktree의 모든 파일이 해당 라운드 시점으로 복원
-- 에이전트: 현재 프로세스 종료 → 새 프로세스 시작 → 이전 대화 컨텍스트 시스템 프롬프트로 주입
+- 파일 시스템: tracked 파일 복원 + untracked artifact 제거 = 해당 라운드 시점의 정확한 상태
+- 에이전트: 현재 프로세스 종료 → 새 프로세스 시작 → `restore_state(snapshot)` 호출로 대화 상태 복원
 - 오케스트레이터: 라운드 카운터, phase 상태 복원
 
-### 2. Safety Guard (다층 방어)
+### 2. Safety Guard — Repository Integrity Protection
 
-> **설계 결정: 출력 문자열 스캔은 mitigation이지 root fix가 아님**
+**Scope:** smux의 safety는 **repository integrity**(저장소 안 파일의 의도치 않은 변경/삭제 방지)에 대한 structural protection이다.
+
+> **Non-goals (smux가 방어하지 않는 것)**
 >
-> 모델이 "rm -rf를 설명"하는 것과 "rm -rf를 실행"하는 것은 다르다.
-> 출력 텍스트만 보면 오탐(설명 텍스트를 차단)과 미탐(실제 실행을 놓침)이 모두 발생한다.
-> 따라서 **실행 경계(execution boundary)**에서 가로챈다.
+> smux는 네트워크 exfiltration, provider 자체 버그, 저장소 밖 부작용(외부 API 호출, secret 유출, 시스템 파일 변경)을 완전히 차단하지 않는다.
+> 이는 provider의 permission 시스템(Claude Code hooks, Codex approval mode)과 OS sandbox의 책임 범위다.
 
 **3층 방어:**
 
 ```
-Layer 1: Worktree Isolation (구조적)
-  → 에이전트는 worktree 안에서만 동작. main 브랜치 접근 불가.
-  → 최악의 경우에도 worktree 삭제로 완전 복원.
+Layer 1: Worktree Isolation (구조적, fail-closed)
+  → 모든 세션은 worktree 안에서만 동작. 비활성화 불가.
+  → worktree 생성 실패 시 세션 시작 자체를 거부한다 (worktree 없이 진행하지 않음).
+  → 최악의 경우에도 worktree 삭제로 저장소 완전 복원.
 
-Layer 2: Agent Permission (provider별)
+Layer 2: Agent Permission (provider별, 위임)
   → Claude Code: CLAUDE.md의 allowedTools + hooks로 명령어 제한
   → Codex: --approval-mode으로 실행 전 승인 요구
   → CLI별 자체 safety 기능을 활용 (smux가 재발명하지 않음)
 
-Layer 3: Post-hoc Audit (감시)
+Layer 3: Post-hoc Audit (감시, best-effort)
   → 라운드 종료 시 git diff를 검사
   → 삭제된 파일 수, 변경 규모 이상 감지
   → 이상 시 자동 rewind 제안 (강제하지 않음)
+  → 이 layer는 mitigation이며, 그 한계를 인정한다.
 ```
 
 ```rust
 struct SafetyConfig {
-    /// Layer 1: worktree는 항상 활성
-    worktree_isolation: bool,  // always true
+    // Layer 1: worktree는 항상 활성, config에 노출하지 않음 (fail-closed)
 
     /// Layer 2: provider별 permission 설정
     claude_allowed_tools: Vec<String>,
@@ -414,27 +472,25 @@ struct SafetyConfig {
 ```
 
 **동작:**
-- Layer 1: 세션 시작 시 자동 활성화, 사용자 비활성화 불가
+- Layer 1: 세션 시작 시 자동 활성화. worktree 생성 실패 → 세션 시작 실패 (fallback 없음)
 - Layer 2: config에서 provider별 설정, smux가 에이전트 시작 시 옵션 전달
 - Layer 3: 라운드 종료마다 `git diff --stat` 검사 → 임계값 초과 시 알림
 
-### 3. Self-Healing (AMUX 영감)
+### 3. Self-Healing (v0.5, AMUX 영감)
 
 ```rust
 enum AgentState {
     Working,
     WaitingForInput,
     Stuck { since: DateTime<Utc> },
-    ContextLow { percentage: u8 },
     Dead,
 }
 ```
 
 **동작:**
-- 컨텍스트 사용률 80%+ → 경고 표시
-- 컨텍스트 사용률 20% 이하 → 자동 `/compact` 전송
-- 30초 이상 응답 없음 → stuck 감지 → 재시작 + 마지막 메시지 재전송
-- 프로세스 crash → 자동 재시작
+- 30초 이상 이벤트 없음 → stuck 감지 → 사용자 알림 → kill + `restore_state()` 옵션
+- `AgentEvent::ProcessExited` 수신 → 자동 `restore_state(latest_snapshot)` → 새 프로세스
+- provider별 context management는 adapter 내부에서 처리 (smux 코어가 `/compact` 같은 provider-specific 명령을 직접 보내지 않음)
 
 ### 4. Diff Viewer (Superset 영감)
 
@@ -467,16 +523,17 @@ smux start → git worktree add .smux/worktrees/<session-id> -b smux/<session-id
 
 | Component | Failure | Detection | Recovery |
 |-----------|---------|-----------|----------|
-| Agent process | Crash/exit | PTY read returns EOF | 자동 재시작 + 마지막 메시지 재전송 |
-| Agent process | Hang (no output) | 30초 타임아웃 | 사용자에게 알림 → kill + 재시작 옵션 |
-| Stop detection | JSON 파싱 실패 | 정규식 fallback | 키워드 매칭 → 실패 시 수동 판정 요청 |
-| Stop detection | 모호한 응답 | 3차 감지 모두 실패 | 30초 내 수동 판정 → timeout 시 NeedsInfo |
-| Context passing | 출력이 4000 토큰 초과 | 토큰 카운터 | 자동 truncation + 요약 |
-| Rewind | git checkout 실패 (dirty) | git exit code | git stash → checkout → stash pop |
-| Rewind | tag가 없음 | tag 존재 확인 | 에러 메시지 + 사용 가능한 라운드 목록 |
+| Agent adapter | Process crash/exit | `AgentEvent::ProcessExited` | `restore_state(latest_snapshot)` → 새 프로세스로 재시작 |
+| Agent adapter | Hang (no events) | 30초 타임아웃 (config) | 사용자에게 알림 → kill + 재시작 옵션 |
+| Agent adapter | SDK API 에러 | HTTP status / SDK exception | 3회 재시도 → 실패 시 사용자 알림 |
+| Stop detection | JSON 파싱 실패 | verdict 블록 없음 | 키워드 정규식 fallback → 실패 시 수동 판정 요청 |
+| Stop detection | 모호한 응답 | 키워드도 매칭 안 됨 | 30초 내 수동 판정 → timeout 시 NeedsInfo → 재요청 |
+| Context passing | 출력 4000 토큰 초과 | 토큰 카운터 | 자동 truncation (마지막 1000토큰) + 이전 라운드 요약 |
+| Rewind | commit SHA 없음 | `git cat-file -t` 실패 | 에러 메시지 + 사용 가능한 라운드 목록 표시 |
+| Rewind | `git clean -fd` 후 빌드 깨짐 | 사용자 보고 | `rewind_clean_ignored = true` 안내 |
 | Browser panel | localhost 연결 실패 | HTTP health check | 재시도 3회 → 실패 시 패널 비활성화 + 알림 |
-| Git worktree | worktree 생성 실패 | git exit code | 기존 worktree cleanup → 재시도 → 실패 시 worktree 없이 진행 |
-| PTY | ANSI 파싱 에러 | malformed escape seq | 원본 바이트 보존 + 깨진 부분 skip |
+| Git worktree | worktree 생성 실패 | git exit code | 기존 worktree cleanup → 재시도 → **실패 시 세션 시작 거부** |
+| PTY adapter | ANSI 파싱 에러 | malformed escape seq | 원본 바이트 보존 + 깨진 부분 skip |
 
 ---
 
@@ -626,7 +683,6 @@ smux start \
   --task "fix authentication bug" \
   --max-rounds 10 \
   --phase plan \
-  --worktree auto \
   --browser on \
   --layout center
 
@@ -649,10 +705,11 @@ smux diff <session-id>       # 변경사항 보기
 max_rounds = 10
 browser = false
 layout = "center"       # center | right | bottom
-worktree = "auto"       # auto | manual | off
+# worktree는 항상 활성 (fail-closed). config에서 비활성화 불가.
 
 [agents.planner]
 default = "claude"
+adapter = "sdk"              # sdk | headless | pty (자동 감지 오버라이드)
 system_prompt = """
 You are the planner/executor. Generate plans and implement code.
 Think deeply before major decisions.
@@ -660,6 +717,7 @@ Think deeply before major decisions.
 
 [agents.verifier]
 default = "codex"
+adapter = "pty"              # codex는 SDK 미지원
 system_prompt = """
 You are the independent verifier. Your job is to catch:
 - Workarounds (mitigation) instead of root fixes
@@ -672,26 +730,32 @@ REQUIRED: End every response with a JSON verdict block:
 {"verdict": "APPROVED"|"REJECTED", "category": "...", "reason": "...", "confidence": 0.0-1.0}
 """
 
-[agents.patterns]
-claude = '^[❯›>\\$] '
+# PTY adapter 전용 설정
+[agents.pty_patterns]
 codex = '^[❯›>\\$] '
-gemini = '^[❯›>\\$] '
 custom = '^\\$ '
 
 [agents.idle]
-timeout_secs = 2            # 출력 멈춤 후 idle 판정까지
-max_response_secs = 300     # 최대 응답 대기 (5분)
+timeout_secs = 2            # PTY adapter: 출력 멈춤 후 idle 판정까지
+max_response_secs = 300     # 모든 adapter: 최대 응답 대기 (5분)
 
 [safety]
-block_dangerous = true
-dangerous_commands = ["rm -rf", "git push --force", "DROP TABLE"]
+# Layer 2: provider별 permission
+claude_allowed_tools = ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+codex_approval_mode = "suggest"  # "suggest" | "auto-edit" | "full-auto"
+
+# Layer 3: post-hoc audit 임계값
+max_files_deleted_per_round = 5
+max_lines_changed_per_round = 2000
+
+[rewind]
+clean_ignored = false        # true면 git clean -fdx (ignored 포함)
 
 [notifications]
 desktop = true
 sound = true
 
 [health]
-auto_compact_threshold = 20  # percent
 stuck_timeout = 30           # seconds
 auto_restart = true
 
@@ -715,8 +779,8 @@ cleanup_after_days = 7       # completed 세션 자동 삭제
 UI 없음. 터미널에 로그 출력. 성공 기준이 계량화되어 있음.
 
 - [ ] Rust 프로젝트 스캐폴딩 (cargo workspace)
-- [ ] `AgentAdapter` trait + `ClaudeSdkAdapter` 구현
-- [ ] `PtyAdapter` 구현 (Codex용) + idle detection
+- [ ] `AgentAdapter` trait (session/event 모델) + `ClaudeSdkAdapter` 구현
+- [ ] `PtyAdapter` 구현 (Codex용) + idle detection + `snapshot_state`/`restore_state`
 - [ ] 기본 핑퐁 루프 (Planner → Verifier → Planner → ...)
 - [ ] Stop detection (JSON verdict 파싱 + 키워드 fallback)
 - [ ] 기본 context passing (전체 출력, 최대 4000 토큰)
@@ -826,7 +890,7 @@ smux의 핑퐁 검증 패턴을 뒷받침하는 주요 연구:
 |--------|--------|-------------|
 | 핑퐁 완주 | 수동 개입 없이 5라운드 연속 | 10회 시도 중 8회 이상 |
 | Stop detection 정확도 | APPROVED/REJECTED 정확 판정 | 20개 샘플 중 16개+ 일치 |
-| Rewind 복원 정확도 | 파일 + 컨텍스트 100% 복원 | `git diff`로 0 diff 확인 |
+| Rewind 복원 정확도 | tracked + untracked 완전 복원 | `git diff` 0 diff + `git clean -n` 0 files |
 | Agent crash recovery | 자동 재시작 성공 | kill -9 후 30초 내 복구 |
 | Context passing | 핵심 정보 누락 없음 | 수동 리뷰 10건 중 8건+ 충분 |
 
