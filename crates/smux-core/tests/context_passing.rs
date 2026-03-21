@@ -40,7 +40,7 @@ fn short_planner_output_passed_through() {
     let prompt = build_verifier_prompt(1, "Everything looks good.", &[], 4000);
     assert!(prompt.contains("Everything looks good."));
     assert!(!prompt.contains("[truncated]"));
-    assert!(prompt.contains("VERIFIER ROUND 1"));
+    assert!(prompt.contains("[smux → Verifier, Round 1]"));
 }
 
 // ── build_verifier_prompt: long text truncated ──────────────────────────
@@ -50,7 +50,7 @@ fn long_planner_output_truncated() {
     // Create a very long planner output (well over 4000 tokens).
     let long_output = "a".repeat(40_000); // 40k ASCII chars = 10_000 tokens
     let prompt = build_verifier_prompt(3, &long_output, &[], 4000);
-    assert!(prompt.contains("[truncated]"));
+    assert!(prompt.contains("[truncated"));
     // The full 40k should NOT be present.
     assert!(prompt.len() < 40_000);
 }
@@ -77,16 +77,16 @@ fn prior_rounds_included_as_bullets() {
         ),
     ];
     let prompt = build_verifier_prompt(3, "plan v3", &prior, 4000);
-    assert!(prompt.contains("Prior rounds"));
-    assert!(prompt.contains("Round 1: REJECTED [weak_test]"));
-    assert!(prompt.contains("Round 2: APPROVED"));
+    assert!(prompt.contains("Previous Rounds Summary"));
+    assert!(prompt.contains("R1: REJECTED (weak_test)"));
+    assert!(prompt.contains("R2: APPROVED"));
     assert!(prompt.contains("Missing tests"));
 }
 
 #[test]
 fn empty_prior_rounds_no_summary_section() {
     let prompt = build_verifier_prompt(1, "first plan", &[], 4000);
-    assert!(!prompt.contains("Prior rounds"));
+    assert!(!prompt.contains("Previous Rounds Summary"));
 }
 
 // ── build_planner_feedback ──────────────────────────────────────────────
@@ -140,7 +140,7 @@ fn planner_feedback_long_output_truncated() {
         confidence: 0.9,
     };
     let feedback = build_planner_feedback(1, &long_output, &verdict, 4000);
-    assert!(feedback.contains("[truncated]"));
+    assert!(feedback.contains("[truncated"));
     assert!(feedback.len() < 40_000);
 }
 
@@ -161,6 +161,6 @@ fn korean_text_truncated_when_over_budget() {
     // Make Korean text that exceeds the budget.
     let korean = "한".repeat(20_000); // 20k Korean chars → 10_000 tokens
     let prompt = build_verifier_prompt(1, &korean, &[], 4000);
-    assert!(prompt.contains("[truncated]"));
+    assert!(prompt.contains("[truncated"));
     assert!(prompt.len() < 60_000); // 20k chars * 3 bytes each = 60k bytes
 }

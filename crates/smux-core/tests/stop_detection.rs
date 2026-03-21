@@ -185,6 +185,37 @@ fn keyword_fail_without_json() {
     assert!(matches!(result, VerifyResult::Rejected { .. }));
 }
 
+// ── Keyword word-boundary enforcement ──────────────────────────────────
+
+#[test]
+fn keyword_pass_does_not_match_password() {
+    let response = "Please reset your PASSWORD to continue.";
+    let result = detect(response);
+    // "PASSWORD" should NOT match "PASS"
+    assert!(matches!(result, VerifyResult::NeedsInfo { .. }));
+}
+
+#[test]
+fn keyword_fail_does_not_match_failsafe() {
+    let response = "The FAILSAFE mechanism triggered.";
+    let result = detect(response);
+    assert!(matches!(result, VerifyResult::NeedsInfo { .. }));
+}
+
+// ── Conflicting keywords ──────────────────────────────────────────────
+
+#[test]
+fn conflicting_keywords_rejection_takes_precedence() {
+    // When both approval and rejection keywords appear, rejection wins
+    // (conservative: don't auto-approve if any rejection signal exists)
+    let response = "Tests FAIL but the reviewer said APPROVED overall.";
+    let result = detect(response);
+    assert!(
+        matches!(result, VerifyResult::Rejected { .. }),
+        "rejection should take precedence over approval: got {result:?}"
+    );
+}
+
 // ── Tier 3: No signal ───────────────────────────────────────────────────
 
 #[test]

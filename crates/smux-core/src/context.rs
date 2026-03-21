@@ -6,10 +6,13 @@
 
 use crate::types::{RejectCategory, VerifyResult};
 
-/// Bytes-per-token for ASCII text.
+/// Characters-per-token for ASCII text.
 const ASCII_CHARS_PER_TOKEN: usize = 4;
-/// Bytes-per-token for non-ASCII text (CJK, etc.).
+/// Characters-per-token for non-ASCII text (CJK, etc.).
 const NON_ASCII_CHARS_PER_TOKEN: usize = 2;
+/// Average chars-per-token for truncation budget calculation.
+/// Conservative estimate (ASCII ratio) to avoid overshooting.
+const CHARS_PER_TOKEN: usize = ASCII_CHARS_PER_TOKEN;
 
 /// Default maximum tokens for a single round of context.
 pub const DEFAULT_MAX_TOKENS: usize = 4000;
@@ -40,51 +43,54 @@ pub fn estimate_tokens(text: &str) -> usize {
 ///
 /// If the text is already within budget, return it unchanged.
 /// Otherwise, keep the last `TAIL_KEEP_TOKENS` worth of characters and
-/// prepend `[truncated]`.
+/// prepend `[truncated — earlier content omitted]`.
+///
+/// Note: The spec (line 284) calls for AI-generated summaries of truncated
+/// content. This is deferred to v0.4 (Integrations milestone) because it
+/// requires an LLM call, which belongs in the orchestrator layer, not in
+/// this pure-logic module. The orchestrator can wrap this function and
+/// prepend an AI summary before the truncated tail.
 fn truncate_to_budget(text: &str, max_tokens: usize) -> String {
     if estimate_tokens(text) <= max_tokens {
         return text.to_string();
     }
-    // Keep tail: estimate how many characters correspond to TAIL_KEEP_TOKENS.
-    // Use the lower bound (ASCII ratio) so we don't overshoot.
-    let keep_chars = TAIL_KEEP_TOKENS * ASCII_CHARS_PER_TOKEN;
+    let keep_chars = TAIL_KEEP_TOKENS * CHARS_PER_TOKEN;
     let tail = tail_chars(text, keep_chars);
-    format!("[truncated]\n{tail}")
+    format!("[truncated — earlier content omitted, AI summary deferred to v0.4]\n{tail}")
 }
 
-/// Return up to the last `n` chars of `text`, split on a char boundary.
+/// Return up to the last `n` characters (not bytes) of `text`.
 fn tail_chars(text: &str, n: usize) -> &str {
-    if text.len() <= n {
+    let char_count = text.chars().count();
+    if char_count <= n {
         return text;
     }
-    // Walk forward until we're within `n` bytes of the end, respecting char
-    // boundaries.
-    let start = text.len() - n;
-    // Find the nearest char boundary at or after `start`.
-    let start = text
+    let skip = char_count - n;
+    // Find the byte offset of the (skip+1)th character.
+    let byte_offset = text
         .char_indices()
+        .nth(skip)
         .map(|(i, _)| i)
-        .find(|&i| i >= start)
         .unwrap_or(text.len());
-    &text[start..]
+    &text[byte_offset..]
 }
 
 /// Format a single prior-round summary as a bullet point.
+///
+/// Format matches spec: `- R1: REJECTED (mitigation) — reason`
 fn format_round_summary(round: u32, result: &VerifyResult) -> String {
     match result {
-        VerifyResult::Approved { reason, confidence } => {
-            format!("- Round {round}: APPROVED (confidence={confidence:.2}) — {reason}")
+        VerifyResult::Approved { reason, .. } => {
+            format!("- R{round}: APPROVED — {reason}")
         }
         VerifyResult::Rejected {
-            reason,
-            category,
-            confidence,
+            reason, category, ..
         } => {
             let cat = category_label(category);
-            format!("- Round {round}: REJECTED [{cat}] (confidence={confidence:.2}) — {reason}")
+            format!("- R{round}: REJECTED ({cat}) — {reason}")
         }
         VerifyResult::NeedsInfo { question } => {
-            format!("- Round {round}: NEEDS_INFO — {question}")
+            format!("- R{round}: NEEDS_INFO — {question}")
         }
     }
 }
@@ -102,18 +108,18 @@ fn category_label(cat: &RejectCategory) -> &'static str {
 
 /// Build the prompt sent to the verifier.
 ///
-/// Layout:
+/// Format matches the spec template (docs/superpowers/specs/2026-03-21-smux-design.md:288-301):
 /// ```text
-/// == VERIFIER ROUND {round} ==
+/// [smux → Verifier, Round 3]
 ///
-/// ## Prior rounds
-/// - Round 1: ...
-/// - Round 2: ...
+/// ## Previous Rounds Summary
+/// - R1: REJECTED (mitigation) — reason
 ///
-/// ## Planner output
+/// ## Current Round Context (from Planner)
 /// <planner_output, possibly truncated>
 ///
-/// Please respond with a JSON verdict: {"verdict": "APPROVED"|"REJECTED", ...}
+/// ## Your Task
+/// ...
 /// ```
 pub fn build_verifier_prompt(
     round: u32,
@@ -123,10 +129,10 @@ pub fn build_verifier_prompt(
 ) -> String {
     let mut sections: Vec<String> = Vec::new();
 
-    sections.push(format!("== VERIFIER ROUND {round} =="));
+    sections.push(format!("[smux → Verifier, Round {round}]"));
 
     if !prior_rounds.is_empty() {
-        let mut summary = String::from("\n## Prior rounds\n");
+        let mut summary = String::from("\n\n## Previous Rounds Summary\n");
         for (r, result) in prior_rounds {
             summary.push_str(&format_round_summary(*r, result));
             summary.push('\n');
@@ -134,13 +140,17 @@ pub fn build_verifier_prompt(
         sections.push(summary);
     }
 
-    sections.push(String::from("\n## Planner output\n"));
+    sections.push(String::from("\n## Current Round Context (from Planner)\n"));
 
     // Reserve tokens for the frame (header + prior rounds + footer).
     let frame = sections.join("");
     let frame_tokens = estimate_tokens(&frame);
-    // Footer is fixed text.
-    let footer = "\nPlease respond with a JSON verdict: {\"verdict\": \"APPROVED\"|\"REJECTED\", \"category\": \"...\", \"reason\": \"...\", \"confidence\": 0.0-1.0}";
+    let footer = concat!(
+        "\n## Your Task\n",
+        "위 계획/구현을 독립적으로 검증하세요.\n",
+        "반드시 마지막에 JSON verdict 블록을 포함하세요.\n",
+        "{\"verdict\": \"APPROVED\"|\"REJECTED\", \"category\": \"...\", \"reason\": \"...\", \"confidence\": 0.0-1.0}"
+    );
     let footer_tokens = estimate_tokens(footer);
     let available = max_tokens.saturating_sub(frame_tokens + footer_tokens);
 
@@ -254,6 +264,6 @@ mod tests {
         // Create text that is definitely over 10 tokens.
         let long_text = "a".repeat(200); // 200 ASCII chars = 50 tokens
         let result = truncate_to_budget(&long_text, 10);
-        assert!(result.starts_with("[truncated]\n"));
+        assert!(result.starts_with("[truncated"));
     }
 }

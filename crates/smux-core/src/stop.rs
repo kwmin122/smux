@@ -74,7 +74,10 @@ fn parse_verdict_json(text: &str) -> Option<VerifyResult> {
     match verdict.as_str() {
         "APPROVED" => Some(VerifyResult::Approved { reason, confidence }),
         "REJECTED" => {
-            // "root_fix" is not a rejection — treat as Approved.
+            // "root_fix" appears in the spec's JSON format (line 249) as a valid
+            // category value but is not a RejectCategory variant. A verdict of
+            // REJECTED + root_fix is semantically contradictory — the verifier
+            // confirmed a root fix, which means approval. Map to Approved.
             if category_str == "root_fix" {
                 return Some(VerifyResult::Approved { reason, confidence });
             }
@@ -138,24 +141,47 @@ fn map_category(s: &str) -> RejectCategory {
 
 // ── Tier 2: Keyword fallback ────────────────────────────────────────────
 
-/// Scan for approval/rejection keywords and return a `VerifyResult` with
-/// default confidence.
+/// Scan for approval/rejection keywords with word-boundary enforcement.
+///
+/// Uses simple word-boundary check: the keyword must not be preceded or
+/// followed by an alphanumeric character. This prevents "PASSWORD" from
+/// matching "PASS".
 fn try_keyword_fallback(response: &str) -> Option<VerifyResult> {
     let upper = response.to_uppercase();
-    if upper.contains("APPROVED") || upper.contains("PASS") {
-        return Some(VerifyResult::Approved {
-            reason: "Detected approval keyword in response".into(),
-            confidence: DEFAULT_KEYWORD_CONFIDENCE,
-        });
-    }
-    if upper.contains("REJECTED") || upper.contains("FAIL") {
+
+    // Check rejection first — if both present, rejection takes precedence
+    // (conservative: if there's any rejection signal, don't auto-approve)
+    if has_word(&upper, "REJECTED") || has_word(&upper, "FAIL") {
         return Some(VerifyResult::Rejected {
             reason: "Detected rejection keyword in response".into(),
             category: RejectCategory::IncompleteImpl,
             confidence: DEFAULT_KEYWORD_CONFIDENCE,
         });
     }
+    if has_word(&upper, "APPROVED") || has_word(&upper, "PASS") {
+        return Some(VerifyResult::Approved {
+            reason: "Detected approval keyword in response".into(),
+            confidence: DEFAULT_KEYWORD_CONFIDENCE,
+        });
+    }
     None
+}
+
+/// Check if `word` appears in `text` as a whole word (not as a substring).
+fn has_word(text: &str, word: &str) -> bool {
+    let mut start = 0;
+    while let Some(pos) = text[start..].find(word) {
+        let abs_pos = start + pos;
+        let before_ok = abs_pos == 0 || !text.as_bytes()[abs_pos - 1].is_ascii_alphanumeric();
+        let after_pos = abs_pos + word.len();
+        let after_ok =
+            after_pos >= text.len() || !text.as_bytes()[after_pos].is_ascii_alphanumeric();
+        if before_ok && after_ok {
+            return true;
+        }
+        start = abs_pos + 1;
+    }
+    false
 }
 
 #[cfg(test)]
