@@ -19,6 +19,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::{AdapterError, AgentAdapter, AgentEventStream};
+use crate::config::SafetyConfig;
 use crate::types::{
     AdapterCapabilities, AgentEvent, SessionConfig, SessionSnapshot, Turn, TurnHandle,
 };
@@ -38,6 +39,8 @@ pub struct ClaudeHeadlessAdapter {
     /// Shared handle to the running child process (if any), for termination.
     /// Shared with the streaming task so terminate() can kill it mid-turn.
     child_handle: Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>,
+    /// Safety configuration for permission flag generation (Layer 2).
+    safety_config: Option<SafetyConfig>,
 }
 
 impl ClaudeHeadlessAdapter {
@@ -51,6 +54,21 @@ impl ClaudeHeadlessAdapter {
             turn_index: 0,
             child_handle: Arc::new(tokio::sync::Mutex::new(None)),
             current_rx: Arc::new(Mutex::new(None)),
+            safety_config: None,
+        }
+    }
+
+    /// Create a new adapter with safety config for permission flag generation.
+    pub fn with_safety(working_dir: PathBuf, safety_config: SafetyConfig) -> Self {
+        Self {
+            session_started: false,
+            working_dir,
+            system_prompt: String::new(),
+            transcript: Vec::new(),
+            turn_index: 0,
+            child_handle: Arc::new(tokio::sync::Mutex::new(None)),
+            current_rx: Arc::new(Mutex::new(None)),
+            safety_config: Some(safety_config),
         }
     }
 
@@ -106,15 +124,32 @@ impl AgentAdapter for ClaudeHeadlessAdapter {
             "sending turn"
         );
 
+        // Build CLI args: base flags + safety permission flags (Layer 2).
+        let mut cli_args = vec![
+            "@anthropic-ai/claude-code".to_string(),
+            "-p".to_string(),
+            "--output-format".to_string(),
+            "text".to_string(),
+        ];
+
+        if let Some(ref safety) = self.safety_config {
+            let perm_args = crate::safety::claude_permission_args(safety);
+            if perm_args.is_empty() {
+                // No explicit permissions configured — fall back to skip.
+                cli_args.push("--dangerously-skip-permissions".to_string());
+            } else {
+                cli_args.extend(perm_args);
+            }
+        } else {
+            // No safety config — legacy behaviour.
+            cli_args.push("--dangerously-skip-permissions".to_string());
+        }
+
+        cli_args.push(full_prompt.clone());
+
+        let arg_refs: Vec<&str> = cli_args.iter().map(|s| s.as_str()).collect();
         let mut child = Command::new("npx")
-            .args([
-                "@anthropic-ai/claude-code",
-                "-p",
-                "--output-format",
-                "text",
-                "--dangerously-skip-permissions",
-                &full_prompt,
-            ])
+            .args(&arg_refs)
             .current_dir(&self.working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

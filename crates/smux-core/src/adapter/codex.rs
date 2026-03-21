@@ -18,6 +18,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use super::{AdapterError, AgentAdapter, AgentEventStream};
+use crate::config::SafetyConfig;
 use crate::types::{
     AdapterCapabilities, AgentEvent, SessionConfig, SessionSnapshot, Turn, TurnHandle,
 };
@@ -36,6 +37,8 @@ pub struct CodexHeadlessAdapter {
     current_rx: Arc<Mutex<Option<mpsc::Receiver<AgentEvent>>>>,
     /// Shared handle to the running child process (if any), for termination.
     child_handle: Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>,
+    /// Safety configuration for permission flag generation (Layer 2).
+    safety_config: Option<SafetyConfig>,
 }
 
 impl CodexHeadlessAdapter {
@@ -49,6 +52,21 @@ impl CodexHeadlessAdapter {
             turn_index: 0,
             current_rx: Arc::new(Mutex::new(None)),
             child_handle: Arc::new(tokio::sync::Mutex::new(None)),
+            safety_config: None,
+        }
+    }
+
+    /// Create a new adapter with safety config for permission flag generation.
+    pub fn with_safety(working_dir: PathBuf, safety_config: SafetyConfig) -> Self {
+        Self {
+            session_started: false,
+            working_dir,
+            system_prompt: String::new(),
+            transcript: Vec::new(),
+            turn_index: 0,
+            current_rx: Arc::new(Mutex::new(None)),
+            child_handle: Arc::new(tokio::sync::Mutex::new(None)),
+            safety_config: Some(safety_config),
         }
     }
 
@@ -104,16 +122,29 @@ impl AgentAdapter for CodexHeadlessAdapter {
             "sending turn"
         );
 
+        // Build CLI args: base command + safety permission flags (Layer 2).
+        let mut cli_args = vec!["@openai/codex".to_string(), "exec".to_string()];
+
+        if let Some(ref safety) = self.safety_config {
+            let perm_args = crate::safety::codex_permission_args(safety);
+            if perm_args.is_empty() {
+                // No explicit permissions — fall back to defaults.
+                cli_args.extend(["-a".to_string(), "never".to_string()]);
+                cli_args.extend(["-s".to_string(), "workspace-write".to_string()]);
+            } else {
+                cli_args.extend(perm_args);
+            }
+        } else {
+            // No safety config — legacy behaviour.
+            cli_args.extend(["-a".to_string(), "never".to_string()]);
+            cli_args.extend(["-s".to_string(), "workspace-write".to_string()]);
+        }
+
+        cli_args.push(full_prompt.clone());
+
+        let arg_refs: Vec<&str> = cli_args.iter().map(|s| s.as_str()).collect();
         let mut child = Command::new("npx")
-            .args([
-                "@openai/codex",
-                "exec",
-                "-a",
-                "never",
-                "-s",
-                "workspace-write",
-                &full_prompt,
-            ])
+            .args(&arg_refs)
             .current_dir(&self.working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

@@ -475,6 +475,16 @@ fn spawn_session(
                             content: state.clone(),
                         });
                     }
+                    OrchestratorEvent::SafetyAlert {
+                        round,
+                        severity,
+                        message,
+                    } => {
+                        let _ = broadcast_tx.send(DaemonMessage::AgentOutput {
+                            role: format!("safety:{severity}"),
+                            content: format!("[round {round}] {message}"),
+                        });
+                    }
                 }
             }
         });

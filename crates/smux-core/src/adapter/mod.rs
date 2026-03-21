@@ -10,6 +10,7 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use futures::Stream;
 
+use crate::config::SafetyConfig;
 use crate::types::{AdapterCapabilities, AgentEvent, SessionConfig, SessionSnapshot, TurnHandle};
 
 /// A boxed, pinned, Send stream of [`AgentEvent`]s.
@@ -80,6 +81,28 @@ pub fn create_adapter(
     match provider {
         "claude" => Ok(Box::new(claude::ClaudeHeadlessAdapter::new(working_dir))),
         "codex" => Ok(Box::new(codex::CodexHeadlessAdapter::new(working_dir))),
+        _ => Err(AdapterError::Other(format!("unknown provider: {provider}"))),
+    }
+}
+
+/// Create an adapter for the given provider name with safety configuration
+/// (Layer 2 permission flags).
+///
+/// Supported providers: `"claude"`, `"codex"`.
+pub fn create_adapter_with_safety(
+    provider: &str,
+    working_dir: PathBuf,
+    safety_config: SafetyConfig,
+) -> Result<Box<dyn AgentAdapter>, AdapterError> {
+    match provider {
+        "claude" => Ok(Box::new(claude::ClaudeHeadlessAdapter::with_safety(
+            working_dir,
+            safety_config,
+        ))),
+        "codex" => Ok(Box::new(codex::CodexHeadlessAdapter::with_safety(
+            working_dir,
+            safety_config,
+        ))),
         _ => Err(AdapterError::Other(format!("unknown provider: {provider}"))),
     }
 }

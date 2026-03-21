@@ -7,6 +7,7 @@ pub mod git_worktree;
 pub mod health;
 pub mod ipc;
 pub mod orchestrator;
+pub mod safety;
 pub mod session_store;
 pub mod stop;
 pub mod types;

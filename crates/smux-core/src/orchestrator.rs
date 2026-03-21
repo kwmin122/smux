@@ -27,6 +27,12 @@ pub enum OrchestratorEvent {
     RoundComplete { round: u32, verdict: VerifyResult },
     /// An agent health state changed.
     HealthStateChanged { agent: String, state: String },
+    /// A post-hoc safety audit alert was triggered (Layer 3).
+    SafetyAlert {
+        round: u32,
+        severity: String,
+        message: String,
+    },
 }
 
 /// Configuration for an orchestrator run.
