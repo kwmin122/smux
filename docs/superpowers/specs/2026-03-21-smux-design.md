@@ -129,7 +129,7 @@ struct SessionSnapshot {
 
 > **Persistent session을 지원하지 않는 adapter (headless CLI)는 canonical transcript를 기반으로 다음 턴을 재구성한다.**
 > 즉 restore_state()가 호출되면 snapshot 안의 이전 대화를 시스템 프롬프트에 요약 삽입하여 문맥을 복원한다.
-> SDK adapter (Claude)는 네이티브 대화 세션을 유지하므로 대화 ID만 저장/복원하면 된다.
+> Claude와 Codex의 v0.1 adapter는 모두 headless CLI 기반이므로 이 경로를 따른다.
 > PTY adapter는 canonical transcript를 새 프로세스에 순차 재전송한다.
 
 ```rust
@@ -202,9 +202,9 @@ adapter = "pty"           # codex는 아직 SDK 없음
        +-------|-----------------|----------+
                |                 |
        +-------+------+  +------+--------+
-       | ClaudeSdk    |  | PtyAdapter    |
-       | Adapter      |  | (codex tty)   |
-       | (SDK 호출)    |  |               |
+       | Claude       |  | Codex         |
+       | Headless CLI |  | Headless CLI  |
+       | Adapter      |  | Adapter       |
        +--------------+  +---------------+
 ```
 
@@ -793,13 +793,14 @@ cleanup_after_days = 7       # completed 세션 자동 삭제
 
 ### v0.1 — Headless Prototype (2-3주)
 
-핵심: **Claude SDK ↔ Codex PTY 단일 페어로 자동 핑퐁이 동작한다.**
+핵심: **Claude headless CLI ↔ Codex headless CLI 단일 페어로 자동 핑퐁이 동작한다.**
 
 UI 없음. 터미널에 로그 출력. 성공 기준이 계량화되어 있음.
 
 - [ ] Rust 프로젝트 스캐폴딩 (cargo workspace)
-- [ ] `AgentAdapter` trait (session/event 모델) + `ClaudeSdkAdapter` 구현
-- [ ] `PtyAdapter` 구현 (Codex용) + idle detection + `snapshot_state`/`restore_state`
+- [ ] `AgentAdapter` trait (session/event 모델) + `HeadlessCliAdapter` 기반 구현
+- [ ] Claude `-p --output-format stream-json` parser/adapter 구현
+- [ ] Codex `exec --json` parser/adapter 구현
 - [ ] 기본 핑퐁 루프 (Planner → Verifier → Planner → ...)
 - [ ] Stop detection (JSON verdict 파싱 + 키워드 fallback)
 - [ ] 기본 context passing (전체 출력, 최대 4000 토큰)
