@@ -433,6 +433,7 @@ fn spawn_session(
             task,
             max_rounds,
             max_tokens: 0,
+            health_config: None,
         };
 
         // VG-008: Wire event streaming from orchestrator to daemon broadcast.
@@ -466,6 +467,12 @@ fn spawn_session(
                         let _ = broadcast_tx.send(DaemonMessage::RoundComplete {
                             round: *round,
                             verdict_summary: summary,
+                        });
+                    }
+                    OrchestratorEvent::HealthStateChanged { agent, state } => {
+                        let _ = broadcast_tx.send(DaemonMessage::AgentOutput {
+                            role: format!("health:{agent}"),
+                            content: state.clone(),
                         });
                     }
                 }

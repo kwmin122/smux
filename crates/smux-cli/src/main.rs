@@ -62,6 +62,13 @@ enum Commands {
         round: u32,
     },
 
+    /// List and recover orphaned/failed sessions
+    Recover {
+        /// Clean up sessions older than this many days
+        #[arg(long)]
+        cleanup_days: Option<u64>,
+    },
+
     /// Manage the daemon process
     Daemon {
         #[command(subcommand)]
@@ -339,6 +346,47 @@ async fn main() {
                 }
                 Err(e) => {
                     eprintln!("smux: receive error — {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        Commands::Recover { cleanup_days } => {
+            if let Some(days) = cleanup_days {
+                match smux_core::session_store::cleanup_old_sessions(days) {
+                    Ok(0) => println!("smux: no sessions older than {days} days to clean up"),
+                    Ok(n) => println!("smux: removed {n} session(s) older than {days} days"),
+                    Err(e) => {
+                        eprintln!("smux: cleanup failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            match smux_core::session_store::list_all_sessions() {
+                Ok(sessions) if sessions.is_empty() => {
+                    println!("smux: no sessions found in ~/.smux/sessions/");
+                }
+                Ok(sessions) => {
+                    println!(
+                        "{:<14} {:<12} {:<8} {:<8} {:<6} TASK",
+                        "ID", "STATUS", "PLANNER", "VERIFIER", "ROUND"
+                    );
+                    for s in &sessions {
+                        let status = format!("{:?}", s.status);
+                        println!(
+                            "{:<14} {:<12} {:<8} {:<8} {:<6} {}",
+                            s.id, status, s.planner, s.verifier, s.current_round, s.task
+                        );
+                    }
+                    println!();
+                    println!(
+                        "smux: {} session(s) found. Use `smux recover --cleanup-days N` to remove old ones.",
+                        sessions.len()
+                    );
+                }
+                Err(e) => {
+                    eprintln!("smux: failed to list sessions: {e}");
                     std::process::exit(1);
                 }
             }

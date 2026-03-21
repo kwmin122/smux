@@ -8,6 +8,7 @@ fn config(task: &str, max_rounds: u32) -> OrchestratorConfig {
         task: task.to_string(),
         max_rounds,
         max_tokens: 4000,
+        health_config: None,
     }
 }
 
@@ -374,6 +375,7 @@ async fn adapter_error_returns_outcome_error() {
         task: "test error path".into(),
         max_rounds: 5,
         max_tokens: 4000,
+        health_config: None,
     };
 
     let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);
@@ -407,6 +409,7 @@ async fn double_needs_info_falls_back_to_rejected() {
         task: "test double needs-info".into(),
         max_rounds: 5,
         max_tokens: 4000,
+        health_config: None,
     };
 
     let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);

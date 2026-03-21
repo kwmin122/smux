@@ -4,6 +4,7 @@ pub mod adapter;
 pub mod config;
 pub mod context;
 pub mod git_worktree;
+pub mod health;
 pub mod ipc;
 pub mod orchestrator;
 pub mod session_store;

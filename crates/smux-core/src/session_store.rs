@@ -10,6 +10,7 @@
 //! ```
 
 use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 
 use crate::SmuxError;
 use crate::types::{RoundSnapshot, SessionMeta};
@@ -145,4 +146,110 @@ impl SessionStore {
         serde_json::from_str(&data)
             .map_err(|e| SmuxError::Storage(format!("failed to parse session meta: {e}")))
     }
+}
+
+// ---------------------------------------------------------------------------
+// Free functions — operate on the sessions root directory
+// ---------------------------------------------------------------------------
+
+/// Return the root directory for all sessions (`~/.smux/sessions/`).
+fn sessions_root() -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    home.join(".smux/sessions")
+}
+
+/// List all sessions found in `~/.smux/sessions/`.
+///
+/// Returns metadata for every session whose `session.json` can be parsed.
+/// Sessions with unreadable/corrupt metadata are silently skipped.
+pub fn list_all_sessions() -> Result<Vec<SessionMeta>, SmuxError> {
+    list_all_sessions_in(&sessions_root())
+}
+
+/// List all sessions found under the given `root` directory.
+///
+/// Each immediate subdirectory of `root` is expected to contain a
+/// `session.json` file.
+pub fn list_all_sessions_in(root: &std::path::Path) -> Result<Vec<SessionMeta>, SmuxError> {
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+
+    let entries = std::fs::read_dir(root)
+        .map_err(|e| SmuxError::Storage(format!("failed to read sessions dir: {e}")))?;
+
+    let mut metas = Vec::new();
+    for entry in entries {
+        let entry =
+            entry.map_err(|e| SmuxError::Storage(format!("failed to read dir entry: {e}")))?;
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let meta_path = entry.path().join("session.json");
+        if !meta_path.exists() {
+            continue;
+        }
+        let data = match std::fs::read_to_string(&meta_path) {
+            Ok(d) => d,
+            Err(_) => continue, // skip unreadable
+        };
+        match serde_json::from_str::<SessionMeta>(&data) {
+            Ok(meta) => metas.push(meta),
+            Err(_) => continue, // skip corrupt
+        }
+    }
+
+    // Sort by created_at descending for consistent display.
+    metas.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(metas)
+}
+
+/// Delete sessions whose directory modification time is older than `max_age_days`.
+///
+/// Returns the number of sessions removed.
+pub fn cleanup_old_sessions(max_age_days: u64) -> Result<usize, SmuxError> {
+    cleanup_old_sessions_in(&sessions_root(), max_age_days)
+}
+
+/// Delete sessions under `root` whose directory modification time is older
+/// than `max_age_days`.
+pub fn cleanup_old_sessions_in(
+    root: &std::path::Path,
+    max_age_days: u64,
+) -> Result<usize, SmuxError> {
+    if !root.exists() {
+        return Ok(0);
+    }
+
+    let cutoff = SystemTime::now() - Duration::from_secs(max_age_days * 86400);
+    let entries = std::fs::read_dir(root)
+        .map_err(|e| SmuxError::Storage(format!("failed to read sessions dir: {e}")))?;
+
+    let mut removed = 0usize;
+    for entry in entries {
+        let entry =
+            entry.map_err(|e| SmuxError::Storage(format!("failed to read dir entry: {e}")))?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let modified = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .unwrap_or(SystemTime::now());
+
+        if modified < cutoff {
+            tracing::info!(path = %path.display(), "removing old session");
+            std::fs::remove_dir_all(&path).map_err(|e| {
+                SmuxError::Storage(format!(
+                    "failed to remove session dir {}: {e}",
+                    path.display()
+                ))
+            })?;
+            removed += 1;
+        }
+    }
+
+    Ok(removed)
 }

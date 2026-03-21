@@ -7,6 +7,7 @@ use futures::StreamExt;
 
 use crate::adapter::AgentAdapter;
 use crate::context::{DEFAULT_MAX_TOKENS, build_planner_feedback, build_verifier_prompt};
+use crate::health::{AgentHealth, HealthConfig, HealthMonitor};
 use crate::stop;
 use crate::types::{AgentEvent, SessionConfig, VerifyResult};
 
@@ -24,6 +25,8 @@ pub enum OrchestratorEvent {
     VerifierOutput { round: u32, content: String },
     /// A round completed with the given verdict.
     RoundComplete { round: u32, verdict: VerifyResult },
+    /// An agent health state changed.
+    HealthStateChanged { agent: String, state: String },
 }
 
 /// Configuration for an orchestrator run.
@@ -35,6 +38,8 @@ pub struct OrchestratorConfig {
     pub max_rounds: u32,
     /// Token budget for context passing (truncation threshold).
     pub max_tokens: usize,
+    /// Health monitoring configuration. `None` disables health monitoring.
+    pub health_config: Option<HealthConfig>,
 }
 
 /// Outcome of an orchestrator run.
@@ -131,15 +136,36 @@ impl Orchestrator {
             self.config.max_tokens
         };
 
+        // Set up health monitors.
+        let health_cfg = self.config.health_config.clone().unwrap_or_default();
+        let mut planner_health = HealthMonitor::new(health_cfg.clone());
+        let mut verifier_health = HealthMonitor::new(health_cfg);
+
         let mut prior_rounds: Vec<(u32, VerifyResult)> = Vec::new();
         let mut planner_prompt = self.config.task.clone();
+
+        // Track whether we already restarted each agent in the current round.
+        let mut planner_restarted_this_round: bool;
+        let mut verifier_restarted_this_round: bool;
 
         for round in 1..=self.config.max_rounds {
             tracing::info!(round, "starting round");
             self.emit(OrchestratorEvent::RoundStarted { round }).await;
 
+            planner_restarted_this_round = false;
+            verifier_restarted_this_round = false;
+
             // ── Step 1-2: Send task/feedback to planner and collect output ──
-            let planner_output = match send_and_collect(&mut self.planner, &planner_prompt).await {
+            let planner_output = match send_and_collect_with_health(
+                &mut self.planner,
+                &planner_prompt,
+                &mut planner_health,
+                "planner",
+                &mut planner_restarted_this_round,
+                &self.event_sink,
+            )
+            .await
+            {
                 Ok(output) => output,
                 Err(e) => {
                     tracing::error!(round, error = %e, "planner adapter failed");
@@ -172,7 +198,15 @@ impl Orchestrator {
                 "context passed to verifier"
             );
 
-            let verifier_output = match send_and_collect(&mut self.verifier, &verifier_prompt).await
+            let verifier_output = match send_and_collect_with_health(
+                &mut self.verifier,
+                &verifier_prompt,
+                &mut verifier_health,
+                "verifier",
+                &mut verifier_restarted_this_round,
+                &self.event_sink,
+            )
+            .await
             {
                 Ok(output) => output,
                 Err(e) => {
@@ -289,6 +323,91 @@ impl Orchestrator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Free functions — keep the borrow checker happy
+// ---------------------------------------------------------------------------
+
+/// Send a prompt to an adapter and collect the full response, updating health
+/// state. If the adapter fails and auto-restart is enabled (and we haven't
+/// already restarted this round), terminate + restart + re-send once.
+async fn send_and_collect_with_health(
+    adapter: &mut Box<dyn AgentAdapter>,
+    prompt: &str,
+    health: &mut HealthMonitor,
+    agent_name: &str,
+    restarted: &mut bool,
+    event_sink: &Option<tokio::sync::mpsc::Sender<OrchestratorEvent>>,
+) -> Result<String, String> {
+    match send_and_collect_recording(adapter, prompt, health).await {
+        Ok(output) => {
+            // Post-response health check.
+            let state = health.check();
+            if !matches!(state, AgentHealth::Healthy) {
+                let state_str = format!("{state:?}");
+                tracing::warn!(agent = agent_name, state = %state_str, "agent health degraded after response");
+                emit_event(
+                    event_sink,
+                    OrchestratorEvent::HealthStateChanged {
+                        agent: agent_name.to_string(),
+                        state: state_str,
+                    },
+                )
+                .await;
+            }
+            Ok(output)
+        }
+        Err(e) => {
+            health.check();
+            let should_restart = health.config().auto_restart && !*restarted;
+
+            if should_restart {
+                tracing::warn!(
+                    agent = agent_name,
+                    error = %e,
+                    "attempting auto-restart (1 retry/round)"
+                );
+                emit_event(
+                    event_sink,
+                    OrchestratorEvent::HealthStateChanged {
+                        agent: agent_name.to_string(),
+                        state: "Restarting".to_string(),
+                    },
+                )
+                .await;
+
+                *restarted = true;
+
+                // Terminate and restart the session.
+                let _ = adapter.terminate().await;
+                let restart_config = SessionConfig {
+                    system_prompt: format!("You are a {agent_name} agent."),
+                    working_directory: std::path::PathBuf::from("/tmp"),
+                    prior_transcript: vec![],
+                };
+                if let Err(re) = adapter.start_session(restart_config).await {
+                    return Err(format!("original error: {e}; restart failed: {re}"));
+                }
+                health.reset();
+
+                // Re-send the prompt.
+                send_and_collect_recording(adapter, prompt, health).await
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
+/// Emit an orchestrator event to the sink if configured.
+async fn emit_event(
+    sink: &Option<tokio::sync::mpsc::Sender<OrchestratorEvent>>,
+    event: OrchestratorEvent,
+) {
+    if let Some(tx) = sink {
+        let _ = tx.send(event).await;
+    }
+}
+
 /// Send a prompt to an adapter and collect the full response string.
 ///
 /// Gathers all `Chunk` events and the `TurnComplete` payload into a single
@@ -309,6 +428,26 @@ async fn send_and_collect(
         .map_err(|e| format!("stream_events failed: {e}"))?;
 
     collect_stream(stream).await
+}
+
+/// Like [`send_and_collect`] but also records events on the health monitor.
+async fn send_and_collect_recording(
+    adapter: &mut Box<dyn AgentAdapter>,
+    prompt: &str,
+    health: &mut HealthMonitor,
+) -> Result<String, String> {
+    adapter
+        .send_turn(prompt)
+        .await
+        .map_err(|e| format!("send_turn failed: {e}"))?;
+
+    health.record_event(); // turn accepted
+
+    let stream = adapter
+        .stream_events()
+        .map_err(|e| format!("stream_events failed: {e}"))?;
+
+    collect_stream_recording(stream, health).await
 }
 
 /// Collect all events from a stream into a single response string.
@@ -340,6 +479,49 @@ async fn collect_stream(stream: crate::adapter::AgentEventStream<'_>) -> Result<
                 if let Some(c) = code
                     && c != 0
                 {
+                    tracing::error!(code = c, "agent process exited with non-zero code");
+                    return Err(format!("agent process exited with code {c}"));
+                }
+            }
+        }
+    }
+
+    // Prefer TurnComplete (full output) over concatenated chunks.
+    Ok(complete.unwrap_or(chunks))
+}
+
+/// Collect all events from a stream into a single response string, recording
+/// each event on the health monitor.
+async fn collect_stream_recording(
+    stream: crate::adapter::AgentEventStream<'_>,
+    health: &mut HealthMonitor,
+) -> Result<String, String> {
+    let mut chunks = String::new();
+    let mut complete: Option<String> = None;
+
+    futures::pin_mut!(stream);
+
+    while let Some(event) = stream.next().await {
+        health.record_event();
+        match event {
+            AgentEvent::Chunk(ref text) => {
+                tracing::debug!(chunk_len = text.len(), "stream chunk received");
+                chunks.push_str(text);
+            }
+            AgentEvent::TurnComplete(text) => {
+                tracing::debug!(len = text.len(), "turn complete");
+                complete = Some(text);
+            }
+            AgentEvent::Error(e) => {
+                tracing::error!(error = %e, "agent stream error");
+                return Err(format!("agent error: {e}"));
+            }
+            AgentEvent::ProcessExited(code) => {
+                tracing::debug!(?code, "agent process exited");
+                if let Some(c) = code
+                    && c != 0
+                {
+                    health.mark_dead(Some(c));
                     tracing::error!(code = c, "agent process exited with non-zero code");
                     return Err(format!("agent process exited with code {c}"));
                 }
