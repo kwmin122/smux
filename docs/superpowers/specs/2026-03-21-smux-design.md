@@ -46,19 +46,33 @@ smux가 두 에이전트 사이에서 **자동으로 컨텍스트를 전달**하
 > 구조화된 경로가 이미 존재하는 provider에서 PTY를 쓰면 오히려 불안정해진다.
 > provider별 capability를 먼저 조사하고, 최적 경로를 선택하는 adapter 패턴을 쓴다.
 
-**Provider Capability Matrix:**
+**Provider Capability Matrix (validated 2026-03-21):**
 
-| Provider | Structured (SDK/API) | Headless CLI | Interactive (PTY) |
-|----------|---------------------|--------------|-------------------|
-| Claude Code | `claude-code-sdk` (Anthropic 공식) — 프로그래매틱 제어, 스트리밍, 구조화 출력 | `claude -p "prompt"` — 단발 | PTY 가능하나 불필요 |
-| Codex CLI | OpenAI API 직접 호출 가능 | `codex -q "prompt"` — 단발 | PTY 필요 (대화형) |
-| Gemini CLI | Gemini API 직접 호출 가능 | `gemini -p "prompt"` — 단발 | PTY 가능하나 불필요 |
-| Custom CLI | 없음 | 있을 수도 없을 수도 | PTY fallback |
+| Provider | Headless CLI (structured output) | Session continuation | Interactive (PTY) |
+|----------|--------------------------------|---------------------|-------------------|
+| Claude Code | `claude -p --output-format stream-json` — 스트리밍 구조화 출력 | `--session-id <uuid>`, `--resume`, `--continue` | PTY 가능하나 headless로 충분 |
+| Codex CLI | `codex exec --json` — JSONL 구조화 출력 | `codex resume`, `codex fork` | PTY 가능하나 exec로 충분 |
+| Gemini CLI | `gemini -p "prompt"` — 단발 (UNVERIFIED, v0.2) | UNVERIFIED | PTY 가능하나 불필요 |
+| Custom CLI | 있을 수도 없을 수도 | 없음 | PTY fallback |
 
-**Adapter 선택 우선순위:**
-1. **SDK/API** (가장 안정): 구조화된 입출력, 스트리밍, 에러 처리 내장
-2. **Headless CLI** (중간): 단발성이지만 깔끔한 출력, 라운드마다 새 프로세스
-3. **PTY** (최후 수단): 대화형 CLI만 가능, ANSI 파싱 필요, idle detection 불안정
+> **설계 변경 (2026-03-21 검증 결과):**
+>
+> 기존 스펙은 Claude를 SDK adapter, Codex를 PTY adapter로 분류했다.
+> 실제 검증 결과 **양쪽 모두 구조화된 headless CLI 모드**를 지원한다:
+> - Claude: `-p --output-format stream-json` (스트리밍 JSON)
+> - Codex: `exec --json` (JSONL 이벤트)
+>
+> 따라서 v0.1에서 PTY adapter는 불필요하다. 양쪽 모두 HeadlessCliAdapter로 충분하다.
+> PTY adapter는 headless 모드가 없는 Custom CLI를 위한 fallback으로 v0.2+에서 구현한다.
+>
+> `claude-code-sdk` (npm 패키지)의 Rust 접근성은 UNVERIFIED.
+> CLI headless 모드(`-p --output-format stream-json`)가 SDK와 동등한 기능을 제공하므로,
+> v0.1은 CLI headless adapter로 시작하고 SDK adapter는 성능 최적화가 필요할 때 추가한다.
+
+**Adapter 선택 우선순위 (수정):**
+1. **Headless CLI** (v0.1 기본): 구조화된 출력(stream-json/JSONL), 프로세스 관리 단순
+2. **SDK/API** (v0.3+, 최적화): 네이티브 세션, 더 낮은 오버헤드 (필요 시)
+3. **PTY** (v0.2+, fallback): headless 모드 없는 CLI만 해당
 
 ```rust
 /// Provider별 capability를 선언하고, session lifecycle를 관리하는 adapter
@@ -119,17 +133,18 @@ struct SessionSnapshot {
 > PTY adapter는 canonical transcript를 새 프로세스에 순차 재전송한다.
 
 ```rust
-// Provider별 구현
-struct ClaudeSdkAdapter { /* claude-code-sdk: persistent session, native snapshot */ }
-struct HeadlessCliAdapter { /* -p flag: 매 턴 새 프로세스, transcript 기반 복원 */ }
-struct PtyAdapter { /* PTY: persistent session, transcript 기반 복원 */ }
+// v0.1: 양쪽 모두 HeadlessCliAdapter
+struct ClaudeHeadlessAdapter { /* claude -p --output-format stream-json */ }
+struct CodexHeadlessAdapter { /* codex exec --json */ }
+// v0.2+: fallback
+struct PtyAdapter { /* PTY: headless 없는 CLI용 */ }
 
 fn create_adapter(provider: &str) -> Box<dyn AgentAdapter> {
     match provider {
-        "claude" => Box::new(ClaudeSdkAdapter::new()),
-        "codex"  => Box::new(PtyAdapter::new("codex")),
-        "gemini" => Box::new(HeadlessCliAdapter::new("gemini")),
-        custom   => Box::new(PtyAdapter::new(custom)),
+        "claude" => Box::new(ClaudeHeadlessAdapter::new()),
+        "codex"  => Box::new(CodexHeadlessAdapter::new()),
+        "gemini" => Box::new(ClaudeHeadlessAdapter::new_with_cmd("gemini", "-p")), // v0.2
+        custom   => Box::new(PtyAdapter::new(custom)),  // v0.2+ fallback
     }
 }
 ```
@@ -462,7 +477,9 @@ struct SafetyConfig {
 
     /// Layer 2: provider별 permission 설정
     claude_allowed_tools: Vec<String>,
-    codex_approval_mode: String,  // "suggest" | "auto-edit" | "full-auto"
+    claude_permission_mode: String,    // "auto" | "bypassPermissions" | "default" | ...
+    codex_approval_policy: String,     // "untrusted" | "on-request" | "never"
+    codex_sandbox_mode: String,        // "read-only" | "workspace-write" | "danger-full-access"
 
     /// Layer 3: post-hoc 감사 기준
     max_files_deleted_per_round: usize,   // 기본 5
@@ -709,7 +726,7 @@ layout = "center"       # center | right | bottom
 
 [agents.planner]
 default = "claude"
-adapter = "sdk"              # sdk | headless | pty (자동 감지 오버라이드)
+adapter = "headless"         # headless | pty (v0.1은 headless만)
 system_prompt = """
 You are the planner/executor. Generate plans and implement code.
 Think deeply before major decisions.
@@ -717,7 +734,7 @@ Think deeply before major decisions.
 
 [agents.verifier]
 default = "codex"
-adapter = "pty"              # codex는 SDK 미지원
+adapter = "headless"         # codex exec --json (구조화 출력 지원 확인됨)
 system_prompt = """
 You are the independent verifier. Your job is to catch:
 - Workarounds (mitigation) instead of root fixes
@@ -740,9 +757,11 @@ timeout_secs = 2            # PTY adapter: 출력 멈춤 후 idle 판정까지
 max_response_secs = 300     # 모든 adapter: 최대 응답 대기 (5분)
 
 [safety]
-# Layer 2: provider별 permission
+# Layer 2: provider별 permission (validated flags from capability-notes.md)
+claude_permission_mode = "auto"              # auto | bypassPermissions | default | ...
 claude_allowed_tools = ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
-codex_approval_mode = "suggest"  # "suggest" | "auto-edit" | "full-auto"
+codex_approval_policy = "on-request"         # untrusted | on-request | never
+codex_sandbox_mode = "workspace-write"       # read-only | workspace-write | danger-full-access
 
 # Layer 3: post-hoc audit 임계값
 max_files_deleted_per_round = 5
