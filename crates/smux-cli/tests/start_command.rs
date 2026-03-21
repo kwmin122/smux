@@ -47,24 +47,23 @@ fn start_requires_task_arg() {
 }
 
 #[test]
-fn list_runs_without_daemon() {
-    // When daemon is not running, `list` should still succeed (graceful fallback).
+fn list_runs_successfully() {
+    // `list` should succeed regardless of daemon state — it reads session files.
     Command::cargo_bin("smux")
         .unwrap()
         .arg("list")
         .assert()
-        .success()
-        .stdout(predicates::str::contains("no active sessions"));
+        .success();
 }
 
 #[test]
 fn daemon_status_runs() {
+    // `daemon status` should always succeed (shows running or not running).
     Command::cargo_bin("smux")
         .unwrap()
         .args(["daemon", "status"])
         .assert()
-        .success()
-        .stdout(predicates::str::contains("daemon is not running"));
+        .success();
 }
 
 #[test]
