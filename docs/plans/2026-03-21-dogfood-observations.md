@@ -128,7 +128,15 @@ Phase별로 다른 트리거:
    - 지금 경욱님이 매번 판단: "이 리뷰 결과 전체를 보내야 하나, Findings만?"
    - smux의 context passer가 이걸 자동으로 해야 함 (이미 스펙에 4000 토큰 제한 있음)
 
-2. **"모드"로 켜는 게 맞다**
+2. **verification-gate 프로토콜 = smux Verifier 엔진의 원형**
+   - verification-gate 스킬이 하는 일: build→fmt→lint→test→semantic review→zero-tolerance 판정
+   - smux Verifier가 해야 할 일: 정확히 같음
+   - 핵심 인사이트: **자동화 가능한 체크는 smux 코어가 직접 실행하고, Verifier LLM은 semantic review만 담당**
+   - 이렇게 분업하면: smux가 "cargo test 통과?" 같은 건 직접 확인하고, "이게 근본 해결인가?" 같은 판단만 Verifier에게 맡김
+   - verification-gate의 VG-NNN ID 체계, waive 프로토콜, 3-attempt escalation도 smux에 그대로 적용 가능
+   - **smux v0.4-0.5 스펙에 "Verification Engine" 섹션 추가 검토**
+
+3. **"모드"로 켜는 게 맞다**
    - `smux start --mode pingpong` 또는 세션 중 `/pingpong on`
    - 모드 OFF면 일반 터미널처럼 동작, ON이면 자동 핸드오프
 
