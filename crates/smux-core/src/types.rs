@@ -5,6 +5,61 @@ use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
+// ---------------------------------------------------------------------------
+// Round & session types (commit-per-round rewind)
+// ---------------------------------------------------------------------------
+
+/// Snapshot of a single round's outcome.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoundSnapshot {
+    /// Round number (1-based).
+    pub round: u32,
+    /// Git commit SHA captured after the round's changes were committed.
+    pub commit_sha: String,
+    /// Path to the planner context file used for this round.
+    pub planner_context_path: PathBuf,
+    /// Path to the verifier context file used for this round.
+    pub verifier_context_path: PathBuf,
+    /// The verifier's verdict for this round.
+    pub verdict: VerifyResult,
+    /// List of files changed in this round.
+    pub files_changed: Vec<String>,
+    /// ISO 8601 timestamp of when this round was committed.
+    pub timestamp: String,
+}
+
+/// Metadata for an entire smux session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionMeta {
+    /// Unique session identifier.
+    pub id: String,
+    /// Task description / goal.
+    pub task: String,
+    /// Planner adapter identifier (e.g. "claude", "codex").
+    pub planner: String,
+    /// Verifier adapter identifier.
+    pub verifier: String,
+    /// Current round number.
+    pub current_round: u32,
+    /// Session status.
+    pub status: SessionStatus,
+    /// Path to the git worktree for this session.
+    pub worktree_path: PathBuf,
+    /// ISO 8601 timestamp of when the session was created.
+    pub created_at: String,
+}
+
+/// Status of a smux session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SessionStatus {
+    /// The session is actively running rounds.
+    InProgress,
+    /// The session completed successfully (verifier approved).
+    Completed,
+    /// The session was rewound to a previous round.
+    Rewound,
+}
+
 /// Declares what an adapter implementation supports.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AdapterCapabilities {
