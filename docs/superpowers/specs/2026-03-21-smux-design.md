@@ -2,9 +2,9 @@
 
 ## Overview
 
-smux는 macOS 네이티브 앱으로, 여러 AI 코딩 에이전트(Claude Code, Codex CLI, Gemini CLI 등)를 **자동 핑퐁 검증 루프**로 연결하는 도구다.
+smux는 여러 AI 코딩 에이전트(Claude Code, Codex CLI, Gemini CLI 등)를 **자동 핑퐁 검증 루프**로 연결하는 macOS용 도구다. headless orchestrator core 위에 Tauri 네이티브 UI를 씌운 구조.
 
-기존 도구(cmux, Claude Squad, AMUX 등)는 에이전트 **병렬 실행**에 초점을 맞추지만, smux는 **"계획자 ↔ 검증자" 간 자동화된 adversarial debate 루프**를 핵심으로 한다. 이 패턴은 학술적으로 품질 향상이 입증되어 있다 (Du et al. 2023, AgentCoder 2023).
+기존 도구(cmux, Claude Squad, AMUX 등)는 에이전트 **병렬 실행**에 초점을 맞추지만, smux는 **"계획자 ↔ 검증자" 간 자동화된 adversarial debate 루프**를 핵심으로 한다. 유사한 패턴(생성자-검증자 분리, 다중 라운드 비판)이 코드 생성 품질을 높인다는 연구 결과가 있다 (Du et al. 2023, AgentCoder 2023). 다만 CLI orchestration 환경에서의 효과는 smux가 직접 검증해야 할 가설이다.
 
 ### Problem
 
@@ -25,106 +25,134 @@ smux가 두 에이전트 사이에서 **자동으로 컨텍스트를 전달**하
 
 | Component | Technology | Rationale |
 |-----------|-----------|-----------|
-| Backend | Rust | 시스템 도구 포지셔닝, 최고 성능, 메모리 안전성 |
-| App Shell | Tauri v2 | Rust 백엔드 + macOS WebKit, 바이너리 ~5-8MB |
-| Frontend | HTML/CSS/TypeScript (WebView) | Tauri WebView 안에서 렌더링, 터미널 스타일 UI |
-| Terminal Emulation | xterm.js (in WebView) | 에이전트 출력을 WebView 안에서 터미널처럼 렌더링 |
-| Browser Panel | macOS WebKit (WKWebView) | 내장 브라우저, Tauri multi-webview |
-| Agent I/O | PTY (pseudo-terminal) | 대화형 CLI를 가짜 터미널로 감싸서 제어 |
-| Platform | macOS only (Apple Silicon + Intel) | Tauri + WebKit 네이티브 최적화 |
+| Orchestrator Core | Rust (headless 라이브러리) | UI 없이 독립 실행 가능, 테스트 가능한 코어 |
+| Daemon | Rust (background process) | 세션 소유, PTY 유지, attach/detach 지원 |
+| App Shell | Tauri v2 (v0.3+) | Rust 백엔드 + macOS WebKit. v0.1-0.2는 터미널 출력 |
+| Frontend | HTML/CSS/TypeScript (v0.3+) | Tauri WebView, xterm.js, 내장 브라우저 |
+| Agent I/O | Provider Capability Adapter | provider별 최적 경로 선택 (아래 상세) |
+| Platform | macOS only (Apple Silicon + Intel) | 우선 macOS, Tauri로 크로스플랫폼 확장 가능 |
 
-> **설계 결정: Ratatui 대신 Tauri WebView**
+> **설계 결정: UI보다 오케스트레이션 코어가 먼저**
 >
-> Ratatui는 터미널(stdout)에 그리는 라이브러리이므로 Tauri의 WebView 안에서 직접 사용할 수 없다.
-> 따라서 UI 전체를 WebView(HTML/CSS/TS)로 구현하고, 터미널 느낌은 xterm.js + 모노스페이스 폰트로 재현한다.
-> 이 방식이 내장 브라우저 패널과도 자연스럽게 통합된다.
+> v0.1은 headless prototype. Tauri UI는 v0.3부터.
+> 이유: 핵심 리스크(agent I/O, stop detection, rewind)가 UI와 무관하게 검증되어야 한다.
+> headless core가 안정되면 UI는 그 위에 얹는 것이다.
 
-### Agent I/O Protocol
+### Agent I/O Protocol — Provider Capability Adapter
 
-> **설계 결정: stdin/stdout pipe 대신 PTY**
+> **설계 결정: PTY 단일화 대신 provider별 최적 경로**
 >
-> `claude --pipe` 같은 파이프 모드는 실제로 존재하지 않는다. 각 CLI의 실제 인터페이스:
-> - Claude Code: `claude -p "prompt"` (단발성), 대화형은 tty 필요
-> - Codex CLI: `codex --quiet` (단발성), 대화형은 tty 필요
-> - Gemini CLI: `gemini -p "prompt"` (단발성), 대화형은 tty 필요
->
-> 연속 대화를 위해 **PTY(pseudo-terminal) 에뮬레이션**을 사용한다.
-> smux가 가짜 터미널을 만들어 CLI가 "진짜 터미널에서 실행 중"이라고 착각하게 한다.
+> PTY를 모든 CLI의 기본 I/O로 쓰면 brittle하다. Claude Code SDK, Gemini headless 모드 등
+> 구조화된 경로가 이미 존재하는 provider에서 PTY를 쓰면 오히려 불안정해진다.
+> provider별 capability를 먼저 조사하고, 최적 경로를 선택하는 adapter 패턴을 쓴다.
+
+**Provider Capability Matrix:**
+
+| Provider | Structured (SDK/API) | Headless CLI | Interactive (PTY) |
+|----------|---------------------|--------------|-------------------|
+| Claude Code | `claude-code-sdk` (Anthropic 공식) — 프로그래매틱 제어, 스트리밍, 구조화 출력 | `claude -p "prompt"` — 단발 | PTY 가능하나 불필요 |
+| Codex CLI | OpenAI API 직접 호출 가능 | `codex -q "prompt"` — 단발 | PTY 필요 (대화형) |
+| Gemini CLI | Gemini API 직접 호출 가능 | `gemini -p "prompt"` — 단발 | PTY 가능하나 불필요 |
+| Custom CLI | 없음 | 있을 수도 없을 수도 | PTY fallback |
+
+**Adapter 선택 우선순위:**
+1. **SDK/API** (가장 안정): 구조화된 입출력, 스트리밍, 에러 처리 내장
+2. **Headless CLI** (중간): 단발성이지만 깔끔한 출력, 라운드마다 새 프로세스
+3. **PTY** (최후 수단): 대화형 CLI만 가능, ANSI 파싱 필요, idle detection 불안정
 
 ```rust
-struct AgentProcess {
-    pty: PtyPair,               // 가짜 터미널 쌍 (master/slave)
-    process: Child,             // CLI 프로세스
-    output_buffer: Vec<u8>,     // 출력 버퍼
-    ansi_parser: AnsiParser,    // ANSI escape 코드 파싱
+/// Provider별 최적 I/O 경로를 선택하는 adapter
+trait AgentAdapter: Send + Sync {
+    /// 에이전트에게 프롬프트를 보내고 완전한 응답을 받는다
+    async fn send_and_receive(&mut self, prompt: &str) -> Result<AgentResponse>;
+
+    /// 에이전트가 현재 응답 중인지 확인
+    fn is_responding(&self) -> bool;
+
+    /// 세션 종료
+    async fn terminate(&mut self) -> Result<()>;
 }
 
-impl AgentProcess {
-    /// 에이전트에게 메시지 전송 (PTY master에 쓰기)
-    fn send(&mut self, message: &str) -> Result<()>;
+struct AgentResponse {
+    content: String,          // 순수 텍스트 응답
+    raw_output: String,       // 원본 (ANSI 포함)
+    duration: Duration,       // 응답 시간
+    token_estimate: usize,    // 토큰 추정치
+}
 
-    /// 에이전트 출력 읽기 (PTY master에서 읽기)
-    /// ANSI 코드 파싱하여 순수 텍스트 + 스타일 분리
-    fn read_until_idle(&mut self, timeout: Duration) -> Result<AgentOutput>;
+// Provider별 구현
+struct ClaudeSdkAdapter { /* claude-code-sdk 사용 */ }
+struct HeadlessCliAdapter { /* -p flag로 매번 새 프로세스 */ }
+struct PtyAdapter { /* PTY fallback */ }
 
-    /// 에이전트가 입력 대기 중인지 감지
-    fn is_waiting_for_input(&self) -> bool;
+/// config에서 provider를 읽어 적절한 adapter 생성
+fn create_adapter(provider: &str) -> Box<dyn AgentAdapter> {
+    match provider {
+        "claude" => Box::new(ClaudeSdkAdapter::new()),
+        "codex"  => Box::new(PtyAdapter::new("codex")),  // SDK 없음, PTY 필요
+        "gemini" => Box::new(HeadlessCliAdapter::new("gemini")),
+        custom   => Box::new(PtyAdapter::new(custom)),    // 미지 CLI는 PTY
+    }
 }
 ```
 
-**Idle Detection (응답 완료 감지):**
-1. 출력 스트림이 일정 시간(2초) 멈추면 → idle 후보
-2. 프롬프트 패턴 감지 (CLI마다 다른 프롬프트 정규식)
-3. 두 조건 모두 충족 시 → "응답 완료"로 판정
+**Idle Detection (PTY adapter에서만 필요):**
+1. 출력 스트림 2초 정지 → idle 후보
+2. 프롬프트 패턴 정규식 매칭
+3. 두 조건 모두 → "응답 완료"
+4. SDK/Headless adapter에서는 불필요 — 함수 반환이 곧 완료
 
 ```toml
-# ~/.smux/config.toml — 에이전트별 프롬프트 패턴
-[agents.patterns]
-claude = "^[❯›>\\$] "        # Claude Code 프롬프트
-codex = "^[❯›>\\$] "         # Codex CLI 프롬프트
-gemini = "^[❯›>\\$] "        # Gemini CLI 프롬프트
-custom = "^\\$ "              # 커스텀 CLI 기본값
+# ~/.smux/config.toml — PTY adapter용 프롬프트 패턴
+[agents.pty_patterns]
+codex = "^[❯›>\\$] "
+custom = "^\\$ "
+
+# adapter 명시 오버라이드 (자동 감지 대신 수동 지정)
+[agents.planner]
+default = "claude"
+adapter = "sdk"           # sdk | headless | pty
+
+[agents.verifier]
+default = "codex"
+adapter = "pty"           # codex는 아직 SDK 없음
 ```
 
 ### System Diagram
 
 ```
-                      +---------------------------+
-                      |        smux App           |
-                      |       (Tauri v2)          |
-                      +--+----------+----------+--+
-                         |          |          |
-              +----------+--+  +----+----+  +--+----------+
-              | WebView:    |  | WebView:|  | WebView:    |
-              | Terminal UI |  | Browser |  | Terminal UI |
-              | (xterm.js)  |  | Panel   |  | (xterm.js)  |
-              | Planner     |  |         |  | Verifier    |
-              +------+------+  +---------+  +------+------+
-                     |                             |
-              +------+------+              +-------+------+
-              | Rust: PTY   |              | Rust: PTY    |
-              | Agent Ctrl  |              | Agent Ctrl   |
-              +------+------+              +-------+------+
-                     |                             |
-              +------+------+              +-------+------+
-              | claude (tty)|              | codex (tty)  |
-              | gemini (tty)|              | claude (tty) |
-              | any CLI     |              | any CLI      |
-              +-------------+              +--------------+
-                     |                             |
-                     +----------+--+---------------+
-                                |
-                     +----------+----------+
-                     |  Orchestrator Core  |
-                     |  (Rust)             |
-                     |                     |
-                     |  - Ping-Pong Engine |
-                     |  - Phase Manager    |
-                     |  - Stop Detector    |
-                     |  - Context Passer   |
-                     |  - Rewind System    |
-                     |  - Health Monitor   |
-                     +---------------------+
+  +---------+     +-----------+     +----------+
+  | smux CLI | or | Tauri GUI | or | 3rd party|
+  | (v0.1+)  |    | (v0.3+)   |    |          |
+  +----+-----+    +-----+-----+    +----+-----+
+       |               |                |
+       +-------+-------+-------+--------+
+               |  Unix Socket (IPC)  |
+       +-------+---------------------+-------+
+       |          smux-daemon                 |
+       |         (background process)         |
+       |                                      |
+       |  +------------------------------+   |
+       |  |     Orchestrator Core        |   |
+       |  |  - Ping-Pong Engine          |   |
+       |  |  - Phase Manager             |   |
+       |  |  - Stop Detector             |   |
+       |  |  - Context Passer            |   |
+       |  |  - Rewind System             |   |
+       |  |  - Health Monitor            |   |
+       |  +----+-----------------+-------+   |
+       |       |                 |           |
+       |  +----+-------+  +-----+--------+  |
+       |  | Planner    |  | Verifier     |  |
+       |  | Adapter    |  | Adapter      |  |
+       |  +----+-------+  +-----+--------+  |
+       +-------|-----------------|----------+
+               |                 |
+       +-------+------+  +------+--------+
+       | ClaudeSdk    |  | PtyAdapter    |
+       | Adapter      |  | (codex tty)   |
+       | (SDK 호출)    |  |               |
+       +--------------+  +---------------+
 ```
 
 ---
@@ -306,14 +334,24 @@ Tauri v2의 multi-webview 기능으로 각 패널이 별도 WebView.
 
 ### 1. Rewind (smux 고유)
 
-라운드별로 git tag + 대화 컨텍스트를 저장. 잘못된 방향이면 `[r]` 키로 되감기.
+라운드별로 **git commit** + 대화 컨텍스트를 저장. 잘못된 방향이면 `[r]` 키로 되감기.
+
+> **설계 결정: commit-per-round on worktree branch**
+>
+> git tag는 dirty worktree를 저장하지 않는다. stash는 스택 기반이라 불안정하다.
+> 대신 **worktree 브랜치에 라운드마다 실제 commit**을 만든다.
+> 이렇게 하면:
+> - dirty 파일 포함 전체 상태가 정확히 보존됨
+> - `git checkout <commit>` 한 줄로 완전 복원
+> - worktree 브랜치이므로 main에 영향 없음
+> - `git log`로 라운드 히스토리 바로 확인
 
 ```rust
 struct RoundSnapshot {
     round: u32,
-    git_tag: String,               // git tag smux/<session>/<round>
-    planner_context: String,       // planner 대화 (직렬화)
-    verifier_context: String,      // verifier 대화 (직렬화)
+    commit_sha: String,            // worktree 브랜치의 실제 커밋
+    planner_context_path: PathBuf, // sessions/<id>/rounds/round-N-planner.json
+    verifier_context_path: PathBuf,// sessions/<id>/rounds/round-N-verifier.json
     verdict: VerifyResult,
     files_changed: Vec<String>,
     timestamp: DateTime<Utc>,
@@ -321,35 +359,64 @@ struct RoundSnapshot {
 ```
 
 **동작:**
-1. 매 라운드 종료 시: `git tag smux/<session-id>/round-<N>` + 컨텍스트 JSON 저장
-2. `[r]` 키 → 라운드 목록 → 선택 → `git checkout <tag>` + 컨텍스트 복원
-3. 복원된 라운드부터 핑퐁 재개
-4. 이전 tag들은 유지 (히스토리 보존)
+1. 매 라운드 종료 시:
+   - `git add -A && git commit -m "smux: round N — {verdict}"` (worktree 브랜치)
+   - 대화 컨텍스트를 `~/.smux/sessions/<id>/rounds/` 에 JSON 저장
+2. `[r]` 키 → 라운드 목록 → 선택 → `git reset --hard <commit>` + 컨텍스트 JSON 로드
+3. 복원된 라운드부터 새 에이전트 프로세스로 핑퐁 재개 (이전 컨텍스트 주입)
+4. 이후 라운드의 커밋은 `git reflog`에 남아 복구 가능
 
-> **설계 결정: git stash 대신 git tag**
+**Rewind가 실제로 하는 일:**
+- 파일 시스템: worktree의 모든 파일이 해당 라운드 시점으로 복원
+- 에이전트: 현재 프로세스 종료 → 새 프로세스 시작 → 이전 대화 컨텍스트 시스템 프롬프트로 주입
+- 오케스트레이터: 라운드 카운터, phase 상태 복원
+
+### 2. Safety Guard (다층 방어)
+
+> **설계 결정: 출력 문자열 스캔은 mitigation이지 root fix가 아님**
 >
-> stash는 스택 기반이라 랜덤 접근이 불안정하고 GC될 수 있다.
-> git tag는 랜덤 접근 가능하고, 명시적이며, 세션 종료 후에도 영구 보존된다.
+> 모델이 "rm -rf를 설명"하는 것과 "rm -rf를 실행"하는 것은 다르다.
+> 출력 텍스트만 보면 오탐(설명 텍스트를 차단)과 미탐(실제 실행을 놓침)이 모두 발생한다.
+> 따라서 **실행 경계(execution boundary)**에서 가로챈다.
 
-### 2. Safety Guard (NTM 영감)
+**3층 방어:**
 
-위험 명령어 자동 감지 및 차단:
+```
+Layer 1: Worktree Isolation (구조적)
+  → 에이전트는 worktree 안에서만 동작. main 브랜치 접근 불가.
+  → 최악의 경우에도 worktree 삭제로 완전 복원.
+
+Layer 2: Agent Permission (provider별)
+  → Claude Code: CLAUDE.md의 allowedTools + hooks로 명령어 제한
+  → Codex: --approval-mode으로 실행 전 승인 요구
+  → CLI별 자체 safety 기능을 활용 (smux가 재발명하지 않음)
+
+Layer 3: Post-hoc Audit (감시)
+  → 라운드 종료 시 git diff를 검사
+  → 삭제된 파일 수, 변경 규모 이상 감지
+  → 이상 시 자동 rewind 제안 (강제하지 않음)
+```
 
 ```rust
-const DANGEROUS_COMMANDS: &[&str] = &[
-    "rm -rf",
-    "git push --force",
-    "git reset --hard",
-    "DROP TABLE",
-    "DELETE FROM",
-    "chmod 777",
-];
+struct SafetyConfig {
+    /// Layer 1: worktree는 항상 활성
+    worktree_isolation: bool,  // always true
+
+    /// Layer 2: provider별 permission 설정
+    claude_allowed_tools: Vec<String>,
+    codex_approval_mode: String,  // "suggest" | "auto-edit" | "full-auto"
+
+    /// Layer 3: post-hoc 감사 기준
+    max_files_deleted_per_round: usize,   // 기본 5
+    max_lines_changed_per_round: usize,   // 기본 2000
+    alert_on_threshold_breach: bool,       // 기본 true
+}
 ```
 
 **동작:**
-- 에이전트 출력에서 위험 명령어 감지 시 실행 중단
-- 사용자에게 확인 요청 (approve/deny)
-- Control Mode의 SAFETY 패널에 기록
+- Layer 1: 세션 시작 시 자동 활성화, 사용자 비활성화 불가
+- Layer 2: config에서 provider별 설정, smux가 에이전트 시작 시 옵션 전달
+- Layer 3: 라운드 종료마다 `git diff --stat` 검사 → 임계값 초과 시 알림
 
 ### 3. Self-Healing (AMUX 영감)
 
@@ -450,10 +517,44 @@ smux start → git worktree add .smux/worktrees/<session-id> -b smux/<session-id
 }
 ```
 
-### Session Discovery
+### Session Lifecycle — Daemon Architecture
 
-- `smux list`: `~/.smux/sessions/` 스캔 → status별 그룹핑
-- `smux attach <id>`: session.json 로드 → PTY 재연결 → UI 복원
+> **설계 결정: daemon이 세션을 소유한다**
+>
+> `smux attach`가 PTY에 재연결하려면, PTY를 소유하는 프로세스가 UI와 독립적으로 살아있어야 한다.
+> tmux가 tmux-server로 이걸 해결하듯, smux도 background daemon이 필요하다.
+
+```
+smux start → smux-daemon (background) 생성
+  daemon이 PTY + 에이전트 프로세스 + 오케스트레이션 소유
+  CLI/UI는 daemon에 IPC(Unix socket)로 연결
+
+smux attach → daemon의 Unix socket에 연결 → 스트림 수신
+smux detach → 연결만 끊기, daemon과 에이전트는 계속 실행
+smux gui → Tauri 앱이 daemon에 연결 (같은 IPC)
+```
+
+```rust
+// daemon ↔ client IPC 프로토콜
+enum ClientMessage {
+    Attach { session_id: String },
+    Detach,
+    Intervene { target: AgentRole, message: String },
+    Rewind { round: u32 },
+    GetStatus,
+}
+
+enum DaemonMessage {
+    AgentOutput { role: AgentRole, content: String },
+    RoundComplete { round: u32, verdict: VerifyResult },
+    SessionComplete { summary: String },
+    Error { message: String },
+}
+```
+
+**Session Discovery:**
+- `smux list`: daemon에 GetStatus 요청 → 활성 세션 목록
+- daemon이 죽은 경우: `~/.smux/sessions/` 파일 스캔 → "orphaned" 상태 표시
 - Cleanup: 7일 이상 된 completed 세션 자동 삭제 (config로 조절 가능)
 
 ---
@@ -482,7 +583,7 @@ Phase 2 E2E 검증 단계에서 자동 실행:
 2. smux가 agent-browser 트리거
 3. 내장 WebView에서 실제 앱 테스트 실시간 표시
 4. E2E 결과 → Verifier에게 전달
-5. 3-way verify: Code Review + Unit Test + E2E = 우회 불가능
+5. 3-way verify: Code Review + Unit Test + E2E (우회 가능성을 크게 줄임)
 
 ---
 
@@ -602,50 +703,81 @@ cleanup_after_days = 7       # completed 세션 자동 삭제
 
 ## Milestones
 
-### v0.1 — MVP (2-3주)
+> **설계 결정: headless first, UI later**
+>
+> 핵심 리스크(agent I/O adapter, stop detection, rewind)는 UI와 무관하게 검증되어야 한다.
+> v0.1은 headless orchestrator + 터미널 로그 출력. Tauri UI는 코어가 안정된 뒤.
 
-핵심: **두 에이전트 간 자동 핑퐁이 동작한다.**
+### v0.1 — Headless Prototype (2-3주)
+
+핵심: **Claude SDK ↔ Codex PTY 단일 페어로 자동 핑퐁이 동작한다.**
+
+UI 없음. 터미널에 로그 출력. 성공 기준이 계량화되어 있음.
+
+- [ ] Rust 프로젝트 스캐폴딩 (cargo workspace)
+- [ ] `AgentAdapter` trait + `ClaudeSdkAdapter` 구현
+- [ ] `PtyAdapter` 구현 (Codex용) + idle detection
+- [ ] 기본 핑퐁 루프 (Planner → Verifier → Planner → ...)
+- [ ] Stop detection (JSON verdict 파싱 + 키워드 fallback)
+- [ ] 기본 context passing (전체 출력, 최대 4000 토큰)
+- [ ] Git worktree isolation (세션마다 자동 생성)
+- [ ] Rewind (commit-per-round + 컨텍스트 JSON 저장/복원)
+- [ ] CLI: `smux start`, `smux list`, `smux rewind`
+- [ ] 터미널 출력: 양쪽 에이전트 로그 인터리브
+
+**v0.1 성공 기준 (계량):**
+- [ ] 수동 개입 없이 5라운드 핑퐁 완주 (claude ↔ codex)
+- [ ] stop detection 정확도: 10회 중 8회 이상 정확한 판정
+- [ ] rewind 후 이전 라운드 파일 상태 100% 복원 확인
+- [ ] 에이전트 crash 후 자동 재시작 성공
+
+### v0.2 — Daemon + Session (2주)
+
+핵심: **detach/attach가 가능한 persistent session.**
+
+- [ ] smux daemon (background process, PTY 소유)
+- [ ] `smux attach` / `smux detach` (tmux처럼)
+- [ ] Session persistence (daemon이 세션 상태 유지)
+- [ ] Safety Layer 2: provider별 permission 설정 전달
+- [ ] Safety Layer 3: post-hoc git diff 감사
+- [ ] HeadlessCliAdapter 구현 (Gemini용)
+- [ ] 3번째 provider 지원 검증
+
+### v0.3 — Tauri UI (3주)
+
+핵심: **headless core 위에 네이티브 앱 UI를 씌운다.**
 
 - [ ] Tauri v2 앱 스캐폴딩 (macOS)
-- [ ] PTY로 AI CLI 프로세스 제어 (spawn, read, write)
-- [ ] Idle detection (프롬프트 패턴 + 타임아웃)
-- [ ] 기본 핑퐁 루프 (Planner → Verifier → Planner → ...)
-- [ ] Stop detection (JSON verdict 파싱)
-- [ ] Focus Mode UI (좌우 분할, xterm.js)
-- [ ] 기본 context passing (전체 출력 전달)
-- [ ] CLI: `smux start`, `smux list`
-
-### v0.2 — Control & Safety (2주)
-
+- [ ] Focus Mode (좌우 분할, xterm.js)
 - [ ] Control Mode (가운데 관제 패널)
-- [ ] Rewind (git tag + 컨텍스트 스냅샷)
-- [ ] Safety Guard (위험 명령어 차단)
-- [ ] Git worktree isolation
-- [ ] Session persistence (attach/resume)
+- [ ] Diff viewer (WebView 렌더링)
+- [ ] macOS 알림 센터 연동
+- [ ] CLI에서 `smux gui`로 UI 실행
 
-### v0.3 — Browser & 3-Way (2주)
+### v0.4 — Browser & E2E (3주)
+
+핵심: **내장 브라우저 + 3-way verification.**
 
 - [ ] 내장 브라우저 패널 (Tauri multi-webview)
-- [ ] 패널 자유 배치 (드래그, 프리셋, 커스텀 저장)
+- [ ] 패널 자유 배치 (드래그, 프리셋 3종, 커스텀 저장)
 - [ ] Agent-browser integration (E2E 트리거)
-- [ ] 3-way verification
-- [ ] Diff viewer (WebView 렌더링)
+- [ ] 3-way verification (Code + Test + E2E)
+- [ ] Context management (토큰 제한, 요약)
 
-### v0.4 — Polish & Integrations (2주)
+### v0.5 — Integrations & Polish (2주)
 
 - [ ] Self-healing (auto-compact, stuck detection, restart)
-- [ ] Smart notifications (macOS 알림 센터)
-- [ ] Superpowers skills integration (Claude Code)
-- [ ] /think integration + graceful degradation
-- [ ] Context management (토큰 제한, 요약)
+- [ ] Superpowers skills integration (Claude Code 전용, graceful degradation)
 - [ ] Phase system (0-3 자동 전환)
+- [ ] 성능 프로파일링 + 최적화
 
 ### v1.0 — Public Release
 
-- [ ] brew install smux
-- [ ] 문서 + README
-- [ ] GitHub Actions CI/CD
-- [ ] 오픈소스 라이선스 결정 (MIT or Apache 2.0)
+- [ ] `brew install smux`
+- [ ] README + 문서 + 스크린캐스트
+- [ ] GitHub Actions CI/CD (macOS universal binary)
+- [ ] 라이선스: MIT
+- [ ] ProductHunt / HN 런칭
 
 ---
 
@@ -666,8 +798,7 @@ smux의 핑퐁 검증 패턴을 뒷받침하는 주요 연구:
 
 ## Competitive Differentiation
 
-smux가 유일하게 제공하는 것: **자동화된 adversarial 검증 루프 + 3중 검증 + rewind.**
-
+**smux의 핵심 차별점은 자동화된 adversarial 검증 루프다.**
 다른 도구는 "여러 에이전트를 **병렬로** 돌리자"이고, smux는 "두 에이전트가 **서로 검증**하게 하자"이다.
 
 | Feature | cmux | Claude Squad | AMUX | Superset | **smux** |
@@ -675,19 +806,35 @@ smux가 유일하게 제공하는 것: **자동화된 adversarial 검증 루프 
 | Auto ping-pong | ✗ | ✗ | ✗ | ✗ | **✓** |
 | Stop detection | ✗ | ✗ | ✗ | ✗ | **✓** |
 | Rewind | ✗ | ✗ | ✗ | ✗ | **✓** |
-| 3-way verify | ✗ | ✗ | ✗ | ✗ | **✓** |
-| Embedded browser | ✓ | ✗ | ✗ | ✗ | **✓** |
-| Self-healing | ✗ | ✗ | ✓ | ✗ | **✓** |
-| Git worktree | ✗ | ✓ | ✗ | ✓ | **✓** |
-| Multi-provider | ✓ | ✓ | ✓ | ✓ | **✓** |
-| Safety guard | ✗ (NTM has) | ✗ | ✗ | ✗ | **✓** |
+| Embedded browser | **✓** | ✗ | ✗ | ✗ | ✓ (v0.4) |
+| Self-healing | ✗ | ✗ | **✓** | ✗ | ✓ (v0.5) |
+| Git worktree | ✗ | **✓** | ✗ | **✓** | ✓ |
+| Multi-provider | **✓** | **✓** | **✓** | **✓** | ✓ |
+| Session mgmt | **✓** (tabs) | **✓** (tmux) | **✓** (web) | **✓** (electron) | ✓ (daemon) |
+| Safety/permissions | ✗ | worktree | watchdog | review gate | multi-layer |
+| Native macOS | **✓** | ✗ (tmux) | ✗ (python) | ✗ (electron) | ✓ (Tauri) |
+
+경쟁 도구들의 강점을 인정한다. cmux의 GPU 렌더링, Claude Squad의 단순함, AMUX의 self-healing은 각각 우수하다. smux가 차별화되는 건 **핑퐁 자동화**라는 단일 축이다.
 
 ---
 
-## Success Criteria
+## Success Criteria (계량화)
 
-- [ ] 두 AI CLI 간 자동 핑퐁 동작 (수동 복사-붙여넣기 0회)
-- [ ] 검증자가 "mitigation" 감지 시 자동 거절 + 피드백 전달
-- [ ] Rewind로 이전 라운드 복원 후 재시작 가능
-- [ ] 내장 브라우저에서 E2E 테스트 실시간 관전
-- [ ] 전체 세션 완료까지 사용자 개입 최소화
+### v0.1 Gate (headless prototype)
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| 핑퐁 완주 | 수동 개입 없이 5라운드 연속 | 10회 시도 중 8회 이상 |
+| Stop detection 정확도 | APPROVED/REJECTED 정확 판정 | 20개 샘플 중 16개+ 일치 |
+| Rewind 복원 정확도 | 파일 + 컨텍스트 100% 복원 | `git diff`로 0 diff 확인 |
+| Agent crash recovery | 자동 재시작 성공 | kill -9 후 30초 내 복구 |
+| Context passing | 핵심 정보 누락 없음 | 수동 리뷰 10건 중 8건+ 충분 |
+
+### v1.0 Gate (제품)
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| 수동 복붙 | 0회 | 전체 세션 동안 |
+| 세션 완주율 | 80%+ | 사용자가 중간 포기 없이 완료 |
+| Rewind 사용 후 수렴 | rewind 후 3라운드 내 APPROVED | 5회 측정 |
+| 실제 코드 품질 향상 | smux 사용 vs 미사용 A/B | 버그 수, 테스트 커버리지 비교 |
