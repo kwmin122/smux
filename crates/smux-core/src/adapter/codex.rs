@@ -141,19 +141,20 @@ impl AgentAdapter for CodexHeadlessAdapter {
         // Build CLI args: base command + safety permission flags (Layer 2).
         let mut cli_args = vec!["@openai/codex".to_string(), "exec".to_string()];
 
+        // Always skip git repo check since daemon runs in its own cwd
+        cli_args.push("--skip-git-repo-check".to_string());
+
         if let Some(ref safety) = self.safety_config {
             let perm_args = crate::safety::codex_permission_args(safety);
             if perm_args.is_empty() {
-                // No explicit permissions — fall back to defaults.
-                cli_args.extend(["-a".to_string(), "never".to_string()]);
-                cli_args.extend(["-s".to_string(), "workspace-write".to_string()]);
+                // No explicit permissions — use full-auto (sandboxed workspace-write).
+                cli_args.push("--full-auto".to_string());
             } else {
                 cli_args.extend(perm_args);
             }
         } else {
-            // No safety config — legacy behaviour.
-            cli_args.extend(["-a".to_string(), "never".to_string()]);
-            cli_args.extend(["-s".to_string(), "workspace-write".to_string()]);
+            // No safety config — use full-auto for non-interactive execution.
+            cli_args.push("--full-auto".to_string());
         }
 
         cli_args.push(full_prompt.clone());
@@ -173,10 +174,23 @@ impl AgentAdapter for CodexHeadlessAdapter {
             .take()
             .ok_or_else(|| AdapterError::Other("failed to capture stdout".into()))?;
 
+        let stderr = child.stderr.take();
+
         let (tx, rx) = mpsc::channel::<AgentEvent>(64);
 
         // Store child in shared handle so terminate() can kill it mid-turn.
         *self.child_handle.lock().await = Some(child);
+
+        // Spawn stderr reader for debugging
+        if let Some(stderr) = stderr {
+            tokio::spawn(async move {
+                let reader = BufReader::new(stderr);
+                let mut lines = reader.lines();
+                while let Ok(Some(line)) = lines.next_line().await {
+                    tracing::debug!(provider = "codex", stderr = %line, "stderr");
+                }
+            });
+        }
 
         let child_handle = Arc::clone(&self.child_handle);
         tokio::spawn(async move {

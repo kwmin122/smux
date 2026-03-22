@@ -215,14 +215,16 @@ pub fn claude_permission_args(config: &SafetyConfig) -> Vec<String> {
 /// Build Codex CLI permission arguments from [`SafetyConfig`].
 ///
 /// Maps config fields to:
-/// - `-a <approval_policy>` (e.g. "never", "on-request", "auto-approve")
-/// - `-s <sandbox_mode>` (e.g. "workspace-write", "full-write", "read-only")
+/// - `-s <sandbox_mode>` (e.g. "workspace-write", "danger-full-access", "read-only")
+/// - `--full-auto` for non-interactive execution
+///
+/// Note: Codex CLI v0.116+ removed the `-a` flag. Use `--full-auto` instead.
 pub fn codex_permission_args(config: &SafetyConfig) -> Vec<String> {
     let mut args = Vec::new();
 
+    // Codex v0.116+ uses --full-auto instead of -a flag
     if !config.codex_approval_policy.is_empty() {
-        args.push("-a".to_string());
-        args.push(config.codex_approval_policy.clone());
+        args.push("--full-auto".to_string());
     }
 
     if !config.codex_sandbox_mode.is_empty() {
