@@ -14,6 +14,15 @@ export function BrowserPanel({ onClose }: BrowserPanelProps) {
     if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
       normalized = 'http://' + normalized
     }
+    // Only allow localhost URLs for security — prevents loading arbitrary external content
+    try {
+      const parsed = new URL(normalized)
+      if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1' && parsed.hostname !== '[::1]') {
+        return // silently reject non-localhost URLs
+      }
+    } catch {
+      return // reject malformed URLs
+    }
     setUrl(normalized)
     setInputUrl(normalized)
   }, [])
@@ -80,7 +89,7 @@ export function BrowserPanel({ onClose }: BrowserPanelProps) {
           ref={iframeRef}
           src={url}
           className="w-full h-full border-0"
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+          sandbox="allow-scripts allow-forms allow-popups"
           title="Browser preview"
         />
       </div>

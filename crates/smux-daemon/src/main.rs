@@ -123,7 +123,16 @@ pub async fn run_daemon(socket_path: &PathBuf) -> Result<(), Box<dyn std::error:
     }
 
     let listener = UnixListener::bind(socket_path)?;
-    tracing::info!(path = %socket_path.display(), "daemon listening");
+
+    // Restrict socket to owner-only access (0o600) to prevent unauthorized
+    // local processes from connecting and controlling sessions.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(socket_path, std::fs::Permissions::from_mode(0o600))?;
+    }
+
+    tracing::info!(path = %socket_path.display(), "daemon listening (socket permissions: 0600)");
 
     // Write PID file.
     let pid_path = std::env::var("SMUX_PID_FILE")
@@ -256,13 +265,18 @@ async fn handle_client(
                     .insert(session_id.clone(), handle.clone());
 
                 // Spawn the orchestrator task with all verifiers.
+                let safety_config = state.lock().await.config.safety.clone();
+                let config_max_rounds = state.lock().await.config.defaults.max_rounds;
+                // Server-side cap: client cannot exceed configured max_rounds.
+                let capped_max_rounds = max_rounds.min(config_max_rounds.max(1));
                 spawn_session(
                     handle.clone(),
                     planner,
                     effective_verifiers,
                     consensus,
                     task,
-                    max_rounds,
+                    capped_max_rounds,
+                    safety_config,
                 );
 
                 send_message(
@@ -432,26 +446,34 @@ fn spawn_session(
     consensus: String,
     task: String,
     max_rounds: u32,
+    safety_config: smux_core::config::SafetyConfig,
 ) {
     tokio::spawn(async move {
         let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/tmp"));
 
-        let planner_adapter =
-            match smux_core::adapter::create_adapter(&planner, working_dir.clone()) {
-                Ok(a) => a,
-                Err(e) => {
-                    let _ = handle.event_tx.send(DaemonMessage::SessionComplete {
-                        summary: format!("failed to create planner adapter: {e}"),
-                    });
-                    *handle.status.lock().await = SessionStatus::Failed;
-                    return;
-                }
-            };
+        let planner_adapter = match smux_core::adapter::create_adapter_with_safety(
+            &planner,
+            working_dir.clone(),
+            safety_config.clone(),
+        ) {
+            Ok(a) => a,
+            Err(e) => {
+                let _ = handle.event_tx.send(DaemonMessage::SessionComplete {
+                    summary: format!("failed to create planner adapter: {e}"),
+                });
+                *handle.status.lock().await = SessionStatus::Failed;
+                return;
+            }
+        };
 
-        // Create adapter for each verifier.
+        // Create adapter for each verifier with safety config applied.
         let mut verifier_adapters: Vec<Box<dyn smux_core::adapter::AgentAdapter>> = Vec::new();
         for v_name in &verifiers {
-            match smux_core::adapter::create_adapter(v_name, working_dir.clone()) {
+            match smux_core::adapter::create_adapter_with_safety(
+                v_name,
+                working_dir.clone(),
+                safety_config.clone(),
+            ) {
                 Ok(a) => verifier_adapters.push(a),
                 Err(e) => {
                     let _ = handle.event_tx.send(DaemonMessage::SessionComplete {
