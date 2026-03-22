@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SMUX_TERMINAL // REWIND_MODE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#d97707",
+                        "on-error-container": "#ffdad6",
+                        "surface-container": "#251e1c",
+                        "tertiary-fixed-dim": "#96d947",
+                        "surface-container-high": "#2f2826",
+                        "on-background": "#ede0dc",
+                        "on-secondary-fixed": "#251815",
+                        "background": "#181210",
+                        "error": "#ffb4ab",
+                        "on-tertiary-fixed-variant": "#2e4f00",
+                        "surface-dim": "#181210",
+                        "tertiary": "#96d947",
+                        "on-tertiary-fixed": "#0f2000",
+                        "on-secondary-container": "#c7b0aa",
+                        "on-primary": "#4d2600",
+                        "on-primary-fixed-variant": "#6e3900",
+                        "primary-fixed": "#ffdcc3",
+                        "surface-container-lowest": "#130d0b",
+                        "surface-bright": "#3f3835",
+                        "secondary": "#d9c1bb",
+                        "primary": "#ffb77d",
+                        "surface-tint": "#ffb77d",
+                        "on-tertiary-container": "#192f00",
+                        "on-primary-fixed": "#2f1500",
+                        "on-surface": "#ede0dc",
+                        "inverse-on-surface": "#362f2c",
+                        "surface-variant": "#3b3331",
+                        "outline-variant": "#554336",
+                        "secondary-fixed": "#f6ddd7",
+                        "on-primary-container": "#432100",
+                        "surface-container-low": "#201a18",
+                        "on-surface-variant": "#dbc2b0",
+                        "secondary-fixed-dim": "#d9c1bb",
+                        "inverse-primary": "#904d00",
+                        "inverse-surface": "#ede0dc",
+                        "error-container": "#93000a",
+                        "on-error": "#690005",
+                        "tertiary-fixed": "#b1f661",
+                        "outline": "#a38c7c",
+                        "tertiary-container": "#63a109",
+                        "primary-fixed-dim": "#ffb77d",
+                        "surface": "#181210",
+                        "on-secondary": "#3c2d29",
+                        "on-secondary-fixed-variant": "#54433f",
+                        "surface-container-highest": "#3b3331",
+                        "secondary-container": "#54433f",
+                        "on-tertiary": "#1e3700"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #130d0b; }
+        ::-webkit-scrollbar-thumb { background: #3b3331; }
+        ::-webkit-scrollbar-thumb:hover { background: #ffb77d; }
+        .terminal-glow { box-shadow: inset 0 0 20px rgba(217, 119, 7, 0.05); }
+        .cursor-block { display: inline-block; width: 8px; height: 1.2em; background: #ffb77d; box-shadow: 0 0 4px #ffb77d; vertical-align: middle; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden h-screen flex">
+<!-- SIDE NAV BAR (Authority: Shared Components JSON) -->
+<aside class="bg-[#201a18] dark:bg-[#201a18] text-[#ffb77d] font-['JetBrains_Mono'] text-xs uppercase flex flex-col w-64 h-screen fixed left-0 top-0 z-40">
+<div class="p-6">
+<div class="text-[#ffb77d] font-bold text-lg tracking-tighter font-headline">REWIND_ENGINE</div>
+<div class="text-[#8a7a75] text-[10px] mt-1">ACTIVE_SESSION_0x4F2</div>
+</div>
+<nav class="flex-1">
+<div class="flex flex-col">
+<!-- Active logic: Reverse Engineering context -->
+<a class="text-[#8a7a75] p-3 hover:bg-[#251e1c] flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" data-icon="architecture">architecture</span> PLANNER
+                </a>
+<a class="bg-[#ffb77d] text-[#4d2600] font-bold p-3 flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" data-icon="verified_user">verified_user</span> VERIFIER
+                </a>
+<a class="text-[#8a7a75] p-3 hover:bg-[#251e1c] flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" data-icon="terminal">terminal</span> EXECUTOR
+                </a>
+<a class="text-[#8a7a75] p-3 hover:bg-[#251e1c] flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" data-icon="memory">memory</span> MEM_DUMP
+                </a>
+<a class="text-[#8a7a75] p-3 hover:bg-[#251e1c] flex items-center gap-3" href="#">
+<span class="material-symbols-outlined" data-icon="lan">lan</span> NET_TRAFFIC
+                </a>
+</div>
+</nav>
+<div class="mt-auto p-4 border-t border-[#3b3331]">
+<div class="flex flex-col gap-1">
+<a class="text-[#8a7a75] p-2 hover:bg-[#251e1c] flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="bug_report">bug_report</span> DEBUG
+                </a>
+<a class="text-[#8a7a75] p-2 hover:bg-[#251e1c] flex items-center gap-2" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="description">description</span> DOCS
+                </a>
+</div>
+<div class="mt-4 flex items-center gap-3 px-2">
+<div class="w-8 h-8 bg-surface-container-highest border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="person">person</span>
+</div>
+<div>
+<div class="text-[10px] font-bold text-on-surface">SYSTEM_ROOT</div>
+<div class="text-[8px] text-outline italic">LVL_0_ACCESS</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- MAIN CANVAS -->
+<main class="flex-1 ml-64 flex flex-col relative h-full">
+<!-- TOP APP BAR -->
+<header class="bg-[#181210] dark:bg-[#181210] flex justify-between items-center w-full px-6 h-12 z-30">
+<div class="flex items-center gap-8">
+<div class="font-['Space_Grotesk'] font-bold text-[#ffb77d] tracking-tighter text-xl">SMUX_TERMINAL</div>
+<nav class="flex h-full items-center">
+<a class="text-[#8a7a75] px-4 py-2 hover:text-[#ffb77d] transition-colors duration-100 font-['Space_Grotesk'] uppercase tracking-widest text-sm" href="#">SESSIONS</a>
+<a class="text-[#ffb77d] border-b-0 bg-[#251e1c] px-4 py-2 font-['Space_Grotesk'] uppercase tracking-widest text-sm" href="#">REVERSE_ENGINEER</a>
+<a class="text-[#8a7a75] px-4 py-2 hover:text-[#ffb77d] transition-colors duration-100 font-['Space_Grotesk'] uppercase tracking-widest text-sm" href="#">LOGS</a>
+<a class="text-[#8a7a75] px-4 py-2 hover:text-[#ffb77d] transition-colors duration-100 font-['Space_Grotesk'] uppercase tracking-widest text-sm" href="#">RECURSION</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#8a7a75] cursor-pointer hover:text-[#ffb77d]" data-icon="history">history</span>
+<span class="material-symbols-outlined text-[#8a7a75] cursor-pointer hover:text-[#ffb77d]" data-icon="settings">settings</span>
+<span class="material-symbols-outlined text-[#8a7a75] cursor-pointer hover:text-[#ffb77d]" data-icon="power_settings_new">power_settings_new</span>
+</div>
+</header>
+<!-- REWIND MODE OVERLAY HEADER -->
+<div class="bg-primary-container/20 border-y border-primary-container/30 px-6 py-2 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary animate-pulse" data-icon="settings_backup_restore">settings_backup_restore</span>
+<span class="font-headline font-bold text-primary tracking-widest text-xs uppercase">REWIND MODE: SCRUBBING HISTORY</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-mono text-outline">TEMPORAL_OFFSET: -42:15:08</span>
+<button class="bg-primary px-4 py-1 text-on-primary font-bold text-[10px] uppercase tracking-wider hover:opacity-90 transition-opacity">RESTORE TO THIS STATE</button>
+</div>
+</div>
+<!-- WORKSPACE CONTENT -->
+<div class="flex-1 flex overflow-hidden">
+<!-- LEFT WORKSPACE: TERMINALS -->
+<div class="flex-1 flex flex-col p-4 gap-4 overflow-hidden bg-surface-dim">
+<div class="flex-1 grid grid-cols-2 gap-4 h-full">
+<!-- PLANNER: SNAPSHOT -->
+<div class="flex flex-col bg-surface-container border border-surface-variant overflow-hidden">
+<div class="bg-surface-container-high px-4 py-2 flex items-center justify-between border-b border-surface-variant">
+<span class="font-headline text-[10px] font-bold text-on-surface-variant tracking-widest">PLANNER: SNAPSHOT [ROUND 2/10]</span>
+<span class="text-[9px] font-mono text-primary/60">0x88A2_PF</span>
+</div>
+<div class="flex-1 p-4 font-mono text-[11px] leading-relaxed overflow-y-auto terminal-glow text-on-surface-variant">
+<div class="mb-4 text-primary opacity-80"># ANALYZING SYSTEM ARCHITECTURE...</div>
+<div class="mb-2">
+<span class="text-tertiary">[FOUND]</span> Entry point at 0x401000.<br/>
+<span class="text-tertiary">[FOUND]</span> Local stack buffer overflow in `auth_v3`.
+                            </div>
+<div class="bg-surface-container-lowest p-2 border-l-2 border-primary mb-4">
+<span class="text-outline">24 |</span> <span class="text-error">- void validate(char* buf) {</span><br/>
+<span class="text-outline">25 |</span> <span class="text-tertiary">+ void validate(const char* buf) {</span><br/>
+<span class="text-outline">26 |</span> <span class="text-outline">   char local[64];</span><br/>
+<span class="text-outline">27 |</span> <span class="text-error">-   strcpy(local, buf);</span><br/>
+<span class="text-outline">28 |</span> <span class="text-tertiary">+   strncpy(local, buf, sizeof(local)-1);</span>
+</div>
+<div class="text-outline">Proposed fix generated. Sent to Verifier.</div>
+<div class="mt-4"><span class="cursor-block"></span></div>
+</div>
+</div>
+<!-- VERIFIER: SNAPSHOT -->
+<div class="flex flex-col bg-surface-container border border-surface-variant overflow-hidden">
+<div class="bg-surface-container-high px-4 py-2 flex items-center justify-between border-b border-surface-variant">
+<span class="font-headline text-[10px] font-bold text-on-surface-variant tracking-widest">VERIFIER: SNAPSHOT [ROUND 2/10]</span>
+<span class="text-[9px] font-mono text-primary/60">0x9F21_VF</span>
+</div>
+<div class="flex-1 p-4 font-mono text-[11px] leading-relaxed overflow-y-auto terminal-glow text-on-surface-variant">
+<div class="mb-4 text-primary opacity-80"># RUNNING STATIC ANALYSIS...</div>
+<div class="mb-2 flex items-start gap-2">
+<span class="material-symbols-outlined text-tertiary text-xs" data-icon="check_circle">check_circle</span>
+<span>Buffer overflow risk: <span class="text-tertiary">REJECTED BY COMPILER</span></span>
+</div>
+<div class="mb-2 flex items-start gap-2">
+<span class="material-symbols-outlined text-tertiary text-xs" data-icon="check_circle">check_circle</span>
+<span>Data flow integrity: <span class="text-tertiary">VERIFIED</span></span>
+</div>
+<div class="mt-4 p-2 bg-tertiary-container/10 border border-tertiary/20">
+<div class="text-[9px] font-bold text-tertiary uppercase mb-1">PROPOSAL_STATUS: APPROVED</div>
+<div class="text-outline">The patch addresses the primary vulnerability without introducing side effects in the stack frame. Ready for execution in Round 3.</div>
+</div>
+<div class="mt-4 text-outline opacity-50 italic">Checksum: a7f8...3e1d</div>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT WORKSPACE: HISTORY LOG -->
+<div class="w-80 bg-surface-container-low border-l border-surface-variant flex flex-col h-full">
+<div class="p-4 border-b border-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-sm" data-icon="event_note">event_note</span>
+<span class="font-headline font-bold text-[10px] text-on-surface-variant tracking-widest uppercase">HISTORY LOG</span>
+</div>
+<div class="flex-1 overflow-y-auto">
+<!-- Round 4 (Future) -->
+<div class="p-4 border-b border-surface-variant/30 opacity-40 cursor-not-allowed">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold font-mono">ROUND 04</span>
+<span class="text-[9px] text-outline">14:22:15</span>
+</div>
+<div class="text-[11px] text-outline leading-tight">Final verification of kernel patch...</div>
+</div>
+<!-- Round 3 (Next) -->
+<div class="p-4 border-b border-surface-variant/30 opacity-60 hover:bg-surface-container transition-colors cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold font-mono">ROUND 03</span>
+<span class="text-[9px] text-outline">14:20:44</span>
+</div>
+<div class="text-[11px] text-on-surface-variant leading-tight">Executor applied patch to 0x401020.</div>
+</div>
+<!-- Round 2 (Current Snapshot) -->
+<div class="p-4 border-l-4 border-primary bg-surface-container-highest">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold font-mono text-primary">ROUND 02 [SELECTED]</span>
+<span class="text-[9px] text-primary/70">14:18:12</span>
+</div>
+<div class="text-[11px] text-on-surface leading-tight">Planner generated fix; Verifier validated memory constraints.</div>
+<div class="mt-2 flex gap-2">
+<span class="px-1 bg-primary/10 text-primary text-[8px] font-bold border border-primary/20">DIFF_LOCKED</span>
+<span class="px-1 bg-tertiary/10 text-tertiary text-[8px] font-bold border border-tertiary/20">MEM_SAFE</span>
+</div>
+</div>
+<!-- Round 1 (History) -->
+<div class="p-4 border-b border-surface-variant/30 hover:bg-surface-container transition-colors cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold font-mono text-outline">ROUND 01</span>
+<span class="text-[9px] text-outline">14:15:00</span>
+</div>
+<div class="text-[11px] text-outline leading-tight">Initial discovery of vulnerability surface.</div>
+</div>
+<!-- Round 0 (History) -->
+<div class="p-4 border-b border-surface-variant/30 hover:bg-surface-container transition-colors cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] font-bold font-mono text-outline">ROUND 00</span>
+<span class="text-[9px] text-outline">14:10:05</span>
+</div>
+<div class="text-[11px] text-outline leading-tight">Session handshake established. Entry node scan.</div>
+</div>
+</div>
+</div>
+</div>
+<!-- REWIND / REPLAY SCRUBBER -->
+<div class="h-24 bg-surface-container-lowest border-t border-surface-variant flex flex-col px-6 justify-center">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-4">
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="first_page">first_page</span>
+</button>
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="play_arrow">play_arrow</span>
+</button>
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="pause">pause</span>
+</button>
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="last_page">last_page</span>
+</button>
+</div>
+<div class="text-[10px] font-mono font-bold tracking-widest text-primary">
+                    ROUND_SNAPSHOT_02 / TOTAL_ROUNDS_10
+                </div>
+</div>
+<!-- Timeline Track -->
+<div class="relative w-full h-8 flex items-center">
+<div class="absolute w-full h-px bg-surface-variant"></div>
+<div class="absolute h-px bg-primary transition-all duration-300" style="width: 20%;"></div>
+<!-- Timeline Markers -->
+<div class="relative w-full flex justify-between px-2">
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-primary transform rotate-45"></div>
+<span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-mono text-outline opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">INIT</span>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-primary transform rotate-45"></div>
+<span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-mono text-outline opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">SCAN</span>
+</div>
+<div class="group relative">
+<!-- Current Selected -->
+<div class="w-3 h-3 bg-primary transform rotate-45 shadow-[0_0_10px_#ffb77d] border-2 border-background -mt-0.5"></div>
+<span class="absolute -top-6 left-1/2 -translate-x-1/2 text-[8px] font-mono text-primary font-bold whitespace-nowrap">FIX_PHASE</span>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-surface-variant transform rotate-45"></div>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-surface-variant transform rotate-45"></div>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-surface-variant transform rotate-45"></div>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-surface-variant transform rotate-45"></div>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-surface-variant transform rotate-45"></div>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-surface-variant transform rotate-45"></div>
+</div>
+<div class="group relative">
+<div class="w-1.5 h-1.5 bg-surface-variant transform rotate-45"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- STATUS BAR -->
+<footer class="h-6 bg-surface-container-lowest flex items-center px-4 justify-between border-t border-surface-variant/30 text-[9px] font-mono text-outline">
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 bg-tertiary"></span> NODE: PRIMARY_RECURSE</span>
+<span>|</span>
+<span>THREAD: 0xFD42_WORKER</span>
+<span>|</span>
+<span>ENCODING: UTF-8 / HEX</span>
+</div>
+<div class="flex items-center gap-4">
+<span>LATENCY: 12ms</span>
+<span>|</span>
+<span class="text-primary font-bold">STATE: REWINDING</span>
+<span>|</span>
+<span>MEM: 1.42GB / 16GB</span>
+</div>
+</footer>
+</main>
+<!-- BOTTOM NAV BAR (Contextual Navigation - Authority: Shared Components JSON) -->
+<!-- Suppression Logic: Only show for top-level ecosystem navigation. On mobile layout would pivot. 
+         This specific design uses the bottom as a scrubber, but technically maps to the control labels. -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-center items-center h-14 bg-[#181210]/85 dark:bg-[#181210]/85 z-50 backdrop-blur-md border-t border-[#3b3331] shadow-[0_-4px_24px_rgba(217,119,7,0.06)] md:hidden">
+<div class="flex items-center h-full">
+<div class="text-[#8a7a75] px-6 py-1 flex flex-col items-center gap-1 hover:bg-[#251e1c]">
+<span class="material-symbols-outlined text-lg" data-icon="first_page">first_page</span>
+<span class="font-['JetBrains_Mono'] text-[10px] tracking-tighter">SCRUB_BACK</span>
+</div>
+<div class="text-[#ffb77d] bg-[#3b3331] px-6 py-1 flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-lg" data-icon="play_arrow">play_arrow</span>
+<span class="font-['JetBrains_Mono'] text-[10px] tracking-tighter">PLAY_SIM</span>
+</div>
+<div class="text-[#8a7a75] px-6 py-1 flex flex-col items-center gap-1 hover:bg-[#251e1c]">
+<span class="material-symbols-outlined text-lg" data-icon="pause">pause</span>
+<span class="font-['JetBrains_Mono'] text-[10px] tracking-tighter">PAUSE_STATE</span>
+</div>
+<div class="text-[#8a7a75] px-6 py-1 flex flex-col items-center gap-1 hover:bg-[#251e1c]">
+<span class="material-symbols-outlined text-lg" data-icon="last_page">last_page</span>
+<span class="font-['JetBrains_Mono'] text-[10px] tracking-tighter">SCRUB_FWD</span>
+</div>
+</div>
+</nav>
+</body></html>

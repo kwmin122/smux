@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>smux | Operator Console</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary": "#4d2600",
+                        "surface-container-low": "#201a18",
+                        "surface-container": "#251e1c",
+                        "on-background": "#ede0dc",
+                        "on-tertiary-container": "#192f00",
+                        "on-secondary": "#3c2d29",
+                        "error": "#ffb4ab",
+                        "on-surface-variant": "#dbc2b0",
+                        "outline": "#a38c7c",
+                        "surface-bright": "#3f3835",
+                        "on-error-container": "#ffdad6",
+                        "background": "#181210",
+                        "on-primary-fixed": "#2f1500",
+                        "surface-container-highest": "#3b3331",
+                        "primary": "#ffb77d",
+                        "surface-container-high": "#2f2826",
+                        "inverse-primary": "#904d00",
+                        "surface-tint": "#ffb77d",
+                        "surface-dim": "#181210",
+                        "inverse-surface": "#ede0dc",
+                        "on-primary-container": "#432100",
+                        "tertiary-fixed": "#b1f661",
+                        "tertiary": "#96d947",
+                        "inverse-on-surface": "#362f2c",
+                        "primary-fixed": "#ffdcc3",
+                        "primary-fixed-dim": "#ffb77d",
+                        "on-secondary-container": "#c7b0aa",
+                        "secondary": "#d9c1bb",
+                        "surface-container-lowest": "#130d0b",
+                        "tertiary-container": "#63a109",
+                        "tertiary-fixed-dim": "#96d947",
+                        "on-error": "#690005",
+                        "on-tertiary-fixed": "#0f2000",
+                        "on-tertiary-fixed-variant": "#2e4f00",
+                        "on-secondary-fixed-variant": "#54433f",
+                        "secondary-container": "#54433f",
+                        "on-tertiary": "#1e3700",
+                        "on-surface": "#ede0dc",
+                        "secondary-fixed-dim": "#d9c1bb",
+                        "on-secondary-fixed": "#251815",
+                        "error-container": "#93000a",
+                        "outline-variant": "#554336",
+                        "surface-variant": "#3b3331",
+                        "surface": "#181210",
+                        "secondary-fixed": "#f6ddd7",
+                        "primary-container": "#d97707",
+                        "on-primary-fixed-variant": "#6e3900"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: { "DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+            font-size: 18px;
+        }
+        .cursor-blink {
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            from, to { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #181210; }
+        ::-webkit-scrollbar-thumb { background: #3b3331; }
+        body { background-color: #181210; color: #ede0dc; overflow: hidden; }
+    
+        a, button, [role='button'], .cursor-pointer {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .cursor-pointer:active, button:active {
+            transform: scale(0.98);
+        }
+        .nav-link-hover:hover {
+            text-shadow: 0 0 8px rgba(255, 183, 125, 0.4);
+            color: #ffb77d !important;
+        }
+        .sidebar-item:hover {
+            background-color: #3b3331;
+            color: #ffb77d !important;
+            box-shadow: inset 2px 0 0 #ffb77d;
+        }
+        .history-item:hover {
+            background-color: #3b3331;
+            border-left: 2px solid #ffb77d;
+        }
+        .status-card:hover {
+            background-color: #3b3331 !important;
+            box-shadow: 0 0 10px rgba(255, 183, 125, 0.1);
+        }
+        .btn-glow:hover {
+            box-shadow: 0 0 15px rgba(255, 183, 125, 0.3);
+        }
+    </style>
+</head>
+<body class="font-body selection:bg-primary/30 h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-[#181210] flex justify-between items-center w-full px-4 h-12 z-50">
+<div class="flex items-center space-x-6">
+<div class="text-2xl font-black text-[#ffb77d] tracking-tighter">smux</div>
+<nav class="hidden md:flex space-x-4 h-full items-center">
+<span class="font-['Space_Grotesk'] font-bold uppercase tracking-wider text-sm text-[#ffb77d] border-b-2 border-[#ffb77d] pb-1 nav-link-hover cursor-pointer">Planning</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase tracking-wider text-sm text-[#8b7e7a] nav-link-hover cursor-pointer">Round 4/10</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase tracking-wider text-sm text-[#8b7e7a] nav-link-hover cursor-pointer">Claude Code</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase tracking-wider text-sm text-[#8b7e7a] nav-link-hover cursor-pointer">Codex</span>
+</nav>
+</div>
+<div class="flex items-center space-x-4">
+<div class="flex items-center space-x-2 bg-surface-container-high px-2 py-1">
+<div class="w-2 h-2 bg-tertiary-container rounded-full"></div>
+<span class="text-[10px] font-mono uppercase tracking-tighter text-on-surface-variant">Active Session</span>
+</div>
+<div class="flex items-center space-x-3">
+<span class="material-symbols-outlined text-[#8b7e7a] hover:text-[#ffb77d] cursor-pointer">terminal</span>
+<span class="material-symbols-outlined text-[#8b7e7a] hover:text-[#ffb77d] cursor-pointer">settings</span>
+</div>
+</div>
+</header>
+<main class="flex-1 flex overflow-hidden">
+<!-- SideNavBar (Used as secondary navigation/tools) -->
+<aside class="bg-[#201a18] flex flex-col items-center py-4 space-y-4 w-16 border-r border-[#130d0b] shrink-0">
+<div class="flex flex-col items-center space-y-6 w-full">
+<div class="bg-[#ffb77d] text-[#4d2600] p-2 w-10 h-10 flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">hub</span>
+</div>
+<div class="text-[#8b7e7a] hover:bg-[#3b3331] p-2 w-10 h-10 flex items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined">history</span>
+</div>
+<div class="text-[#8b7e7a] hover:bg-[#3b3331] p-2 w-10 h-10 flex items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined">gavel</span>
+</div>
+<div class="text-[#8b7e7a] hover:bg-[#3b3331] p-2 w-10 h-10 flex items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined">monitor_heart</span>
+</div>
+<div class="text-[#8b7e7a] hover:bg-[#3b3331] p-2 w-10 h-10 flex items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined">security</span>
+</div>
+<div class="text-[#8b7e7a] hover:bg-[#3b3331] p-2 w-10 h-10 flex items-center justify-center cursor-pointer">
+<span class="material-symbols-outlined">fast_rewind</span>
+</div>
+</div>
+</aside>
+<!-- Main Workspace Split View -->
+<section class="flex-1 flex flex-col md:flex-row bg-surface-dim p-1 gap-1">
+<!-- Planner Pane -->
+<div class="flex-1 flex flex-col bg-surface-container relative">
+<div class="h-8 flex items-center justify-between px-3 bg-surface-container-high shrink-0">
+<div class="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+<span class="font-mono text-[11px] font-bold text-primary tracking-tight">PLANNER: CLAUDE-3.5-SONNET</span>
+<span class="text-[10px] text-on-surface-variant/40 font-mono">|</span>
+<span class="text-[10px] text-on-surface-variant font-mono">PID: 8842</span>
+</div>
+<div class="flex items-center space-x-3 text-[10px] font-mono text-on-surface-variant">
+<span>L: 142ms</span>
+<span>T: 4.2k/s</span>
+</div>
+</div>
+<div class="flex-1 p-4 font-mono text-[13px] leading-relaxed overflow-y-auto bg-surface-container-lowest">
+<div class="text-tertiary mb-2">[SYSTEM] Initialization complete. Round 4 started.</div>
+<div class="text-on-surface-variant mb-4">Analyzing worktree for dependency conflict in <span class="text-primary">/src/auth/engine.ts</span>...</div>
+<div class="bg-surface-container-highest p-3 mb-4">
+<div class="text-error opacity-70">--- src/auth/engine.ts</div>
+<div class="text-tertiary opacity-70">+++ src/auth/engine.ts</div>
+<div class="text-on-surface-variant">@@ -42,6 +42,7 @@</div>
+<div class="text-on-surface-variant pl-4"> export async function validate(token: string) {</div>
+<div class="text-error pl-2 bg-error/10">-   const user = await db.fetch(token);</div>
+<div class="text-tertiary pl-2 bg-tertiary/10">+   const user = await cache.getOrFetch(token);</div>
+<div class="text-on-surface-variant pl-4">     if (!user) throw new AuthError();</div>
+</div>
+<div class="text-on-surface-variant mb-4">Thinking: The current implementation blocks the event loop on large datasets. Switching to cache-first validation should reduce latency by ~60%.</div>
+<div class="flex items-center text-primary">
+<span class="mr-2">smux@agent:~$</span>
+<span class="bg-primary text-on-primary px-1">executing cache_migration_v2.sh</span>
+<div class="w-2.5 h-5 bg-primary ml-1 cursor-blink"></div>
+</div>
+</div>
+</div>
+<!-- Verifier Pane -->
+<div class="flex-1 flex flex-col bg-surface-container relative">
+<div class="h-8 flex items-center justify-between px-3 bg-surface-container-high shrink-0">
+<div class="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+<span class="font-mono text-[11px] font-bold text-secondary tracking-tight">VERIFIER: CODEX-X</span>
+<span class="text-[10px] text-on-surface-variant/40 font-mono">|</span>
+<span class="text-[10px] text-on-surface-variant font-mono">PID: 9102</span>
+</div>
+<div class="flex items-center space-x-3 text-[10px] font-mono text-on-surface-variant">
+<span>HEALTH: OPTIMAL</span>
+</div>
+</div>
+<div class="flex-1 p-4 font-mono text-[12px] leading-tight overflow-y-auto bg-surface-container-lowest">
+<div class="text-on-surface-variant/60 mb-1">[9:42:10] Listening for filesystem changes...</div>
+<div class="text-on-surface-variant/60 mb-1">[9:42:15] Change detected in /src/auth/engine.ts</div>
+<div class="text-tertiary mb-2">[9:42:16] Running test suite: 'auth-security-layer'...</div>
+<div class="space-y-1 mb-4">
+<div class="flex justify-between w-full max-w-xs">
+<span class="text-on-surface-variant">PASS: validation_logic</span>
+<span class="text-tertiary">✓</span>
+</div>
+<div class="flex justify-between w-full max-w-xs">
+<span class="text-on-surface-variant">PASS: token_parsing</span>
+<span class="text-tertiary">✓</span>
+</div>
+<div class="flex justify-between w-full max-w-xs">
+<span class="text-on-surface-variant">WAIT: regression_test_v4</span>
+<span class="text-primary animate-pulse">⟳</span>
+</div>
+</div>
+<div class="border-l-2 border-primary-container bg-primary-container/5 p-2 mb-4">
+<span class="text-[10px] uppercase font-bold text-primary-container block mb-1">Observation</span>
+<span class="text-on-surface">The proposed change improves memory allocation but introduces a potential race condition in the singleton cache. Recommending mutex lock.</span>
+</div>
+<div class="text-on-surface-variant/40 italic">Waiting for planner commit...</div>
+<div class="flex items-center text-on-surface-variant/50 mt-4">
+<span class="mr-2">smux@verifier:~$</span>
+<div class="w-2.5 h-5 bg-on-surface-variant/30 ml-1"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Right Control Column -->
+<aside class="w-72 bg-[#201a18] border-l border-[#130d0b] flex flex-col shrink-0">
+<div class="p-4 border-b border-[#3b3331]">
+<div class="text-[#ffb77d] font-bold text-xs tracking-widest uppercase">CONTROL</div>
+<div class="text-[#8b7e7a] text-[10px] font-mono">v1.0.4-stable</div>
+</div>
+<div class="flex-1 overflow-y-auto space-y-6 py-4">
+<!-- Rounds History -->
+<section class="px-4">
+<h3 class="font-['Space_Grotesk'] text-[11px] font-bold uppercase text-on-surface-variant/60 mb-3 tracking-widest">Rounds History</h3>
+<div class="space-y-1">
+<div class="flex items-center justify-between p-2 bg-surface-container-high hover:bg-[#3b3331] cursor-pointer group history-item">
+<span class="text-[11px] font-mono">R3: Dependency Fix</span>
+<span class="material-symbols-outlined text-tertiary text-sm">check_circle</span>
+</div>
+<div class="flex items-center justify-between p-2 bg-surface-container hover:bg-[#3b3331] cursor-pointer group history-item">
+<span class="text-[11px] font-mono">R2: Type Refactor</span>
+<span class="material-symbols-outlined text-tertiary text-sm">check_circle</span>
+</div>
+<div class="flex items-center justify-between p-2 bg-surface-container-low/50 border border-error/20 cursor-pointer group history-item">
+<span class="text-[11px] font-mono text-error">R1: Build Error</span>
+<span class="material-symbols-outlined text-error text-sm">error</span>
+</div>
+</div>
+</section>
+<!-- Verdicts -->
+<section class="px-4">
+<h3 class="font-['Space_Grotesk'] text-[11px] font-bold uppercase text-on-surface-variant/60 mb-3 tracking-widest">Verdicts</h3>
+<div class="bg-surface-container-lowest p-3 font-mono text-[10px] leading-relaxed text-on-surface-variant border-l-2 border-primary">
+<span class="text-primary font-bold">LATEST:</span> Planner proposed cache shift; Verifier requested mutex implementation. Pending synchronization.
+                    </div>
+</section>
+<!-- Health/Safety -->
+<section class="px-4">
+<h3 class="font-['Space_Grotesk'] text-[11px] font-bold uppercase text-on-surface-variant/60 mb-3 tracking-widest">Health &amp; Safety</h3>
+<div class="grid grid-cols-2 gap-2">
+<div class="bg-surface-container-highest p-2 status-card cursor-pointer">
+<div class="text-[9px] text-on-surface-variant/60 uppercase">CPU Load</div>
+<div class="text-xs font-mono text-tertiary">14.2%</div>
+</div>
+<div class="bg-surface-container-highest p-2 status-card cursor-pointer">
+<div class="text-[9px] text-on-surface-variant/60 uppercase">Tokens</div>
+<div class="text-xs font-mono text-primary">82k/1M</div>
+</div>
+<div class="bg-surface-container-highest p-2 status-card cursor-pointer">
+<div class="text-[9px] text-on-surface-variant/60 uppercase">Security</div>
+<div class="text-xs font-mono text-tertiary">SECURE</div>
+</div>
+<div class="bg-surface-container-highest p-2 status-card cursor-pointer">
+<div class="text-[9px] text-on-surface-variant/60 uppercase">Agent Sync</div>
+<div class="text-xs font-mono text-on-surface">98%</div>
+</div>
+</div>
+</section>
+<!-- Git State -->
+<section class="px-4">
+<h3 class="font-['Space_Grotesk'] text-[11px] font-bold uppercase text-on-surface-variant/60 mb-3 tracking-widest">Git Worktree</h3>
+<div class="space-y-2">
+<div class="flex items-center space-x-2 text-[11px] font-mono">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">account_tree</span>
+<span class="text-on-surface">feature/optimization-v2</span>
+</div>
+<div class="flex items-center space-x-2 text-[10px] font-mono text-on-surface-variant pl-6">
+<span>M</span>
+<span>src/auth/engine.ts</span>
+</div>
+</div>
+</section>
+</div>
+<!-- Side Action -->
+<div class="p-4 border-t border-[#3b3331]">
+<button class="w-full bg-[#3b3331] hover:bg-[#ffb77d] hover:text-[#4d2600] text-[#ffb77d] py-2 flex items-center justify-center space-x-2 transition-none btn-glow">
+<span class="material-symbols-outlined">fast_rewind</span>
+<span class="font-['Space_Grotesk'] font-bold text-xs uppercase tracking-widest">Rewind State</span>
+</button>
+</div>
+</aside>
+</main>
+<!-- BottomNavBar / Status Bar -->
+<footer class="bg-[#251e1c] fixed bottom-0 w-full h-8 z-50 border-t border-[#3b3331] shadow-[0_-4px_24px_rgba(217,119,6,0.06)]">
+<div class="flex items-center justify-start space-x-0 h-full">
+<div class="bg-[#ffb77d] text-[#4d2600] px-4 flex items-center h-full font-['JetBrains_Mono'] text-[10px] uppercase font-bold">
+<span class="material-symbols-outlined mr-2 text-[14px]">keyboard_tab</span>
+                Tab: Switch
+            </div>
+<div class="text-[#8b7e7a] px-4 flex items-center h-full font-['JetBrains_Mono'] text-[10px] uppercase hover:bg-[#3b3331] cursor-pointer">
+<span class="material-symbols-outlined mr-2 text-[14px]">terminal</span>
+                Cmd+1: Planner
+            </div>
+<div class="text-[#8b7e7a] px-4 flex items-center h-full font-['JetBrains_Mono'] text-[10px] uppercase hover:bg-[#3b3331] cursor-pointer">
+<span class="material-symbols-outlined mr-2 text-[14px]">history</span>
+                Rewind
+            </div>
+<div class="text-[#8b7e7a] px-4 flex items-center h-full font-['JetBrains_Mono'] text-[10px] uppercase hover:bg-[#3b3331] cursor-pointer border-r border-[#3b3331]">
+<span class="material-symbols-outlined mr-2 text-[14px]">difference</span>
+                Diff
+            </div>
+<div class="text-[#8b7e7a] px-4 flex items-center h-full font-['JetBrains_Mono'] text-[10px] uppercase hover:bg-[#3b3331] cursor-pointer">
+<span class="material-symbols-outlined mr-2 text-[14px]">pan_tool</span>
+                Intervene
+            </div>
+<div class="flex-1"></div>
+<div class="px-4 flex items-center h-full font-mono text-[10px] text-[#8b7e7a]">
+<span class="text-tertiary mr-2">●</span>
+<span>SYNCED</span>
+<span class="mx-2">|</span>
+<span>UTF-8</span>
+<span class="mx-2">|</span>
+<span>main</span>
+</div>
+</div>
+</footer>
+</body></html>

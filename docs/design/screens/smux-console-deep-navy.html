@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#690005",
+              "surface-container-lowest": "#0b0e14",
+              "tertiary-fixed": "#ffdad8",
+              "on-primary-fixed": "#001c39",
+              "surface-tint": "#a4c9ff",
+              "primary-container": "#60a5fa",
+              "on-tertiary-fixed": "#410006",
+              "on-secondary-container": "#004d44",
+              "on-primary-container": "#003a6b",
+              "on-secondary-fixed": "#00201c",
+              "surface-bright": "#363940",
+              "tertiary-fixed-dim": "#ffb3b0",
+              "primary": "#a4c9ff",
+              "on-primary": "#00315d",
+              "background": "#10131a",
+              "surface-container-low": "#191c22",
+              "inverse-on-surface": "#2e3037",
+              "on-error-container": "#ffdad6",
+              "tertiary-container": "#ff7978",
+              "outline-variant": "#414751",
+              "primary-fixed": "#d4e3ff",
+              "secondary": "#44e2cd",
+              "secondary-container": "#03c6b2",
+              "secondary-fixed": "#62fae3",
+              "surface-variant": "#32353c",
+              "inverse-surface": "#e1e2eb",
+              "surface": "#10131a",
+              "primary-fixed-dim": "#a4c9ff",
+              "on-primary-fixed-variant": "#004883",
+              "inverse-primary": "#0060ac",
+              "error-container": "#93000a",
+              "outline": "#8b919d",
+              "on-surface-variant": "#c1c7d3",
+              "on-tertiary": "#670211",
+              "on-tertiary-container": "#740d18",
+              "surface-container-highest": "#32353c",
+              "surface-dim": "#10131a",
+              "on-secondary-fixed-variant": "#005047",
+              "error": "#ffb4ab",
+              "on-background": "#e1e2eb",
+              "on-tertiary-fixed-variant": "#881d24",
+              "surface-container": "#1d2026",
+              "on-secondary": "#003731",
+              "secondary-fixed-dim": "#3cddc7",
+              "tertiary": "#ffb3b0",
+              "on-surface": "#e1e2eb",
+              "surface-container-high": "#272a31"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .mono-text { font-family: 'JetBrains Mono', monospace; }
+        .glass-panel {
+            background: rgba(29, 32, 38, 0.7);
+            backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body h-screen overflow-hidden flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-[#10131a] dark:bg-[#10131a] flex justify-between items-center w-full px-6 py-3 shrink-0">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-blue-400 dark:text-blue-400 tracking-[-0.02em] font-['Inter'] uppercase">TERMINAL_OS</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-blue-400 font-bold border-b-2 border-blue-400 pb-1 font-['Inter'] tracking-tighter uppercase text-sm" href="#">Sessions</a>
+<a class="text-slate-400 font-medium hover:bg-slate-800/50 transition-colors duration-200 font-['Inter'] tracking-tighter uppercase text-sm" href="#">Clusters</a>
+<a class="text-slate-400 font-medium hover:bg-slate-800/50 transition-colors duration-200 font-['Inter'] tracking-tighter uppercase text-sm" href="#">Network</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-surface-container-lowest flex items-center px-3 py-1.5 rounded border border-outline-variant/15">
+<span class="material-symbols-outlined text-on-surface-variant text-sm mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-xs mono-text w-48 text-primary placeholder:text-outline" placeholder="EXECUTE_COMMAND..." type="text"/>
+</div>
+<button class="p-2 text-on-surface-variant hover:bg-slate-800/50 transition-colors duration-200">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-slate-800/50 transition-colors duration-200">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden ml-2">
+<img alt="User Profile" data-alt="Abstract minimalist user profile avatar icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWsyEttggMvHVIKaOnAawE1MDbtn5DD_WnRHCj1xITtuwwABKgfLqUx123pt7RXT2QKGroXRevz5At4IJ1czVd8SXBOvyKE8qa_0QWf5e6HM8lJ3hMO6iKBhutrH9AASyCJv2mYR5A38ssVNaX5JNUw9g34JyL5VQN8GBQ7cCEsJcygHhGr0IV5s0ikgEhkfdZw512nfMCpL6mojgDV00kSzjyx8H5wgKnqWU85rr3mOaGmTCJUv2mITjnsDo90HcUkH7ophzWLSk"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="bg-[#0b0e14] dark:bg-[#0b0e14] flex flex-col h-full border-r border-slate-800/20 w-64 shrink-0">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-10 h-10 bg-surface-container-highest flex items-center justify-center rounded-lg border border-primary/20">
+<span class="material-symbols-outlined text-primary">terminal</span>
+</div>
+<div>
+<div class="text-lg font-bold text-blue-400 font-['JetBrains_Mono']">NODE_01</div>
+<div class="text-[10px] text-slate-500 font-['JetBrains_Mono'] tracking-tight">Active Session</div>
+</div>
+</div>
+<button class="w-full bg-primary-container text-on-primary-container py-3 rounded-lg font-bold text-xs mono-text mb-8 tracking-wider hover:opacity-90 transition-opacity">
+                    NEW_TERMINAL
+                </button>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 bg-blue-500/10 text-blue-400 border-r-2 border-blue-400 px-4 py-3 font-['JetBrains_Mono'] text-xs tracking-tight" href="#">
+<span class="material-symbols-outlined text-sm">terminal</span>
+                        Sessions
+                    </a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-['JetBrains_Mono'] text-xs tracking-tight" href="#">
+<span class="material-symbols-outlined text-sm">dns</span>
+                        Clusters
+                    </a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-['JetBrains_Mono'] text-xs tracking-tight" href="#">
+<span class="material-symbols-outlined text-sm">lan</span>
+                        Network
+                    </a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-['JetBrains_Mono'] text-xs tracking-tight" href="#">
+<span class="material-symbols-outlined text-sm">list_alt</span>
+                        Logs
+                    </a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-['JetBrains_Mono'] text-xs tracking-tight" href="#">
+<span class="material-symbols-outlined text-sm">lock</span>
+                        Vault
+                    </a>
+</nav>
+</div>
+<div class="mt-auto p-6">
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-['JetBrains_Mono'] text-xs tracking-tight" href="#">
+<span class="material-symbols-outlined text-sm">settings</span>
+                    Settings
+                </a>
+</div>
+</aside>
+<!-- Main Workspace -->
+<main class="flex-1 overflow-hidden flex flex-col bg-background p-6 gap-6">
+<!-- Context Header -->
+<div class="flex justify-between items-end">
+<div>
+<h1 class="text-3xl font-black text-on-surface tracking-tighter">OPERATOR_CONSOLE_v2.4</h1>
+<p class="text-on-surface-variant mono-text text-sm">SECURE_TUNNEL: <span class="text-secondary">ESTABLISHED</span> | NODE: <span class="text-primary">ALPHA-9</span></p>
+</div>
+<div class="flex gap-2">
+<div class="bg-surface-container px-3 py-1 rounded mono-text text-[10px] text-outline flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+                        PLANNER_IDLE
+                    </div>
+<div class="bg-surface-container px-3 py-1 rounded mono-text text-[10px] text-outline flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                        VERIFIER_SYNC
+                    </div>
+</div>
+</div>
+<!-- Dashboard Grid -->
+<div class="flex-1 grid grid-cols-12 gap-6 overflow-hidden">
+<!-- Left Pane: Planner -->
+<div class="col-span-12 lg:col-span-7 flex flex-col gap-6 overflow-hidden">
+<!-- Planner Visualization -->
+<div class="flex-1 bg-surface-container-low rounded-xl border border-outline-variant/15 flex flex-col overflow-hidden">
+<div class="px-4 py-3 border-b border-outline-variant/15 flex justify-between items-center bg-surface-container">
+<span class="text-xs font-bold mono-text text-primary">PLANNER_VIEW</span>
+<div class="flex gap-2">
+<span class="material-symbols-outlined text-sm text-outline cursor-pointer hover:text-on-surface">zoom_in</span>
+<span class="material-symbols-outlined text-sm text-outline cursor-pointer hover:text-on-surface">settings_overscan</span>
+</div>
+</div>
+<div class="flex-1 relative bg-surface-container-lowest p-4 overflow-hidden">
+<!-- Tactical Grid Simulation -->
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(circle, #60a5fa 1px, transparent 1px); background-size: 24px 24px;"></div>
+<!-- Visual Content -->
+<div class="relative h-full flex items-center justify-center">
+<div class="w-full max-w-lg aspect-video glass-panel rounded-lg border border-primary/20 p-6 flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<div class="text-[10px] text-outline mono-text">TRAJECTORY_MAP</div>
+<div class="text-xl font-bold mono-text text-on-surface">FLIGHT_PATH_DELTA</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] text-outline mono-text">VELOCITY</div>
+<div class="text-lg font-bold mono-text text-secondary">2,840 m/s</div>
+</div>
+</div>
+<!-- Placeholder for Map/Graph -->
+<div class="flex-1 bg-background/50 rounded flex items-center justify-center overflow-hidden border border-outline-variant/10">
+<img alt="Dynamic Map" class="w-full h-full object-cover opacity-50" data-alt="Technological dark world map with data points and paths" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCg-6U7cqonwgLSQKsdStAtV-PFDtXAHCj4OgX8ZlXGEskWgtH2Uw6CA6IF2gMlZmWbb6bC6JJYw3uAg3HHJTCzb_qbqC-0bmS0fKhriaRDGe2_fvQ_KuYRBsHFPuMoRhJhe5QbhBUbjanuznX3zxXHugnxBtx7vDz6GHGHPMAZ6t-vxzYdCR-KdKJVFx00Ri8NafwU1QEkcn_CEvrlZaujK1guapm9-zmH1meVUvOPr3jpLW6Mb0KJZAVzE24j1xZ9h7aBpLMEQGg"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Command Interface -->
+<div class="h-48 bg-surface-container-lowest rounded-xl border border-outline-variant/15 p-4 flex flex-col font-mono text-xs">
+<div class="flex items-center gap-2 mb-2 text-outline">
+<span class="material-symbols-outlined text-xs">terminal</span>
+<span>SEQUENTIAL_OUTPUT</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-1 text-on-surface-variant">
+<div class="flex gap-4"><span class="text-primary opacity-50">14:20:01</span> <span>INITIALIZING_SMUX_CORE...</span></div>
+<div class="flex gap-4"><span class="text-primary opacity-50">14:20:03</span> <span class="text-secondary">[OK] SUBSYSTEMS_ONLINE</span></div>
+<div class="flex gap-4"><span class="text-primary opacity-50">14:20:05</span> <span>LINKING_TO_CLUSTER_NODE_BRAVO_07...</span></div>
+<div class="flex gap-4"><span class="text-primary opacity-50">14:20:08</span> <span class="text-secondary">[OK] HANDSHAKE_COMPLETE</span></div>
+<div class="flex gap-4"><span class="text-primary opacity-50">14:21:00</span> <span class="animate-pulse text-primary">&gt;_ AWAITING_OPERATOR_INPUT</span></div>
+</div>
+</div>
+</div>
+<!-- Right Pane: Verifier & Sidebar Controls -->
+<div class="col-span-12 lg:col-span-5 flex flex-col gap-6 overflow-hidden">
+<!-- Verifier Module -->
+<div class="flex-1 bg-surface-container-low rounded-xl border border-outline-variant/15 flex flex-col overflow-hidden">
+<div class="px-4 py-3 border-b border-outline-variant/15 flex justify-between items-center bg-surface-container">
+<span class="text-xs font-bold mono-text text-secondary">VERIFIER_ENGINE</span>
+<span class="text-[10px] text-on-secondary bg-secondary px-2 py-0.5 rounded font-bold uppercase">LIVE</span>
+</div>
+<div class="flex-1 p-4 space-y-4">
+<!-- Status Card -->
+<div class="bg-surface-container-high/50 p-4 rounded-lg border border-outline-variant/20">
+<div class="flex justify-between items-center mb-3">
+<span class="text-[10px] mono-text text-outline uppercase tracking-widest">Integrity Report</span>
+<span class="text-xs font-bold text-on-surface mono-text">99.8%</span>
+</div>
+<div class="w-full bg-background h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[99.8%]"></div>
+</div>
+</div>
+<!-- Dense Control Grid -->
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/15 flex flex-col gap-2">
+<span class="text-[10px] text-outline mono-text">LATENCY_SYNC</span>
+<div class="flex justify-between items-end">
+<span class="text-lg font-bold mono-text text-on-surface">1.2ms</span>
+<span class="material-symbols-outlined text-secondary text-lg">bolt</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-3 rounded-lg border border-outline-variant/15 flex flex-col gap-2">
+<span class="text-[10px] text-outline mono-text">PACKET_LOSS</span>
+<div class="flex justify-between items-end">
+<span class="text-lg font-bold mono-text text-on-surface">0.00%</span>
+<span class="material-symbols-outlined text-secondary text-lg">check_circle</span>
+</div>
+</div>
+</div>
+<!-- List of checks -->
+<div class="flex-1 space-y-2 overflow-y-auto pr-2">
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-highest/30 border-l-2 border-secondary">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-sm">verified_user</span>
+<span class="text-xs mono-text text-on-surface">AUTH_KEY_ROTATION</span>
+</div>
+<span class="text-[10px] mono-text text-outline">VALID</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-highest/30 border-l-2 border-secondary">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-sm">verified_user</span>
+<span class="text-xs mono-text text-on-surface">KERNEL_MEMORY_LOCK</span>
+</div>
+<span class="text-[10px] mono-text text-outline">LOCKED</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-highest/30 border-l-2 border-primary">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm">sync</span>
+<span class="text-xs mono-text text-on-surface">REDUNDANCY_SYNC</span>
+</div>
+<span class="text-[10px] mono-text text-outline">PENDING</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-surface-container-highest/30 border-l-2 border-secondary">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary text-sm">verified_user</span>
+<span class="text-xs mono-text text-on-surface">ENCRYPTION_LAYER_7</span>
+</div>
+<span class="text-[10px] mono-text text-outline">ACTIVE</span>
+</div>
+</div>
+</div>
+<div class="p-4 bg-surface-container-high">
+<button class="w-full bg-secondary-container text-on-secondary-container py-3 rounded font-bold text-xs mono-text hover:brightness-110 transition-all">
+                                TRIGGER_RE_VERIFICATION
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar / Data Ribbon -->
+<footer class="bg-[#272a31] dark:bg-[#272a31] fixed bottom-0 left-0 w-full z-50 flex justify-end items-center px-4 gap-6 h-8 shrink-0">
+<div class="flex items-center gap-2 text-cyan-400 font-['JetBrains_Mono'] text-[10px] uppercase font-medium">
+<span class="material-symbols-outlined text-sm">memory</span>
+            CPU: 12%
+        </div>
+<div class="flex items-center gap-2 text-slate-400 hover:text-cyan-300 transition-colors font-['JetBrains_Mono'] text-[10px] uppercase font-medium cursor-default">
+<span class="material-symbols-outlined text-sm">speed</span>
+            LATENCY: 14ms
+        </div>
+<div class="flex items-center gap-2 text-slate-400 hover:text-cyan-300 transition-colors font-['JetBrains_Mono'] text-[10px] uppercase font-medium cursor-default">
+<span class="material-symbols-outlined text-sm">account_tree</span>
+            GIT: main
+        </div>
+<div class="flex items-center gap-2 text-slate-400 hover:text-cyan-300 transition-colors font-['JetBrains_Mono'] text-[10px] uppercase font-medium cursor-default">
+<span class="material-symbols-outlined text-sm">timer</span>
+            UPTIME: 42h
+        </div>
+</footer>
+</body></html>

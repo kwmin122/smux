@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TERMINAL_OS | REWIND_MODE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-error": "#690005",
+              "surface-container-lowest": "#0b0e14",
+              "tertiary-fixed": "#ffdad8",
+              "on-primary-fixed": "#001c39",
+              "surface-tint": "#a4c9ff",
+              "primary-container": "#60a5fa",
+              "on-tertiary-fixed": "#410006",
+              "on-secondary-container": "#004d44",
+              "on-primary-container": "#003a6b",
+              "on-secondary-fixed": "#00201c",
+              "surface-bright": "#363940",
+              "tertiary-fixed-dim": "#ffb3b0",
+              "primary": "#a4c9ff",
+              "on-primary": "#00315d",
+              "background": "#10131a",
+              "surface-container-low": "#191c22",
+              "inverse-on-surface": "#2e3037",
+              "on-error-container": "#ffdad6",
+              "tertiary-container": "#ff7978",
+              "outline-variant": "#414751",
+              "primary-fixed": "#d4e3ff",
+              "secondary": "#44e2cd",
+              "secondary-container": "#03c6b2",
+              "secondary-fixed": "#62fae3",
+              "surface-variant": "#32353c",
+              "inverse-surface": "#e1e2eb",
+              "surface": "#10131a",
+              "primary-fixed-dim": "#a4c9ff",
+              "on-primary-fixed-variant": "#004883",
+              "inverse-primary": "#0060ac",
+              "error-container": "#93000a",
+              "outline": "#8b919d",
+              "on-surface-variant": "#c1c7d3",
+              "on-tertiary": "#670211",
+              "on-tertiary-container": "#740d18",
+              "surface-container-highest": "#32353c",
+              "surface-dim": "#10131a",
+              "on-secondary-fixed-variant": "#005047",
+              "error": "#ffb4ab",
+              "on-background": "#e1e2eb",
+              "on-tertiary-fixed-variant": "#881d24",
+              "surface-container": "#1d2026",
+              "on-secondary": "#003731",
+              "secondary-fixed-dim": "#3cddc7",
+              "tertiary": "#ffb3b0",
+              "on-surface": "#e1e2eb",
+              "surface-container-high": "#272a31"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"],
+              "mono": ["JetBrains Mono"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .terminal-blur { backdrop-filter: blur(12px); }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container min-h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar Component -->
+<header class="bg-[#10131a] border-none fixed top-0 w-full z-40 flex justify-between items-center w-full px-6 py-3">
+<div class="flex items-center gap-6">
+<span class="text-xl font-black text-blue-400 tracking-[-0.02em] font-['Inter'] uppercase">TERMINAL_OS</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-slate-400 font-medium font-['Inter'] text-sm hover:bg-slate-800/50 transition-colors duration-200 px-2 py-1" href="#">Dashboard</a>
+<a class="text-blue-400 font-bold border-b-2 border-blue-400 pb-1 font-['Inter'] text-sm uppercase" href="#">Rewind</a>
+<a class="text-slate-400 font-medium font-['Inter'] text-sm hover:bg-slate-800/50 transition-colors duration-200 px-2 py-1" href="#">Nodes</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
+<input class="bg-surface-container-lowest border-none rounded-lg pl-10 pr-4 py-1.5 text-xs font-mono focus:ring-1 focus:ring-primary/40 w-64" placeholder="GOTO_TIMESTAMP..." type="text"/>
+</div>
+<button class="text-slate-400 hover:bg-slate-800/50 p-2 transition-all"><span class="material-symbols-outlined">help_outline</span></button>
+<button class="text-slate-400 hover:bg-slate-800/50 p-2 transition-all"><span class="material-symbols-outlined">settings</span></button>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-slate-700">
+<img alt="User Profile" data-alt="Cyberpunk style user profile avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKu3IDGmb1DS5_L8pAUBh1H9xaLBzCNZ50cOuf1MfNOZLQgHHuDDex-yugJrVLXH6PY0ecUgKAMnwuQDL_yUgME4MPjnSss89rjH9a7mg2A5mKXE1cbayaDis4ic-lB7aI6tdA97xiZRYn1ceirCTsKRalbVlhCPCKS2B9gWEdANs0aS8GXV1YRpmddov6B7EmVyUWJs3IDt0EWlV64zHsg_sCQW4oTmy491aa1K4aSOhu3BNLe91WWOR6EgDGmdEPlU5wfosEApM"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 pt-14 pb-8 overflow-hidden">
+<!-- SideNavBar Component -->
+<aside class="bg-[#0b0e14] flex flex-col h-full border-r border-slate-800/20 w-64 shrink-0 font-['JetBrains_Mono'] text-xs tracking-tight">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-10 h-10 bg-surface-container-high rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">dns</span>
+</div>
+<div>
+<div class="text-blue-400 font-bold text-lg leading-none">NODE_01</div>
+<div class="text-slate-500 text-[10px] uppercase">Active Session</div>
+</div>
+</div>
+<button class="w-full bg-primary-container text-on-primary-container font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 mb-8 hover:opacity-90 transition-all scale-98 active:scale-95">
+<span class="material-symbols-outlined text-sm">add_circle</span>
+                    NEW_TERMINAL
+                </button>
+</div>
+<nav class="flex-1 overflow-y-auto no-scrollbar">
+<div class="px-2 space-y-1">
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-slate-800/30 text-slate-300 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-sm">terminal</span> Sessions
+                    </a>
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-slate-800/30 text-slate-300 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-sm">dns</span> Clusters
+                    </a>
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-slate-800/30 text-slate-300 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-sm">lan</span> Network
+                    </a>
+<a class="bg-blue-500/10 text-blue-400 border-r-2 border-blue-400 px-4 py-3 flex items-center gap-4" href="#">
+<span class="material-symbols-outlined text-sm">list_alt</span> Logs
+                    </a>
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-slate-800/30 text-slate-300 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-sm">lock</span> Vault
+                    </a>
+</div>
+</nav>
+<div class="p-4 mt-auto">
+<a class="text-slate-500 px-4 py-3 flex items-center gap-4 hover:bg-slate-800/30 text-slate-300 transition-all rounded" href="#">
+<span class="material-symbols-outlined text-sm">settings</span> Settings
+                </a>
+</div>
+</aside>
+<!-- Main Workspace: Rewind Canvas -->
+<main class="flex-1 flex flex-col p-6 gap-6 bg-surface overflow-hidden relative">
+<!-- Glassmorphism Scrubber Header -->
+<div class="flex items-center justify-between bg-surface-container-high/40 terminal-blur p-4 rounded-xl border border-outline-variant/15">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-lowest rounded-full border border-primary/20">
+<span class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#a4c9ff]"></span>
+<span class="font-mono text-[10px] text-primary tracking-widest uppercase">Rewind Mode Active</span>
+</div>
+<span class="font-mono text-sm text-on-surface-variant">T-MINUS: <span class="text-on-surface font-bold">04:12:88</span></span>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">first_page</span></button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">fast_rewind</span></button>
+<button class="w-10 h-10 flex items-center justify-center bg-primary text-on-primary rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">fast_forward</span></button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors"><span class="material-symbols-outlined">last_page</span></button>
+</div>
+<button class="bg-secondary-container text-on-secondary-container font-bold px-4 py-2 rounded-lg flex items-center gap-2 text-xs uppercase hover:opacity-90 transition-all">
+<span class="material-symbols-outlined text-sm">restore</span>
+                    Restore State
+                </button>
+</div>
+<!-- Bento Content Area -->
+<div class="grid grid-cols-12 gap-6 flex-1 min-h-0">
+<!-- Log Terminal Section -->
+<div class="col-span-12 lg:col-span-8 flex flex-col bg-surface-container-lowest rounded-xl overflow-hidden border border-outline-variant/10">
+<div class="bg-surface-container flex items-center justify-between px-4 py-2 border-b border-outline-variant/10">
+<span class="font-mono text-[10px] text-slate-500 uppercase tracking-widest">Main_Terminal_Output [RW_BUFFER]</span>
+<div class="flex gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+</div>
+</div>
+<div class="flex-1 p-6 font-mono text-xs overflow-y-auto no-scrollbar space-y-4">
+<div class="flex gap-4">
+<span class="text-slate-600 shrink-0">12:04:12</span>
+<span class="text-secondary">[SUCCESS]</span>
+<span class="text-on-surface-variant">Cluster sync handshake complete. Node_01 acknowledging.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-600 shrink-0">12:04:15</span>
+<span class="text-primary">[INFO]</span>
+<span class="text-on-surface-variant">Initializing sub-process "REPLAY_DAEMON". Port 8088 exposed.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-600 shrink-0">12:04:22</span>
+<span class="text-primary">[INFO]</span>
+<span class="text-on-surface-variant">Loading session snapshot 0xFF21-A9...</span>
+</div>
+<div class="flex gap-4 bg-primary/5 p-2 -mx-2 rounded">
+<span class="text-primary shrink-0">12:04:30</span>
+<span class="text-primary font-bold">[SCRUB_HIT]</span>
+<span class="text-on-surface">Configuration change detected in /etc/network/config.yaml</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-600 shrink-0">12:04:45</span>
+<span class="text-error">[WARN]</span>
+<span class="text-on-surface-variant">Packet loss detected on eth0. Dropping to 100Mbps.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-600 shrink-0">12:05:01</span>
+<span class="text-primary">[INFO]</span>
+<span class="text-on-surface-variant">Rewriting kernel pointers for memory alignment.</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-600 shrink-0">12:05:12</span>
+<span class="text-primary">[INFO]</span>
+<span class="text-on-surface-variant">Buffer flush successful. Ready for next instruction.</span>
+</div>
+<!-- Blinking Cursor -->
+<div class="flex gap-4">
+<span class="text-slate-600 shrink-0">12:05:15</span>
+<div class="w-2 h-4 bg-primary animate-pulse"></div>
+</div>
+</div>
+</div>
+<!-- History Sidebar -->
+<div class="col-span-12 lg:col-span-4 flex flex-col bg-surface-container-low rounded-xl border border-outline-variant/10 overflow-hidden">
+<div class="p-4 border-b border-outline-variant/10 flex items-center justify-between">
+<span class="font-bold text-xs uppercase tracking-tighter">Event History</span>
+<span class="material-symbols-outlined text-slate-500 text-sm">history</span>
+</div>
+<div class="flex-1 overflow-y-auto no-scrollbar">
+<div class="space-y-1 p-2">
+<div class="p-3 rounded-lg hover:bg-surface-container-highest/50 cursor-pointer transition-colors group">
+<div class="flex justify-between items-start mb-1">
+<span class="font-mono text-[10px] text-primary">T-04:12:88</span>
+<span class="bg-primary/10 text-primary text-[8px] px-1 rounded">CURRENT</span>
+</div>
+<div class="text-xs font-bold mb-1">System State Restored</div>
+<div class="text-[10px] text-on-surface-variant leading-relaxed">Automatic backup point generated by Kernel.</div>
+</div>
+<div class="p-3 rounded-lg hover:bg-surface-container-highest/50 cursor-pointer transition-colors group">
+<div class="flex justify-between items-start mb-1">
+<span class="font-mono text-[10px] text-slate-500">T-06:45:12</span>
+</div>
+<div class="text-xs font-bold mb-1">Config Conflict</div>
+<div class="text-[10px] text-on-surface-variant leading-relaxed">User modified network settings via SSH.</div>
+</div>
+<div class="p-3 rounded-lg bg-surface-container-highest/30 border border-primary/10 cursor-pointer transition-colors group">
+<div class="flex justify-between items-start mb-1">
+<span class="font-mono text-[10px] text-slate-500">T-12:30:00</span>
+</div>
+<div class="text-xs font-bold mb-1">Cluster Rebalance</div>
+<div class="text-[10px] text-on-surface-variant leading-relaxed">Nodes redistributed across 3 regions.</div>
+</div>
+<div class="p-3 rounded-lg hover:bg-surface-container-highest/50 cursor-pointer transition-colors group">
+<div class="flex justify-between items-start mb-1">
+<span class="font-mono text-[10px] text-slate-500">T-24:00:00</span>
+</div>
+<div class="text-xs font-bold mb-1">Daily Maintenance</div>
+<div class="text-[10px] text-on-surface-variant leading-relaxed">Routine script run completed successfully.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Timeline Scrubber View (Bottom-locked in main content) -->
+<div class="mt-auto h-32 bg-surface-container-low/50 border border-outline-variant/10 rounded-xl p-4 flex flex-col gap-4 relative overflow-hidden">
+<div class="flex justify-between items-end">
+<span class="font-mono text-[10px] text-slate-500">-24H</span>
+<span class="font-mono text-xs text-primary font-bold">SCRUBBING_HEAD: 04:12:88</span>
+<span class="font-mono text-[10px] text-slate-500">REALTIME</span>
+</div>
+<!-- Timeline Visualizer -->
+<div class="relative h-12 flex items-center">
+<!-- Tracks -->
+<div class="absolute inset-0 flex items-center">
+<div class="w-full h-px bg-slate-800"></div>
+</div>
+<!-- Activity Pips -->
+<div class="flex-1 h-full flex items-end justify-around px-2 relative z-10">
+<div class="w-1 h-4 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-6 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-3 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-8 bg-primary/40 rounded-full shadow-[0_0_8px_#a4c9ff66]"></div>
+<div class="w-1 h-5 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-4 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-2 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-7 bg-primary rounded-full shadow-[0_0_12px_#a4c9ff]"></div>
+<div class="w-1 h-3 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-6 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-4 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-10 bg-error/40 rounded-full"></div>
+<div class="w-1 h-5 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-8 bg-slate-700 rounded-full"></div>
+<div class="w-1 h-4 bg-slate-700 rounded-full"></div>
+</div>
+<!-- Scrubber Indicator -->
+<div class="absolute left-[62%] h-full w-px bg-primary z-20 shadow-[0_0_15px_#a4c9ff]">
+<div class="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-primary rounded-full border-2 border-surface"></div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Data Ribbon) -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex justify-end items-center px-4 gap-6 bg-[#272a31] h-8 font-['JetBrains_Mono'] text-[10px] uppercase font-medium">
+<div class="text-slate-400 flex items-center gap-2 hover:text-cyan-300 transition-colors">
+<span class="material-symbols-outlined text-xs">memory</span>
+            CPU: 12%
+        </div>
+<div class="text-slate-400 flex items-center gap-2 hover:text-cyan-300 transition-colors">
+<span class="material-symbols-outlined text-xs">speed</span>
+            LATENCY: 14ms
+        </div>
+<div class="text-slate-400 flex items-center gap-2 hover:text-cyan-300 transition-colors">
+<span class="material-symbols-outlined text-xs">account_tree</span>
+            GIT: main
+        </div>
+<div class="text-cyan-400 flex items-center gap-2 hover:text-cyan-300 transition-colors">
+<span class="material-symbols-outlined text-xs">timer</span>
+            UPTIME: 42h
+        </div>
+</footer>
+</body></html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TACTICAL_OS_V4 - REWIND_MODE</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-variant": "#333534",
+              "secondary-fixed": "#6bff8f",
+              "surface": "#121413",
+              "inverse-surface": "#e2e3e0",
+              "on-primary-fixed-variant": "#005227",
+              "primary-fixed-dim": "#4de082",
+              "inverse-primary": "#006d36",
+              "inverse-on-surface": "#2f3130",
+              "tertiary-container": "#ffb0aa",
+              "on-error-container": "#ffdad6",
+              "outline-variant": "#3d4a3e",
+              "primary-fixed": "#6dfe9c",
+              "secondary": "#4ae176",
+              "secondary-container": "#00b954",
+              "on-secondary-fixed": "#002109",
+              "on-primary-container": "#005e2d",
+              "primary": "#6bfb9a",
+              "tertiary-fixed-dim": "#ffb3ad",
+              "surface-bright": "#383a38",
+              "background": "#121413",
+              "on-primary": "#003919",
+              "surface-container-low": "#1a1c1b",
+              "tertiary-fixed": "#ffdad7",
+              "surface-container-lowest": "#0d0f0e",
+              "on-error": "#690005",
+              "primary-container": "#4ade80",
+              "surface-tint": "#4de082",
+              "on-primary-fixed": "#00210c",
+              "on-secondary-container": "#004119",
+              "on-tertiary-fixed": "#410004",
+              "tertiary": "#ffd7d3",
+              "on-surface": "#e2e3e0",
+              "surface-container-high": "#282a29",
+              "on-background": "#e2e3e0",
+              "on-tertiary-fixed-variant": "#930013",
+              "on-secondary": "#003915",
+              "secondary-fixed-dim": "#4ae176",
+              "surface-container": "#1e201f",
+              "on-surface-variant": "#bccabb",
+              "on-tertiary": "#68000a",
+              "on-tertiary-container": "#a50318",
+              "surface-container-highest": "#333534",
+              "surface-dim": "#121413",
+              "on-secondary-fixed-variant": "#005321",
+              "error": "#ffb4ab",
+              "error-container": "#93000a",
+              "outline": "#869486"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["JetBrains Mono"],
+              "label": ["Space Grotesk"]
+            },
+            borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .scanline-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 4px;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        .glow-primary:hover {
+            box-shadow: 0 0 15px rgba(107, 251, 154, 0.4);
+        }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0d0f0e; }
+        ::-webkit-scrollbar-thumb { background: #3d4a3e; }
+        .mask-gradient {
+            mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden">
+<div class="scanline-overlay"></div>
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-4 h-12 bg-[#121413] font-headline uppercase tracking-tighter font-bold text-lg">
+<div class="flex items-center gap-6">
+<span class="text-xl font-black text-[#6bfb9a] tracking-widest">TACTICAL_OS_V4</span>
+<nav class="hidden md:flex gap-6 text-xs mt-1">
+<a class="text-[#6bfb9a]/60 hover:text-[#6bfb9a]" href="#">COMMAND</a>
+<a class="text-[#6bfb9a] border-b-2 border-[#6bfb9a] pb-1" href="#">REWIND_MODE</a>
+<a class="text-[#6bfb9a]/60 hover:text-[#6bfb9a]" href="#">SENSORS</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden sm:flex items-center bg-surface-container-lowest px-2 py-1 gap-2 border border-outline-variant/20">
+<span class="material-symbols-outlined text-primary text-sm">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-[10px] w-32 uppercase placeholder:text-outline-variant" placeholder="SYS_QUERY..." type="text"/>
+</div>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-primary hover:text-on-primary transition-all p-1">settings</span>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-primary hover:text-on-primary transition-all p-1">terminal</span>
+<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-primary hover:text-on-primary transition-all p-1">notifications</span>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-12 h-[calc(100%-3rem)] w-64 flex flex-col justify-between py-4 bg-[#121413] z-40">
+<div class="px-4 mb-6">
+<div class="flex items-center gap-3 p-2 bg-surface-container-low mb-8">
+<div class="w-10 h-10 bg-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" data-weight="fill">person</span>
+</div>
+<div>
+<div class="text-[10px] font-bold text-primary opacity-50">OPERATOR_01</div>
+<div class="text-xs font-black text-primary">SECTOR_7_OPS</div>
+</div>
+</div>
+<nav class="space-y-1">
+<div class="flex items-center gap-3 px-3 py-2 text-[#6bfb9a] opacity-70 hover:opacity-100 hover:bg-[#1e201f] transition-all cursor-pointer font-bold text-xs uppercase group">
+<span class="material-symbols-outlined text-lg" data-icon="terminal">terminal</span>
+<span>COMMAND</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 bg-[#6bfb9a] text-[#003919] font-black border-l-4 border-[#4ade80] transition-all cursor-pointer text-xs uppercase">
+<span class="material-symbols-outlined text-lg" data-icon="history">history</span>
+<span>REWIND_MODE</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-[#6bfb9a] opacity-70 hover:opacity-100 hover:bg-[#1e201f] transition-all cursor-pointer font-bold text-xs uppercase">
+<span class="material-symbols-outlined text-lg" data-icon="hub">hub</span>
+<span>NETWORK</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-[#6bfb9a] opacity-70 hover:opacity-100 hover:bg-[#1e201f] transition-all cursor-pointer font-bold text-xs uppercase">
+<span class="material-symbols-outlined text-lg" data-icon="radar">radar</span>
+<span>SENSORS</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-[#6bfb9a] opacity-70 hover:opacity-100 hover:bg-[#1e201f] transition-all cursor-pointer font-bold text-xs uppercase">
+<span class="material-symbols-outlined text-lg" data-icon="database">database</span>
+<span>LOGS</span>
+</div>
+</nav>
+</div>
+<div class="px-4 space-y-1">
+<button class="w-full bg-primary py-3 text-on-primary font-black text-xs tracking-widest uppercase glow-primary transition-all active:scale-95 mb-4">
+                EXECUTE_PURGE
+            </button>
+<div class="flex items-center gap-3 px-3 py-2 text-[#6bfb9a] opacity-70 hover:opacity-100 transition-all cursor-pointer font-bold text-xs uppercase">
+<span class="material-symbols-outlined text-lg">build</span>
+<span>DIAGNOSTICS</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-[#6bfb9a] opacity-70 hover:opacity-100 transition-all cursor-pointer font-bold text-xs uppercase">
+<span class="material-symbols-outlined text-lg">logout</span>
+<span>LOGOUT</span>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-12 pb-6 h-screen overflow-hidden flex flex-col">
+<!-- Control Header -->
+<div class="flex justify-between items-end p-6 border-b border-outline-variant/10">
+<div>
+<h1 class="font-headline text-3xl font-black text-on-surface tracking-tighter uppercase">Scrubbing_Session: 0xFF21</h1>
+<p class="text-[10px] text-primary/60 font-bold uppercase tracking-[0.2em] mt-1">Temporal Data Reconstruction in Progress</p>
+</div>
+<div class="flex gap-4">
+<button class="flex items-center gap-2 px-4 py-2 border border-primary text-primary text-xs font-bold uppercase hover:bg-primary/10 transition-all">
+<span class="material-symbols-outlined text-sm">download</span> Export_State
+                </button>
+<button class="flex items-center gap-2 px-6 py-2 bg-secondary-container text-on-secondary-container text-xs font-black uppercase glow-primary transition-all active:translate-y-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">refresh</span> Restore State
+                </button>
+</div>
+</div>
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Side: Scrubber & Visual Log -->
+<div class="flex-1 flex flex-col border-r border-outline-variant/10">
+<!-- Main Scrubber Visualizer -->
+<div class="flex-1 p-6 relative bg-surface-container-lowest">
+<div class="absolute top-4 left-4 flex gap-2">
+<span class="bg-primary/20 text-primary text-[10px] px-2 py-0.5 font-bold border border-primary/30 uppercase">HD_BUFFER: 98.2%</span>
+<span class="bg-surface-container-high text-on-surface-variant text-[10px] px-2 py-0.5 font-bold uppercase">Frame: 12,402</span>
+</div>
+<!-- Asymmetric Tactical Card Grid -->
+<div class="grid grid-cols-12 grid-rows-6 gap-4 h-full">
+<div class="col-span-8 row-span-4 bg-surface-container border border-outline-variant/20 relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-8 h-4 bg-primary flex items-center justify-center text-[8px] font-black text-on-primary uppercase">VIEW_A</div>
+<img class="w-full h-full object-cover opacity-50 grayscale contrast-125 group-hover:scale-105 transition-transform duration-700" data-alt="Cybersecurity server infrastructure visualizer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA-YMmHiikpNdTpdAtZ_ITLKS6btgVnvUlwU2GDGtSVtEXoR4zOHaiNRlLZ19EGvIEmxOPltp5Ot5w1gBtA8eYcztv8EE0jik-MaUaBwOIqvcKmlF2FRbBUbWaQzvyCe9ShVI2yWl2VC2pjh29AwW-UmyTbpzZvgFQjWFNh44VfUm15YWFv_ltZSayQ-x1ar1xR-cWOa0iJX7g7v-d9IHTctNbSA6kLvP4NWVTmq96nOjJRdvpWiIT-WFw6q3ZkFc5EkoixbZSmHFw"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-80"></div>
+<div class="absolute bottom-4 left-4 right-4">
+<div class="flex justify-between items-end mb-2">
+<div class="text-xl font-headline font-black text-primary">NETWORK_TRAFFIC_SPIKE</div>
+<div class="text-xs text-primary font-bold">T-MINUS: 00:04:12</div>
+</div>
+<div class="h-1 bg-surface-container-highest w-full">
+<div class="h-full bg-primary w-2/3 shadow-[0_0_8px_rgba(107,251,154,0.6)]"></div>
+</div>
+</div>
+</div>
+<div class="col-span-4 row-span-2 bg-surface-container-low p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="text-[10px] text-primary/60 font-bold uppercase tracking-widest">ENCRYPTION_KEY</span>
+<span class="material-symbols-outlined text-primary text-sm">lock</span>
+</div>
+<div class="text-2xl font-headline font-black text-on-surface truncate">0x9F...A231</div>
+<div class="text-[8px] text-outline-variant font-bold leading-none">VALIDATED_BY_NODE_07</div>
+</div>
+<div class="col-span-4 row-span-2 bg-surface-container border border-primary/20 p-4 relative overflow-hidden">
+<div class="absolute -right-4 -bottom-4 opacity-5">
+<span class="material-symbols-outlined text-8xl">radar</span>
+</div>
+<div class="text-[10px] text-primary/60 font-bold uppercase mb-2">GPS_ANCHOR</div>
+<div class="text-lg font-black text-on-surface">40.7128° N</div>
+<div class="text-lg font-black text-on-surface">74.0060° W</div>
+</div>
+<div class="col-span-4 row-span-2 bg-[#1e201f] p-4 flex flex-col">
+<div class="text-[10px] text-secondary font-bold uppercase tracking-widest mb-3">SYSTEM_LOG_FEED</div>
+<div class="flex-1 font-body text-[9px] text-on-surface-variant overflow-hidden space-y-1">
+<div class="flex gap-2">
+<span class="text-primary/40 shrink-0">12:04:01</span>
+<span class="truncate">&gt;&gt; Handshake successful with Peer_9</span>
+</div>
+<div class="flex gap-2">
+<span class="text-primary/40 shrink-0">12:04:15</span>
+<span class="truncate">&gt;&gt; Packet fragmentation detected</span>
+</div>
+<div class="flex gap-2">
+<span class="text-error shrink-0">12:04:30</span>
+<span class="truncate">&gt;&gt; WARN: Payload mismatch</span>
+</div>
+</div>
+</div>
+<div class="col-span-8 row-span-2 bg-surface-container-highest flex items-center justify-center relative">
+<div class="absolute top-2 left-2 text-[8px] font-bold text-outline uppercase tracking-widest">Frequency_Analysis</div>
+<div class="w-full h-12 flex items-center justify-center gap-[2px] px-8">
+<div class="w-1 bg-primary h-4 opacity-20"></div>
+<div class="w-1 bg-primary h-6 opacity-40"></div>
+<div class="w-1 bg-primary h-10 opacity-60"></div>
+<div class="w-1 bg-primary h-8 opacity-80 shadow-[0_0_8px_#6bfb9a]"></div>
+<div class="w-1 bg-primary h-12 shadow-[0_0_12px_#6bfb9a]"></div>
+<div class="w-1 bg-primary h-6 shadow-[0_0_8px_#6bfb9a]"></div>
+<div class="w-1 bg-primary h-4 opacity-80"></div>
+<div class="w-1 bg-primary h-8 opacity-60"></div>
+<div class="w-1 bg-primary h-12 opacity-40"></div>
+<div class="w-1 bg-primary h-4 opacity-20"></div>
+<div class="w-1 bg-primary h-10 opacity-20"></div>
+<div class="w-1 bg-primary h-8 opacity-40"></div>
+<div class="w-1 bg-primary h-12 opacity-60"></div>
+<div class="w-1 bg-primary h-10 opacity-80 shadow-[0_0_8px_#6bfb9a]"></div>
+<div class="w-1 bg-primary h-4 shadow-[0_0_12px_#6bfb9a]"></div>
+<div class="w-1 bg-primary h-8 shadow-[0_0_8px_#6bfb9a]"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Timeline Scrubber UI -->
+<div class="h-32 bg-surface-container px-6 py-4 border-t border-outline-variant/10">
+<div class="flex justify-between items-center mb-3">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary cursor-pointer">skip_previous</span>
+<span class="material-symbols-outlined text-primary cursor-pointer text-3xl">play_circle</span>
+<span class="material-symbols-outlined text-primary cursor-pointer">skip_next</span>
+</div>
+<div class="text-xs font-black text-primary bg-surface-container-lowest px-3 py-1 border border-primary/20">
+                            TIME: 04:12:00:88
+                        </div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer text-sm">speed</span>
+<span class="text-[10px] font-bold">1.0X</span>
+</div>
+</div>
+<div class="relative h-8 group cursor-pointer">
+<div class="absolute inset-0 bg-surface-container-low flex items-center">
+<div class="h-[2px] w-full bg-outline-variant/30"></div>
+</div>
+<!-- Scrubber Marks -->
+<div class="absolute inset-0 flex justify-between items-center mask-gradient px-4">
+<div class="w-[1px] h-3 bg-outline-variant"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-3 bg-primary/40"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-3 bg-outline-variant"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-3 bg-primary shadow-[0_0_10px_#6bfb9a] h-6 z-10"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-3 bg-outline-variant"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-1 bg-outline-variant/50"></div>
+<div class="w-[1px] h-3 bg-outline-variant"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- History Sidebar -->
+<aside class="w-80 flex flex-col bg-surface">
+<div class="p-4 border-b border-outline-variant/10 flex justify-between items-center">
+<span class="text-xs font-black uppercase tracking-widest text-primary">History_Log</span>
+<span class="material-symbols-outlined text-sm text-outline cursor-pointer hover:text-primary">filter_list</span>
+</div>
+<div class="flex-1 overflow-y-auto p-2 space-y-1">
+<!-- Log Entries -->
+<div class="p-3 bg-surface-container hover:bg-surface-container-high cursor-pointer transition-all border-l-2 border-primary">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[9px] font-bold text-primary">12:04:30</span>
+<span class="text-[8px] px-1 bg-error-container text-on-error-container uppercase font-black">Event</span>
+</div>
+<div class="text-[11px] font-bold uppercase text-on-surface">Payload_Mismatch_Detected</div>
+<div class="text-[9px] text-on-surface-variant leading-tight mt-1 opacity-70 italic">Automatic state capture recorded...</div>
+</div>
+<div class="p-3 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all border-l-2 border-transparent">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[9px] font-bold text-primary/60">12:04:15</span>
+<span class="text-[8px] px-1 bg-surface-container-highest text-on-surface-variant uppercase font-black">Info</span>
+</div>
+<div class="text-[11px] font-bold uppercase text-on-surface">Node_Handshake_Complete</div>
+</div>
+<div class="p-3 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all border-l-2 border-transparent">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[9px] font-bold text-primary/60">11:58:22</span>
+<span class="text-[8px] px-1 bg-secondary-container text-on-secondary-container uppercase font-black">Snapshot</span>
+</div>
+<div class="text-[11px] font-bold uppercase text-on-surface">System_State_Stable</div>
+</div>
+<div class="p-3 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all border-l-2 border-transparent opacity-50">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[9px] font-bold text-primary/60">11:45:00</span>
+<span class="text-[8px] px-1 bg-surface-container-highest text-on-surface-variant uppercase font-black">Info</span>
+</div>
+<div class="text-[11px] font-bold uppercase text-on-surface">Initial_Boot_Sequence</div>
+</div>
+</div>
+<!-- Terminal Log Input -->
+<div class="p-4 bg-surface-container-lowest border-t border-outline-variant/20">
+<div class="flex items-center gap-2 text-primary font-bold text-[10px] mb-2">
+<span>SYS:REWIND_DAEMON</span>
+<span class="w-1.5 h-3 bg-primary animate-pulse"></span>
+</div>
+<div class="relative">
+<input class="w-full bg-surface p-2 text-[10px] border-none focus:ring-1 focus:ring-primary/40 uppercase font-bold text-primary placeholder:text-outline-variant/40" placeholder="COMMAND_ENTRY..." type="text"/>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- BottomNavBar -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex justify-between items-center px-6 py-1 h-6 bg-[#0d0f0e] border-t border-[#3d4a3e]/20 font-body text-[10px] tracking-widest text-[#6bfb9a]">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px] font-bold" data-icon="check_circle">check_circle</span>
+<span class="font-bold">STATUS:NOMINAL</span>
+</div>
+<div class="flex items-center gap-1 opacity-40">
+<span class="material-symbols-outlined text-[12px]" data-icon="location_on">location_on</span>
+<span>LAT:40.71</span>
+</div>
+<div class="flex items-center gap-1 opacity-40">
+<span class="material-symbols-outlined text-[12px]" data-icon="explore">explore</span>
+<span>LON:-74.00</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1 opacity-40">
+<span class="material-symbols-outlined text-[12px]" data-icon="settings_input_antenna">settings_input_antenna</span>
+<span>FREQ:8.4GHZ</span>
+</div>
+<div class="px-2 bg-primary/10 border-x border-primary/20">
+                UPS_TIME: 104:12:01
+            </div>
+</div>
+</footer>
+</body></html>

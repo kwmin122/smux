@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SMUX - Compare Mode</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#e1e2eb",
+                        "surface-bright": "#363940",
+                        "surface": "#10131a",
+                        "on-primary-fixed-variant": "#004883",
+                        "outline-variant": "#414751",
+                        "tertiary-fixed": "#ffdad8",
+                        "on-secondary": "#003731",
+                        "inverse-on-surface": "#2e3037",
+                        "surface-container-highest": "#32353c",
+                        "secondary": "#44e2cd",
+                        "on-surface": "#e1e2eb",
+                        "primary-fixed": "#d4e3ff",
+                        "on-secondary-container": "#004d44",
+                        "inverse-primary": "#0060ac",
+                        "secondary-fixed": "#62fae3",
+                        "surface-container-lowest": "#0b0e14",
+                        "on-tertiary-fixed": "#410006",
+                        "on-secondary-fixed-variant": "#005047",
+                        "background": "#10131a",
+                        "tertiary-container": "#ff7978",
+                        "surface-tint": "#a4c9ff",
+                        "error-container": "#93000a",
+                        "on-error": "#690005",
+                        "surface-dim": "#10131a",
+                        "primary-container": "#60a5fa",
+                        "tertiary": "#ffb3b0",
+                        "on-primary-fixed": "#001c39",
+                        "on-tertiary": "#670211",
+                        "on-error-container": "#ffdad6",
+                        "on-background": "#e1e2eb",
+                        "error": "#ffb4ab",
+                        "outline": "#8b919d",
+                        "tertiary-fixed-dim": "#ffb3b0",
+                        "on-tertiary-fixed-variant": "#881d24",
+                        "secondary-fixed-dim": "#3cddc7",
+                        "surface-container-low": "#191c22",
+                        "surface-container": "#1d2026",
+                        "on-primary": "#00315d",
+                        "on-secondary-fixed": "#00201c",
+                        "surface-variant": "#32353c",
+                        "on-primary-container": "#003a6b",
+                        "surface-container-high": "#272a31",
+                        "on-surface-variant": "#c1c7d3",
+                        "primary": "#a4c9ff",
+                        "secondary-container": "#03c6b2",
+                        "primary-fixed-dim": "#a4c9ff",
+                        "on-tertiary-container": "#740d18"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .diff-added { background-color: rgba(68, 226, 205, 0.1); border-left: 2px solid #44e2cd; }
+        .diff-removed { background-color: rgba(255, 180, 171, 0.1); border-left: 2px solid #ffb4ab; }
+        .glass-panel { backdrop-filter: blur(12px); background: rgba(29, 32, 38, 0.8); }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body overflow-hidden h-screen flex flex-col">
+<!-- TopAppBar Component -->
+<header class="bg-[#10131a] border-none docked full-width top-0 z-50">
+<div class="flex justify-between items-center w-full px-6 py-3">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black text-blue-400 dark:text-blue-400 tracking-[-0.02em] font-['Inter'] uppercase">SMUX</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-slate-400 font-medium hover:bg-slate-800/50 transition-colors duration-200" href="#">Terminal</a>
+<a class="text-blue-400 font-bold border-b-2 border-blue-400 pb-1" href="#">Compare</a>
+<a class="text-slate-400 font-medium hover:bg-slate-800/50 transition-colors duration-200" href="#">Nodes</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="hidden md:flex items-center bg-surface-container-lowest px-3 py-1 rounded border border-outline-variant/20">
+<span class="material-symbols-outlined text-sm text-outline">search</span>
+<input class="bg-transparent border-none text-xs focus:ring-0 text-on-surface-variant w-48" placeholder="Search logs..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-slate-800/50 transition-colors duration-200">settings</button>
+<button class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-slate-800/50 transition-colors duration-200">help_outline</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden border border-primary/20">
+<img alt="Operator Profile" data-alt="Avatar of the system operator" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGuWM7IsCYrGCBcWkdm9ZTqvkgWecZSSV__0ALl0qN0fKvSJ91ri8LwF2Qb6N4vYg2dvPqFQcKvgwseeeH68r7lv6YIJYkM-zEf1vFIeZrgMnH9gqINjHOFZ9fcO8LHG5u9Wv_s2VVt9eGkyCA87wrwv0H6dRqbOzPs-HO_tVqhdos8IBeyL0zXdAzsxyi_a33yCH6tyXqG4ERcYLZ322kjwumdheT_NKR0x_3oJULEwLmHQ0HgLvru0ESEa6-MWMjwgvGv2Zv49U"/>
+</div>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar Component -->
+<aside class="bg-[#0b0e14] docked h-full left-0 w-64 flex flex-col border-r border-slate-800/20">
+<div class="p-6 border-b border-outline-variant/10">
+<div class="flex items-center gap-3 mb-1">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="text-lg font-bold text-blue-400 font-mono">NODE_01</span>
+</div>
+<span class="font-['JetBrains_Mono'] text-xs tracking-tight text-slate-500 uppercase">Active Session</span>
+</div>
+<nav class="flex-1 py-4 overflow-y-auto">
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-mono text-xs" href="#">
+<span class="material-symbols-outlined text-lg">terminal</span> Sessions
+                </a>
+<a class="flex items-center gap-3 bg-blue-500/10 text-blue-400 border-r-2 border-blue-400 px-4 py-3 transition-all font-mono text-xs" href="#">
+<span class="material-symbols-outlined text-lg">dns</span> Clusters
+                </a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-mono text-xs" href="#">
+<span class="material-symbols-outlined text-lg">lan</span> Network
+                </a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-mono text-xs" href="#">
+<span class="material-symbols-outlined text-lg">list_alt</span> Logs
+                </a>
+<a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-800/30 text-slate-300 transition-all font-mono text-xs" href="#">
+<span class="material-symbols-outlined text-lg">lock</span> Vault
+                </a>
+</nav>
+<div class="p-4">
+<button class="w-full bg-primary-container text-on-primary-container font-mono text-xs py-2 rounded font-bold tracking-wider hover:opacity-90 transition-all">
+                    NEW_TERMINAL
+                </button>
+</div>
+<div class="mt-auto border-t border-outline-variant/10">
+<a class="flex items-center gap-3 text-slate-500 px-4 py-4 hover:bg-slate-800/30 text-slate-300 transition-all font-mono text-xs" href="#">
+<span class="material-symbols-outlined text-lg">settings</span> Settings
+                </a>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col bg-surface relative">
+<!-- COMPARE MODE Banner -->
+<div class="bg-primary/10 border-b border-primary/20 px-6 py-2 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">compare</span>
+<span class="font-mono text-xs font-bold tracking-[0.2em] text-primary">COMPARE MODE ACTIVATED</span>
+</div>
+<div class="flex gap-4 text-[10px] font-mono text-on-surface-variant">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-secondary"></span> +24 ADDITIONS</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-error"></span> -12 DELETIONS</span>
+</div>
+</div>
+<!-- Split View Area -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Left: Snapshot -->
+<section class="flex-1 flex flex-col border-r border-outline-variant/10 relative">
+<div class="p-3 bg-surface-container-low flex items-center gap-2 border-b border-outline-variant/10">
+<span class="material-symbols-outlined text-blue-400/60 text-sm">history</span>
+<span class="font-mono text-[11px] font-bold text-blue-400/80 uppercase">SNAPSHOT [ROUND 02]</span>
+<span class="ml-auto font-mono text-[10px] text-slate-500">2023-10-24 14:22:01</span>
+</div>
+<!-- Terminal Content -->
+<div class="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed text-blue-400/40 bg-blue-900/5">
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">102</span>
+<span>root@node_01:~$ systemctl status smux-core</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">103</span>
+<span>● smux-core.service - SMUX Main Engine</span>
+</div>
+<div class="flex gap-4 mb-1 diff-removed">
+<span class="text-error/60 w-8 text-right select-none">104</span>
+<span>   Active: inactive (dead) since Tue 2023-10-24 14:15:00</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">105</span>
+<span>   Main PID: 4052 (code=exited, status=0/SUCCESS)</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">106</span>
+<span>[CONFIG_LAYER] base_freq=2400MHz</span>
+</div>
+<div class="flex gap-4 mb-1 diff-removed">
+<span class="text-error/60 w-8 text-right select-none">107</span>
+<span>[NETWORK] status=disconnected_wait</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">108</span>
+<span>[SYSTEM] uptime=4h 22m</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">...</span>
+</div>
+<!-- Overlay to indicate it's the past -->
+<div class="absolute inset-0 pointer-events-none bg-blue-500/5 mix-blend-overlay"></div>
+</div>
+</section>
+<!-- Right: Live State -->
+<section class="flex-1 flex flex-col relative bg-surface-container-lowest/30">
+<div class="p-3 bg-surface-container-low flex items-center gap-2 border-b border-outline-variant/10">
+<span class="material-symbols-outlined text-secondary text-sm">sensors</span>
+<span class="font-mono text-[11px] font-bold text-secondary uppercase">LIVE_STATE [CURRENT]</span>
+<div class="ml-auto flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></div>
+<span class="font-mono text-[10px] text-secondary">REAL-TIME</span>
+</div>
+</div>
+<!-- Terminal Content -->
+<div class="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed text-on-surface-variant">
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">102</span>
+<span class="text-on-surface">root@node_01:~$ systemctl status smux-core</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">103</span>
+<span>● smux-core.service - SMUX Main Engine</span>
+</div>
+<div class="flex gap-4 mb-1 diff-added">
+<span class="text-secondary w-8 text-right select-none">104</span>
+<span class="text-secondary font-bold">   Active: active (running) since Wed 2023-10-25 09:12:44</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">105</span>
+<span>   Main PID: 8842 (code=running)</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">106</span>
+<span>[CONFIG_LAYER] base_freq=2400MHz</span>
+</div>
+<div class="flex gap-4 mb-1 diff-added">
+<span class="text-secondary w-8 text-right select-none">107</span>
+<span class="text-secondary font-bold">[NETWORK] status=established_linked</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">108</span>
+<span>[SYSTEM] uptime=42h 12m</span>
+</div>
+<div class="flex gap-4 mb-1">
+<span class="text-slate-600 w-8 text-right select-none">109</span>
+<span class="text-primary italic">_ cursor pulsing...</span>
+</div>
+</div>
+</section>
+<!-- Compare Control Sidebar -->
+<aside class="w-72 bg-surface-container-high border-l border-outline-variant/20 flex flex-col">
+<div class="p-6">
+<h3 class="font-mono text-[10px] uppercase text-slate-400 mb-4 tracking-widest">Timeline Navigation</h3>
+<!-- Timeline -->
+<div class="relative pl-4 space-y-6 before:absolute before:left-1 before:top-2 before:bottom-2 before:w-[1px] before:bg-outline-variant/30">
+<div class="relative">
+<div class="absolute -left-[1.35rem] top-1 w-2.5 h-2.5 rounded-full bg-secondary ring-4 ring-secondary/20"></div>
+<div class="font-mono text-[11px] text-secondary font-bold">LIVE_STATE</div>
+<div class="text-[10px] text-slate-500">Just now</div>
+</div>
+<div class="relative opacity-60">
+<div class="absolute -left-[1.25rem] top-1 w-1.5 h-1.5 rounded-full bg-outline"></div>
+<div class="font-mono text-[11px] text-on-surface">ROUND 03</div>
+<div class="text-[10px] text-slate-500">2h ago</div>
+</div>
+<div class="relative">
+<div class="absolute -left-[1.35rem] top-1 w-2.5 h-2.5 rounded-full bg-blue-400 ring-4 ring-blue-400/20"></div>
+<div class="font-mono text-[11px] text-blue-400 font-bold uppercase">SNAPSHOT [ROUND 02]</div>
+<div class="text-[10px] text-slate-500">18h ago</div>
+</div>
+<div class="relative opacity-60">
+<div class="absolute -left-[1.25rem] top-1 w-1.5 h-1.5 rounded-full bg-outline"></div>
+<div class="font-mono text-[11px] text-on-surface">ROUND 01</div>
+<div class="text-[10px] text-slate-500">Oct 22, 2023</div>
+</div>
+</div>
+</div>
+<div class="p-6 bg-surface-container-highest/20 mt-auto">
+<h3 class="font-mono text-[10px] uppercase text-slate-400 mb-4 tracking-widest">Diff Summary</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between font-mono text-xs">
+<span class="text-slate-400">Total Changes</span>
+<span class="text-on-surface">36 lines</span>
+</div>
+<div class="flex items-center justify-between font-mono text-xs">
+<span class="text-secondary">+ Added</span>
+<span>24</span>
+</div>
+<div class="flex items-center justify-between font-mono text-xs">
+<span class="text-error">- Removed</span>
+<span>12</span>
+</div>
+</div>
+</div>
+<div class="p-6 space-y-2 border-t border-outline-variant/10">
+<button class="w-full py-2.5 bg-primary-container text-on-primary-container font-mono text-[10px] font-bold rounded hover:opacity-90 transition-all uppercase tracking-wider">
+                            RESTORE SNAPSHOT
+                        </button>
+<button class="w-full py-2.5 bg-surface-container-highest text-primary font-mono text-[10px] font-bold rounded hover:bg-slate-700/50 transition-all uppercase tracking-wider">
+                            APPLY SELECTIVE CHANGES
+                        </button>
+<button class="w-full py-2.5 border border-outline-variant/30 text-error font-mono text-[10px] font-bold rounded hover:bg-error/10 transition-all uppercase tracking-wider mt-4">
+                            EXIT COMPARE
+                        </button>
+</div>
+</aside>
+</div>
+</main>
+</div>
+<!-- BottomNavBar Component -->
+<footer class="bg-[#272a31] docked full-width bottom-0 h-8 fixed bottom-0 left-0 w-full z-50 flex justify-end items-center px-4 gap-6">
+<div class="text-cyan-400 flex items-center gap-2 font-['JetBrains_Mono'] text-[10px] uppercase font-medium">
+<span class="material-symbols-outlined text-[14px]">memory</span>
+<span>CPU: 12%</span>
+</div>
+<div class="text-slate-400 flex items-center gap-2 font-['JetBrains_Mono'] text-[10px] uppercase font-medium hover:text-cyan-300 transition-colors">
+<span class="material-symbols-outlined text-[14px]">speed</span>
+<span>LATENCY: 14ms</span>
+</div>
+<div class="text-slate-400 flex items-center gap-2 font-['JetBrains_Mono'] text-[10px] uppercase font-medium hover:text-cyan-300 transition-colors">
+<span class="material-symbols-outlined text-[14px]">account_tree</span>
+<span>GIT: main</span>
+</div>
+<div class="text-slate-400 flex items-center gap-2 font-['JetBrains_Mono'] text-[10px] uppercase font-medium hover:text-cyan-300 transition-colors">
+<span class="material-symbols-outlined text-[14px]">timer</span>
+<span>UPTIME: 42h</span>
+</div>
+</footer>
+</body></html>
