@@ -148,8 +148,8 @@ async fn main() {
             let planner = planner.unwrap_or(config.agents.planner.default.clone());
             let verifier = verifier.unwrap_or(config.agents.verifier.default.clone());
             let max_rounds = max_rounds.unwrap_or(config.defaults.max_rounds);
-            let verifiers_list = verifiers.unwrap_or_default();
-            let consensus_str = consensus.unwrap_or_else(|| "majority".into());
+            let verifiers_list = verifiers.unwrap_or_else(|| config.agents.verifiers.clone());
+            let consensus_str = consensus.unwrap_or_else(|| config.defaults.consensus.clone());
 
             // Ensure daemon is running.
             if let Err(e) = ensure_daemon_running().await {

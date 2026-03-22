@@ -36,6 +36,8 @@ pub struct DefaultsConfig {
     pub max_rounds: u32,
     pub browser: bool,
     pub layout: String,
+    /// Default consensus strategy: "majority", "weighted", "unanimous", "leader".
+    pub consensus: String,
 }
 
 impl Default for DefaultsConfig {
@@ -44,6 +46,7 @@ impl Default for DefaultsConfig {
             max_rounds: 10,
             browser: false,
             layout: "center".to_string(),
+            consensus: "majority".to_string(),
         }
     }
 }
@@ -53,6 +56,8 @@ impl Default for DefaultsConfig {
 pub struct AgentsConfig {
     pub planner: AgentConfig,
     pub verifier: AgentConfig,
+    /// Additional verifiers for cross-verify mode (e.g. ["claude", "codex", "gemini"]).
+    pub verifiers: Vec<String>,
     pub pty_patterns: HashMap<String, String>,
     pub idle: IdleConfig,
 }
@@ -70,6 +75,7 @@ impl Default for AgentsConfig {
                 adapter: "headless".to_string(),
                 system_prompt: String::new(),
             },
+            verifiers: Vec::new(),
             pty_patterns: HashMap::new(),
             idle: IdleConfig::default(),
         }
