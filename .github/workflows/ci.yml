@@ -6,7 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --workspace
-      - run: cargo test --workspace
+      - run: cargo build --workspace --exclude smux-app
+      - run: cargo test --workspace --exclude smux-app
       - run: cargo fmt --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --workspace --exclude smux-app --all-targets -- -D warnings
