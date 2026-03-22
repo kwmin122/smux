@@ -430,3 +430,77 @@ async fn double_needs_info_falls_back_to_rejected() {
         other => panic!("expected Approved at round 2, got {other:?}"),
     }
 }
+
+// ── Multi-verifier integration tests ──
+
+#[tokio::test]
+async fn multi_verifier_2_approved_majority() {
+    let planner = FakeAdapter::new(vec!["implement feature X".into()]);
+    let v1 = FakeAdapter::new(vec![
+        r#"{"verdict":"APPROVED","reason":"v1 ok","confidence":0.9}"#.into(),
+    ]);
+    let v2 = FakeAdapter::new(vec![
+        r#"{"verdict":"APPROVED","reason":"v2 ok","confidence":0.8}"#.into(),
+    ]);
+    let config = config("test 2-verifier majority", 5);
+    let mut orch =
+        Orchestrator::new_multi(Box::new(planner), vec![Box::new(v1), Box::new(v2)], config);
+    match orch.run().await {
+        OrchestratorOutcome::Approved { round, .. } => assert_eq!(round, 1),
+        other => panic!("expected Approved, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn multi_verifier_3_mixed_majority_approved() {
+    let planner = FakeAdapter::new(vec!["implement feature Y".into()]);
+    let v1 = FakeAdapter::new(vec![
+        r#"{"verdict":"APPROVED","reason":"v1 pass","confidence":0.9}"#.into(),
+    ]);
+    let v2 = FakeAdapter::new(vec![
+        r#"{"verdict":"REJECTED","category":"WeakTest","reason":"v2 rejected","confidence":0.7}"#
+            .into(),
+    ]);
+    let v3 = FakeAdapter::new(vec![
+        r#"{"verdict":"APPROVED","reason":"v3 pass","confidence":0.85}"#.into(),
+    ]);
+    let config = config("test 3-verifier majority", 5);
+    let mut orch = Orchestrator::new_multi(
+        Box::new(planner),
+        vec![Box::new(v1), Box::new(v2), Box::new(v3)],
+        config,
+    );
+    match orch.run().await {
+        OrchestratorOutcome::Approved { round, .. } => assert_eq!(round, 1),
+        other => panic!("expected Approved, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn multi_verifier_3_rejected_then_approved() {
+    let planner = FakeAdapter::new(vec!["first".into(), "second".into()]);
+    let v1 = FakeAdapter::new(vec![
+        r#"{"verdict":"APPROVED","reason":"ok","confidence":0.6}"#.into(),
+        r#"{"verdict":"APPROVED","reason":"ok now","confidence":0.9}"#.into(),
+    ]);
+    let v2 = FakeAdapter::new(vec![
+        r#"{"verdict":"REJECTED","category":"IncompleteImpl","reason":"missing","confidence":0.8}"#
+            .into(),
+        r#"{"verdict":"APPROVED","reason":"fixed","confidence":0.85}"#.into(),
+    ]);
+    let v3 = FakeAdapter::new(vec![
+        r#"{"verdict":"REJECTED","category":"Regression","reason":"broken","confidence":0.75}"#
+            .into(),
+        r#"{"verdict":"APPROVED","reason":"fixed","confidence":0.8}"#.into(),
+    ]);
+    let config = config("test 3-verifier reject-then-approve", 5);
+    let mut orch = Orchestrator::new_multi(
+        Box::new(planner),
+        vec![Box::new(v1), Box::new(v2), Box::new(v3)],
+        config,
+    );
+    match orch.run().await {
+        OrchestratorOutcome::Approved { round, .. } => assert_eq!(round, 2),
+        other => panic!("expected Approved at round 2, got {other:?}"),
+    }
+}

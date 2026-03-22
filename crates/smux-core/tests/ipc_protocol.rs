@@ -1,6 +1,8 @@
 //! Tests for the IPC protocol: serialization round-trips and socket I/O.
 
-use smux_core::ipc::{ClientMessage, DaemonMessage, SessionInfo, recv_message, send_message};
+use smux_core::ipc::{
+    ClientMessage, DaemonMessage, SessionInfo, VerifierVerdictInfo, recv_message, send_message,
+};
 
 // ---------------------------------------------------------------------------
 // Serialization round-trip: ClientMessage
@@ -126,6 +128,33 @@ fn daemon_message_round_complete_round_trip() {
     let msg = DaemonMessage::RoundComplete {
         round: 3,
         verdict_summary: "APPROVED".into(),
+    };
+    let json = serde_json::to_string(&msg).unwrap();
+    let decoded: DaemonMessage = serde_json::from_str(&json).unwrap();
+    assert_eq!(decoded, msg);
+}
+
+#[test]
+fn daemon_message_cross_verify_result_round_trip() {
+    let msg = DaemonMessage::CrossVerifyResult {
+        round: 2,
+        individual: vec![
+            VerifierVerdictInfo {
+                verifier: "claude".into(),
+                verdict: "APPROVED".into(),
+                confidence: 0.92,
+                reason: "looks good".into(),
+            },
+            VerifierVerdictInfo {
+                verifier: "codex".into(),
+                verdict: "REJECTED".into(),
+                confidence: 0.71,
+                reason: "missing tests".into(),
+            },
+        ],
+        final_verdict: "APPROVED".into(),
+        strategy: "Majority".into(),
+        agreement_ratio: 0.5,
     };
     let json = serde_json::to_string(&msg).unwrap();
     let decoded: DaemonMessage = serde_json::from_str(&json).unwrap();

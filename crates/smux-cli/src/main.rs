@@ -525,6 +525,30 @@ async fn stream_until_complete(stream: &mut UnixStream) {
                 println!("smux: session complete — {summary}");
                 return;
             }
+            Ok(DaemonMessage::CrossVerifyResult {
+                round,
+                individual,
+                final_verdict,
+                strategy,
+                agreement_ratio,
+            }) => {
+                println!();
+                println!("=== Cross-Verify (round {round}) ===");
+                for v in &individual {
+                    println!(
+                        "  {}: {} (confidence: {:.0}%) — {}",
+                        v.verifier,
+                        v.verdict,
+                        v.confidence * 100.0,
+                        v.reason
+                    );
+                }
+                println!(
+                    "  Final: {final_verdict} ({strategy}, {:.0}% agreement)",
+                    agreement_ratio * 100.0
+                );
+                println!();
+            }
             Ok(DaemonMessage::Error { message }) => {
                 eprintln!("smux: error — {message}");
                 return;
