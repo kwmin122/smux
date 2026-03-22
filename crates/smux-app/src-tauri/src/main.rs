@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::UnixStream;
@@ -306,8 +306,14 @@ fn create_pty(
         })
         .map_err(|e| format!("openpty failed: {e}"))?;
 
-    let reader = pair.master.try_clone_reader().map_err(|e| format!("clone reader: {e}"))?;
-    let writer = pair.master.take_writer().map_err(|e| format!("take writer: {e}"))?;
+    let reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|e| format!("clone reader: {e}"))?;
+    let writer = pair
+        .master
+        .take_writer()
+        .map_err(|e| format!("take writer: {e}"))?;
 
     // Detect user's shell
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
@@ -325,14 +331,13 @@ fn create_pty(
 
     let tab_id = uuid::Uuid::new_v4().to_string();
 
-    pty_mgr
-        .sessions
-        .lock()
-        .unwrap()
-        .insert(tab_id.clone(), PtySession {
+    pty_mgr.sessions.lock().unwrap().insert(
+        tab_id.clone(),
+        PtySession {
             master: pair.master,
             writer: Arc::new(std::sync::Mutex::new(writer)),
-        });
+        },
+    );
     pty_mgr
         .pending_readers
         .lock()
