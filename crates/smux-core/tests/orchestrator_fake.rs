@@ -507,3 +507,34 @@ async fn multi_verifier_3_rejected_then_approved() {
         other => panic!("expected Approved at round 2, got {other:?}"),
     }
 }
+
+#[tokio::test]
+async fn max_rounds_one_approved() {
+    let planner = FakeAdapter::new(vec!["plan".into()]);
+    let verifier = FakeAdapter::new(vec![
+        r#"{"verdict":"APPROVED","reason":"ok","confidence":0.9}"#.into(),
+    ]);
+    let config = config("test max_rounds=1", 1);
+    let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);
+    match orch.run().await {
+        OrchestratorOutcome::Approved { round, .. } => assert_eq!(round, 1),
+        other => panic!("expected Approved at round 1, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn max_rounds_one_rejected_reaches_max() {
+    let planner = FakeAdapter::new(vec!["plan".into()]);
+    let verifier = FakeAdapter::new(vec![
+        r#"{"verdict":"REJECTED","category":"IncompleteImpl","reason":"nope","confidence":0.8}"#
+            .into(),
+    ]);
+    let config = config("test max_rounds=1 rejected", 1);
+    let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);
+    match orch.run().await {
+        OrchestratorOutcome::MaxRoundsReached { rounds_completed } => {
+            assert_eq!(rounds_completed, 1)
+        }
+        other => panic!("expected MaxRoundsReached, got {other:?}"),
+    }
+}

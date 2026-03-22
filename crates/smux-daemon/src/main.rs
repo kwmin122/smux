@@ -544,7 +544,13 @@ fn spawn_session(
             "weighted" => smux_core::types::ConsensusStrategy::Weighted,
             "unanimous" => smux_core::types::ConsensusStrategy::Unanimous,
             "leader" | "leaderdelegate" => smux_core::types::ConsensusStrategy::LeaderDelegate,
-            _ => smux_core::types::ConsensusStrategy::Majority,
+            other => {
+                tracing::warn!(
+                    strategy = other,
+                    "unknown consensus strategy, defaulting to majority"
+                );
+                smux_core::types::ConsensusStrategy::Majority
+            }
         };
 
         let config = OrchestratorConfig {

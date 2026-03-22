@@ -9,6 +9,10 @@ fn parse_valid_config_all_fields() {
 max_rounds = 20
 browser = true
 layout = "left"
+consensus = "weighted"
+
+[agents]
+verifiers = ["claude", "codex", "gemini"]
 
 [agents.planner]
 default = "codex"
@@ -52,7 +56,9 @@ cleanup_after_days = 14
     assert_eq!(config.defaults.max_rounds, 20);
     assert!(config.defaults.browser);
     assert_eq!(config.defaults.layout, "left");
+    assert_eq!(config.defaults.consensus, "weighted");
 
+    assert_eq!(config.agents.verifiers, vec!["claude", "codex", "gemini"]);
     assert_eq!(config.agents.planner.default, "codex");
     assert_eq!(config.agents.planner.adapter, "pty");
     assert_eq!(

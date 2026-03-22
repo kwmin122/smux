@@ -418,21 +418,47 @@ impl Orchestrator {
                          {{\"verdict\": \"APPROVED\"|\"REJECTED\", \"category\": \"...\", \"reason\": \"...\", \"confidence\": 0.0-1.0}}"
                     );
 
-                    // Re-ask ALL verifiers (not just [0]) to maintain consistency.
-                    let mut re_outputs: Vec<String> = Vec::new();
-                    for (i, verifier) in self.verifiers.iter_mut().enumerate() {
-                        match send_and_collect(verifier, &re_ask_prompt).await {
-                            Ok(output) => re_outputs.push(output),
-                            Err(e) => {
-                                tracing::error!(round, verifier = i, error = %e, "verifier re-ask failed");
-                                return OrchestratorOutcome::Error {
-                                    message: format!(
+                    // Re-ask ALL verifiers in parallel (same pattern as initial).
+                    let taken = self.verifiers.drain(..).collect::<Vec<_>>();
+                    let mut re_join = tokio::task::JoinSet::new();
+                    for (i, mut v) in taken.into_iter().enumerate() {
+                        let p = re_ask_prompt.clone();
+                        re_join.spawn(async move {
+                            let r = send_and_collect_bare(&mut v, &p).await;
+                            (i, v, r)
+                        });
+                    }
+                    let mut re_outputs: Vec<(usize, String)> = Vec::new();
+                    let mut re_returned: Vec<(usize, Box<dyn AgentAdapter>)> = Vec::new();
+                    let mut re_error: Option<String> = None;
+                    while let Some(jr) = re_join.join_next().await {
+                        match jr {
+                            Ok((i, v, Ok(out))) => {
+                                re_outputs.push((i, out));
+                                re_returned.push((i, v));
+                            }
+                            Ok((i, v, Err(e))) => {
+                                re_returned.push((i, v));
+                                if re_error.is_none() {
+                                    re_error = Some(format!(
                                         "verifier[{i}] re-ask error in round {round}: {e}"
-                                    ),
-                                };
+                                    ));
+                                }
+                            }
+                            Err(e) => {
+                                if re_error.is_none() {
+                                    re_error = Some(format!("re-ask task panicked: {e}"));
+                                }
                             }
                         }
                     }
+                    re_returned.sort_by_key(|(i, _)| *i);
+                    self.verifiers = re_returned.into_iter().map(|(_, v)| v).collect();
+                    re_outputs.sort_by_key(|(i, _)| *i);
+                    if let Some(err) = re_error {
+                        return OrchestratorOutcome::Error { message: err };
+                    }
+                    let re_outputs: Vec<String> = re_outputs.into_iter().map(|(_, o)| o).collect();
 
                     // Apply consensus to re-ask results (same path as initial).
                     let re_verdict = if re_outputs.len() == 1 {
@@ -595,23 +621,6 @@ async fn emit_event(
 /// Send a prompt and collect the response. Takes owned adapter for use in
 /// spawned tasks (parallel verifier execution).
 async fn send_and_collect_bare(
-    adapter: &mut Box<dyn AgentAdapter>,
-    prompt: &str,
-) -> Result<String, String> {
-    adapter
-        .send_turn(prompt)
-        .await
-        .map_err(|e| format!("send_turn failed: {e}"))?;
-
-    let stream = adapter
-        .stream_events()
-        .map_err(|e| format!("stream_events failed: {e}"))?;
-
-    collect_stream(stream).await
-}
-
-/// Send a prompt to an adapter and collect the full response string.
-async fn send_and_collect(
     adapter: &mut Box<dyn AgentAdapter>,
     prompt: &str,
 ) -> Result<String, String> {

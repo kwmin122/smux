@@ -33,7 +33,6 @@ pub struct GeminiHeadlessAdapter {
     turn_index: u64,
     current_rx: Arc<Mutex<Option<mpsc::Receiver<AgentEvent>>>>,
     child_handle: Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>,
-    #[allow(dead_code)]
     safety_config: Option<SafetyConfig>,
 }
 
@@ -162,8 +161,17 @@ impl AgentAdapter for GeminiHeadlessAdapter {
 
         // Gemini CLI: npx @google/gemini-cli -p "<prompt>"
         // The -p flag runs in non-interactive (prompt) mode.
+        // Apply sandbox mode from safety config if available.
+        let mut cli_args = vec!["@google/gemini-cli".to_string(), "-p".to_string()];
+        if let Some(ref safety) = self.safety_config
+            && !safety.codex_sandbox_mode.is_empty()
+        {
+            cli_args.push("--sandbox".to_string());
+        }
+        cli_args.push(full_prompt);
+        let arg_refs: Vec<&str> = cli_args.iter().map(|s| s.as_str()).collect();
         let mut child = Command::new("npx")
-            .args(["@google/gemini-cli", "-p", &full_prompt])
+            .args(&arg_refs)
             .current_dir(&self.working_dir)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
