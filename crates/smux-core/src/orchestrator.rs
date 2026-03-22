@@ -169,21 +169,21 @@ impl Orchestrator {
         // Set up health monitors.
         let health_cfg = self.config.health_config.clone().unwrap_or_default();
         let mut planner_health = HealthMonitor::new(health_cfg.clone());
-        let mut verifier_health = HealthMonitor::new(health_cfg);
+        let _verifier_health = HealthMonitor::new(health_cfg);
 
         let mut prior_rounds: Vec<(u32, VerifyResult)> = Vec::new();
         let mut planner_prompt = self.config.task.clone();
 
         // Track whether we already restarted each agent in the current round.
         let mut planner_restarted_this_round: bool;
-        let mut verifier_restarted_this_round: bool;
+        let mut _verifier_restarted_this_round: bool;
 
         for round in 1..=self.config.max_rounds {
             tracing::info!(round, "starting round");
             self.emit(OrchestratorEvent::RoundStarted { round }).await;
 
             planner_restarted_this_round = false;
-            verifier_restarted_this_round = false;
+            _verifier_restarted_this_round = false;
 
             // ── Step 1-2: Send task/feedback to planner and collect output ──
             let planner_output = match send_and_collect_with_health(
@@ -229,27 +229,28 @@ impl Orchestrator {
                 "context passed to verifier(s)"
             );
 
-            // Collect output from all verifiers.
-            // For single verifier, this is equivalent to the v0.2 path.
-            let num_verifiers = self.verifiers.len();
-            let mut verifier_outputs: Vec<(usize, String)> = Vec::new();
-            for (i, verifier) in self.verifiers.iter_mut().enumerate() {
-                let agent_name = if num_verifiers == 1 {
-                    "verifier".to_string()
-                } else {
-                    format!("verifier[{i}]")
-                };
-                match send_and_collect_with_health(
-                    verifier,
-                    &verifier_prompt,
-                    &mut verifier_health,
-                    &agent_name,
-                    &mut verifier_restarted_this_round,
-                    &self.event_sink,
-                )
-                .await
-                {
-                    Ok(output) => {
+            // Collect output from all verifiers IN PARALLEL.
+            // Take verifiers out of self to allow concurrent mutable access.
+            let taken_verifiers: Vec<Box<dyn AgentAdapter>> = self.verifiers.drain(..).collect();
+            let num_verifiers = taken_verifiers.len();
+
+            let mut join_set = tokio::task::JoinSet::new();
+            for (i, mut verifier) in taken_verifiers.into_iter().enumerate() {
+                let prompt = verifier_prompt.clone();
+                join_set.spawn(async move {
+                    let result = send_and_collect_bare(&mut verifier, &prompt).await;
+                    (i, verifier, result)
+                });
+            }
+
+            let mut verifier_outputs: Vec<(usize, String)> = Vec::with_capacity(num_verifiers);
+            let mut returned_verifiers: Vec<(usize, Box<dyn AgentAdapter>)> =
+                Vec::with_capacity(num_verifiers);
+            let mut first_error: Option<String> = None;
+
+            while let Some(join_result) = join_set.join_next().await {
+                match join_result {
+                    Ok((i, verifier, Ok(output))) => {
                         tracing::info!(
                             round,
                             verifier = i,
@@ -265,14 +266,31 @@ impl Orchestrator {
                         )
                         .await;
                         verifier_outputs.push((i, output));
+                        returned_verifiers.push((i, verifier));
+                    }
+                    Ok((i, verifier, Err(e))) => {
+                        tracing::error!(round, verifier = i, error = %e, "verifier adapter failed");
+                        returned_verifiers.push((i, verifier));
+                        if first_error.is_none() {
+                            first_error =
+                                Some(format!("verifier[{i}] error in round {round}: {e}"));
+                        }
                     }
                     Err(e) => {
-                        tracing::error!(round, verifier = i, error = %e, "verifier adapter failed");
-                        return OrchestratorOutcome::Error {
-                            message: format!("verifier[{i}] error in round {round}: {e}"),
-                        };
+                        if first_error.is_none() {
+                            first_error = Some(format!("verifier task panicked: {e}"));
+                        }
                     }
                 }
+            }
+
+            // Put verifiers back in order.
+            returned_verifiers.sort_by_key(|(i, _)| *i);
+            self.verifiers = returned_verifiers.into_iter().map(|(_, v)| v).collect();
+            verifier_outputs.sort_by_key(|(i, _)| *i);
+
+            if let Some(err) = first_error {
+                return OrchestratorOutcome::Error { message: err };
             }
 
             // ── Step 6: Parse verdict(s) and apply consensus ──
@@ -527,12 +545,25 @@ async fn emit_event(
     }
 }
 
+/// Send a prompt and collect the response. Takes owned adapter for use in
+/// spawned tasks (parallel verifier execution).
+async fn send_and_collect_bare(
+    adapter: &mut Box<dyn AgentAdapter>,
+    prompt: &str,
+) -> Result<String, String> {
+    adapter
+        .send_turn(prompt)
+        .await
+        .map_err(|e| format!("send_turn failed: {e}"))?;
+
+    let stream = adapter
+        .stream_events()
+        .map_err(|e| format!("stream_events failed: {e}"))?;
+
+    collect_stream(stream).await
+}
+
 /// Send a prompt to an adapter and collect the full response string.
-///
-/// Gathers all `Chunk` events and the `TurnComplete` payload into a single
-/// concatenated string. Returns the `TurnComplete` content (which in
-/// `FakeAdapter` is the full response) if present, otherwise falls back to
-/// the concatenated chunks.
 async fn send_and_collect(
     adapter: &mut Box<dyn AgentAdapter>,
     prompt: &str,
