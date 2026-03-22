@@ -64,6 +64,36 @@ impl GeminiHeadlessAdapter {
         }
     }
 
+    /// Check if the Gemini CLI is available. Tries `npx @google/gemini-cli --version`
+    /// first, then falls back to `gemini --version`.
+    /// Check if the Gemini CLI is available. Tries `npx @google/gemini-cli --version`
+    /// first, then falls back to `gemini --version`.
+    pub async fn is_available() -> bool {
+        // Try npx first.
+        if let Ok(output) = tokio::process::Command::new("npx")
+            .args(["@google/gemini-cli", "--version"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .stdin(std::process::Stdio::null())
+            .output()
+            .await
+            && output.status.success()
+        {
+            return true;
+        }
+        // Fallback: globally installed binary.
+        matches!(
+            tokio::process::Command::new("gemini")
+                .arg("--version")
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .stdin(std::process::Stdio::null())
+                .output()
+                .await,
+            Ok(output) if output.status.success()
+        )
+    }
+
     fn build_full_prompt(&self, prompt: &str) -> String {
         let mut parts: Vec<String> = Vec::new();
 

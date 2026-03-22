@@ -495,8 +495,25 @@ fn spawn_session(
         };
 
         // Create adapter for each verifier with safety config applied.
+        // Skip unavailable verifiers (e.g. gemini CLI not installed) with warning.
         let mut verifier_adapters: Vec<Box<dyn smux_core::adapter::AgentAdapter>> = Vec::new();
         for v_name in &verifiers {
+            // Check availability for gemini adapter before creating.
+            if v_name == "gemini"
+                && !smux_core::adapter::gemini::GeminiHeadlessAdapter::is_available().await
+            {
+                tracing::warn!(
+                    verifier = v_name,
+                    "gemini CLI not available, skipping verifier"
+                );
+                let _ = handle.event_tx.send(DaemonMessage::AgentOutput {
+                    role: "system".into(),
+                    content: format!(
+                        "Warning: gemini CLI not available, skipping verifier '{v_name}'"
+                    ),
+                });
+                continue;
+            }
             match smux_core::adapter::create_adapter_with_safety(
                 v_name,
                 working_dir.clone(),
@@ -511,6 +528,15 @@ fn spawn_session(
                     return;
                 }
             }
+        }
+
+        if verifier_adapters.is_empty() {
+            let _ = handle.event_tx.send(DaemonMessage::SessionComplete {
+                summary: "no verifiers available — all requested verifiers were unavailable"
+                    .to_string(),
+            });
+            *handle.status.lock().await = SessionStatus::Failed;
+            return;
         }
 
         // Parse consensus strategy from string.
