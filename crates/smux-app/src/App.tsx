@@ -5,6 +5,10 @@ import { BrowserPanel } from './components/BrowserPanel'
 import { WelcomeView } from './components/WelcomeView'
 import { TabBar, type TabInfo, type TabColor } from './components/TabBar'
 import { SplitContainer, type SplitNode, createLeaf, splitLeaf, removeLeaf } from './components/SplitContainer'
+import { AiExecutionLevel, type ExecutionLevel } from './components/AiExecutionLevel'
+import { FailedCommandOverlay } from './components/FailedCommandOverlay'
+import { useAiPingPong, type AiSessionStatus } from './hooks/useAiPingPong'
+import type { CommandRecord } from './hooks/useShellIntegration'
 
 declare global {
   interface Window {
@@ -72,6 +76,11 @@ function App() {
   // Split pane management
   const [splitRoot, setSplitRoot] = useState<SplitNode | null>(null)
   const [activeLeafId, setActiveLeafId] = useState<string | null>(null)
+  // AI session state
+  const [executionLevel, setExecutionLevel] = useState<ExecutionLevel>('auto')
+  const [failedCommand, setFailedCommand] = useState<CommandRecord | null>(null)
+  const [aiSessionStatus, setAiSessionStatus] = useState<AiSessionStatus>('idle')
+  const pingPong = useAiPingPong()
   const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
     // Auto-resume last project if available
     try {
@@ -779,6 +788,9 @@ function App() {
                           onCwdChange={(cwd) => {
                             setTabs(prev => prev.map(t => t.id === tabId ? { ...t, cwd, name: cwd.split('/').pop() || t.name } : t))
                           }}
+                          onCommandComplete={(cmd) => {
+                            if (cmd.status === 'error') setFailedCommand(cmd)
+                          }}
                         />
                       )
                     }}
@@ -803,9 +815,28 @@ function App() {
                         onCwdChange={(cwd) => {
                           setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, cwd, name: cwd.split('/').pop() || t.name } : t))
                         }}
+                        onCommandComplete={(cmd) => {
+                          if (cmd.status === 'error') setFailedCommand(cmd)
+                        }}
                       />
                     </div>
                   ))
+                )}
+                {/* Failed Command Overlay */}
+                {failedCommand && (
+                  <FailedCommandOverlay
+                    command={failedCommand}
+                    onFixWithAi={(cmd) => {
+                      // Send failed command to AI for analysis
+                      const activeRef = tabRefsMap.current.get(activeTabId || '')
+                      if (activeRef) {
+                        activeRef.write(`\n# AI Analysis: The command '${cmd.command}' failed with exit code ${cmd.exitCode}\n`)
+                        activeRef.write(`claude -p 'The following command failed with exit code ${cmd.exitCode}: ${cmd.command}. Please analyze why and suggest a fix.'\n`)
+                      }
+                      setFailedCommand(null)
+                    }}
+                    onDismiss={() => setFailedCommand(null)}
+                  />
                 )}
               </div>
             </section>
@@ -814,9 +845,72 @@ function App() {
               {/* Planner PTY Panel — runs claude */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
                 <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Planner (Claude)</span>
-                    <span className="ml-2 w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${pingPong.status === 'planner-running' ? 'bg-secondary animate-pulse' : 'bg-outline'}`} />
+                    {pingPong.currentRound > 0 && (
+                      <span className="font-mono text-[9px] text-on-surface-variant">R{pingPong.currentRound}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <AiExecutionLevel level={executionLevel} onChange={setExecutionLevel} compact />
+                    {pingPong.status === 'idle' && (
+                      <button
+                        onClick={() => {
+                          if (plannerRef.current && verifierRef.current) {
+                            setAiSessionStatus('planner-running')
+                            pingPong.start(
+                              {
+                                task: aiTask,
+                                planner: 'claude',
+                                verifier: 'codex',
+                                maxRounds: 5,
+                                cwd: projectDir || undefined,
+                                onStatusChange: setAiSessionStatus,
+                                onRoundComplete: (round) => {
+                                  addLogEntry('round', `R${round.round}: ${round.verdict}`)
+                                  if (document.hidden) {
+                                    notify(`Round ${round.round}`, round.verdict.toUpperCase())
+                                  }
+                                },
+                                onSessionComplete: () => {
+                                  notify('AI Session Complete', `Finished after ${pingPong.currentRound} rounds`)
+                                },
+                              },
+                              plannerRef.current,
+                              verifierRef.current
+                            )
+                          }
+                        }}
+                        className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary text-on-primary hover:opacity-90"
+                      >
+                        START
+                      </button>
+                    )}
+                    {(pingPong.status === 'planner-running' || pingPong.status === 'verifier-running') && (
+                      <>
+                        <button
+                          onClick={pingPong.pause}
+                          className="font-mono text-[9px] px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:opacity-90"
+                        >
+                          PAUSE
+                        </button>
+                        <button
+                          onClick={pingPong.abort}
+                          className="font-mono text-[9px] px-2 py-0.5 rounded bg-error/20 text-error border border-error/30 hover:opacity-90"
+                        >
+                          STOP
+                        </button>
+                      </>
+                    )}
+                    {pingPong.status === 'paused' && (
+                      <button
+                        onClick={pingPong.resume}
+                        className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary/20 text-secondary border border-secondary/30 hover:opacity-90"
+                      >
+                        RESUME
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -832,12 +926,19 @@ function App() {
               {/* Verifier PTY Panel — runs codex */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
                 <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-tertiary">Verifier (Codex)</span>
-                    <span className="ml-2 w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${pingPong.status === 'verifier-running' ? 'bg-tertiary animate-pulse' : 'bg-outline'}`} />
+                    <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded ${
+                      aiSessionStatus === 'completed' ? 'bg-secondary/20 text-secondary' :
+                      aiSessionStatus === 'error' ? 'bg-error/20 text-error' :
+                      'bg-outline/10 text-outline'
+                    }`}>
+                      {aiSessionStatus === 'idle' ? 'READY' : aiSessionStatus.toUpperCase().replace('-', ' ')}
+                    </span>
                   </div>
                   <button
-                    onClick={() => { setTerminalMode('terminal'); setAiTask('') }}
+                    onClick={() => { pingPong.abort(); setTerminalMode('terminal'); setAiTask(''); setAiSessionStatus('idle') }}
                     className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
                   >
                     EXIT AI
