@@ -567,7 +567,7 @@ fn spawn_session(
                             .individual
                             .iter()
                             .map(|v| {
-                                let (verdict_str, confidence, reason) = match &v.verdict {
+                                let (verdict_str, confidence, reason) = match &v.result {
                                     smux_core::types::VerifyResult::Approved {
                                         reason,
                                         confidence,
@@ -582,7 +582,7 @@ fn spawn_session(
                                     }
                                 };
                                 smux_core::ipc::VerifierVerdictInfo {
-                                    verifier: v.verifier.clone(),
+                                    verifier: v.adapter_name.clone(),
                                     verdict: verdict_str,
                                     confidence,
                                     reason,

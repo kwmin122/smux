@@ -191,10 +191,12 @@ pub enum ConsensusStrategy {
 /// Individual verifier's verdict in a cross-verify round.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerifierVerdict {
-    /// Which verifier produced this verdict (e.g. "claude", "codex").
-    pub verifier: String,
+    /// Which adapter produced this verdict (e.g. "claude", "codex").
+    pub adapter_name: String,
     /// The verdict itself.
-    pub verdict: VerifyResult,
+    pub result: VerifyResult,
+    /// Wall-clock time this verifier took, in milliseconds.
+    pub duration_ms: u64,
 }
 
 /// Result of applying a consensus strategy to multiple verifier verdicts.

@@ -238,19 +238,21 @@ impl Orchestrator {
             for (i, mut verifier) in taken_verifiers.into_iter().enumerate() {
                 let prompt = verifier_prompt.clone();
                 join_set.spawn(async move {
+                    let start = tokio::time::Instant::now();
                     let result = send_and_collect_bare(&mut verifier, &prompt).await;
-                    (i, verifier, result)
+                    let duration_ms = start.elapsed().as_millis() as u64;
+                    (i, verifier, result, duration_ms)
                 });
             }
 
-            let mut verifier_outputs: Vec<(usize, String)> = Vec::with_capacity(num_verifiers);
+            let mut verifier_outputs: Vec<(usize, String, u64)> = Vec::with_capacity(num_verifiers);
             let mut returned_verifiers: Vec<(usize, Box<dyn AgentAdapter>)> =
                 Vec::with_capacity(num_verifiers);
             let mut first_error: Option<String> = None;
 
             while let Some(join_result) = join_set.join_next().await {
                 match join_result {
-                    Ok((i, verifier, Ok(output))) => {
+                    Ok((i, verifier, Ok(output), duration_ms)) => {
                         tracing::info!(
                             round,
                             verifier = i,
@@ -265,10 +267,10 @@ impl Orchestrator {
                             },
                         )
                         .await;
-                        verifier_outputs.push((i, output));
+                        verifier_outputs.push((i, output, duration_ms));
                         returned_verifiers.push((i, verifier));
                     }
-                    Ok((i, verifier, Err(e))) => {
+                    Ok((i, verifier, Err(e), _duration_ms)) => {
                         tracing::error!(round, verifier = i, error = %e, "verifier adapter failed");
                         returned_verifiers.push((i, verifier));
                         if first_error.is_none() {
@@ -287,7 +289,7 @@ impl Orchestrator {
             // Put verifiers back in order.
             returned_verifiers.sort_by_key(|(i, _)| *i);
             self.verifiers = returned_verifiers.into_iter().map(|(_, v)| v).collect();
-            verifier_outputs.sort_by_key(|(i, _)| *i);
+            verifier_outputs.sort_by_key(|(i, _, _)| *i);
 
             if let Some(err) = first_error {
                 return OrchestratorOutcome::Error { message: err };
@@ -309,12 +311,13 @@ impl Orchestrator {
                 // Multi-verifier — parse each, apply consensus engine.
                 let individual_verdicts: Vec<VerifierVerdict> = verifier_outputs
                     .iter()
-                    .map(|(i, output)| {
+                    .map(|(i, output, duration_ms)| {
                         let v = stop::detect(output);
-                        tracing::info!(round, verifier = i, ?v, "individual verdict");
+                        tracing::info!(round, verifier = i, ?v, duration_ms, "individual verdict");
                         VerifierVerdict {
-                            verifier: format!("verifier[{i}]"),
-                            verdict: v,
+                            adapter_name: format!("verifier[{i}]"),
+                            result: v,
+                            duration_ms: *duration_ms,
                         }
                     })
                     .collect();
@@ -346,12 +349,20 @@ impl Orchestrator {
                 final_v
             };
 
-            // Collect combined verifier output for feedback (use first verifier's output).
-            let verifier_output = verifier_outputs
-                .into_iter()
-                .next()
-                .map(|(_, o)| o)
-                .unwrap_or_default();
+            // Collect combined output from ALL verifiers for planner feedback.
+            let verifier_output = if verifier_outputs.len() == 1 {
+                verifier_outputs
+                    .into_iter()
+                    .next()
+                    .map(|(_, o, _)| o)
+                    .unwrap_or_default()
+            } else {
+                verifier_outputs
+                    .into_iter()
+                    .map(|(i, o, _)| format!("[verifier[{i}]]\n{o}"))
+                    .collect::<Vec<_>>()
+                    .join("\n\n")
+            };
 
             match &verdict {
                 // ── Step 7: Approved -> done ──
@@ -401,8 +412,9 @@ impl Orchestrator {
                             .iter()
                             .enumerate()
                             .map(|(i, output)| VerifierVerdict {
-                                verifier: format!("verifier[{i}]"),
-                                verdict: stop::detect(output),
+                                adapter_name: format!("verifier[{i}]"),
+                                result: stop::detect(output),
+                                duration_ms: 0,
                             })
                             .collect();
                         let re_consensus =

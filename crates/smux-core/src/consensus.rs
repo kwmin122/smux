@@ -36,14 +36,14 @@ fn majority(verdicts: &[VerifierVerdict]) -> VerifyResult {
     let total = verdicts.len();
     let approved_count = verdicts
         .iter()
-        .filter(|v| matches!(v.verdict, VerifyResult::Approved { .. }))
+        .filter(|v| matches!(v.result, VerifyResult::Approved { .. }))
         .count();
 
     if approved_count * 2 > total {
         // Approved — use the reason from the highest-confidence approval.
         let best = verdicts
             .iter()
-            .filter_map(|v| match &v.verdict {
+            .filter_map(|v| match &v.result {
                 VerifyResult::Approved { reason, confidence } => Some((reason, *confidence)),
                 _ => None,
             })
@@ -71,7 +71,7 @@ fn weighted(verdicts: &[VerifierVerdict]) -> VerifyResult {
     let mut weighted_reject = 0.0_f64;
 
     for v in verdicts {
-        match &v.verdict {
+        match &v.result {
             VerifyResult::Approved { confidence, .. } => weighted_approve += confidence,
             VerifyResult::Rejected { confidence, .. } => weighted_reject += confidence,
             VerifyResult::NeedsInfo { .. } => {} // NeedsInfo contributes 0
@@ -93,7 +93,7 @@ fn weighted(verdicts: &[VerifierVerdict]) -> VerifyResult {
     if approval_ratio > 0.5 {
         let best = verdicts
             .iter()
-            .filter_map(|v| match &v.verdict {
+            .filter_map(|v| match &v.result {
                 VerifyResult::Approved { reason, confidence } => Some((reason, *confidence)),
                 _ => None,
             })
@@ -118,13 +118,13 @@ fn weighted(verdicts: &[VerifierVerdict]) -> VerifyResult {
 fn unanimous(verdicts: &[VerifierVerdict]) -> VerifyResult {
     let all_approved = verdicts
         .iter()
-        .all(|v| matches!(v.verdict, VerifyResult::Approved { .. }));
+        .all(|v| matches!(v.result, VerifyResult::Approved { .. }));
 
     if all_approved {
         // Average confidence.
         let avg_conf: f64 = verdicts
             .iter()
-            .filter_map(|v| match &v.verdict {
+            .filter_map(|v| match &v.result {
                 VerifyResult::Approved { confidence, .. } => Some(*confidence),
                 _ => None,
             })
@@ -142,14 +142,14 @@ fn unanimous(verdicts: &[VerifierVerdict]) -> VerifyResult {
 
 /// LeaderDelegate: the first verifier (leader) decides, others are advisory.
 fn leader_delegate(verdicts: &[VerifierVerdict]) -> VerifyResult {
-    verdicts[0].verdict.clone()
+    verdicts[0].result.clone()
 }
 
 /// Extract the best (highest-confidence) rejection reason, falling back to a default.
 fn best_rejection(verdicts: &[VerifierVerdict]) -> VerifyResult {
     let best = verdicts
         .iter()
-        .filter_map(|v| match &v.verdict {
+        .filter_map(|v| match &v.result {
             VerifyResult::Rejected {
                 reason,
                 category,
@@ -178,7 +178,7 @@ fn compute_agreement(verdicts: &[VerifierVerdict], final_verdict: &VerifyResult)
     let is_approved = matches!(final_verdict, VerifyResult::Approved { .. });
     let matching = verdicts
         .iter()
-        .filter(|v| matches!(v.verdict, VerifyResult::Approved { .. }) == is_approved)
+        .filter(|v| matches!(v.result, VerifyResult::Approved { .. }) == is_approved)
         .count();
     matching as f64 / verdicts.len() as f64
 }
@@ -189,31 +189,34 @@ mod tests {
 
     fn approved(verifier: &str, confidence: f64) -> VerifierVerdict {
         VerifierVerdict {
-            verifier: verifier.into(),
-            verdict: VerifyResult::Approved {
+            adapter_name: verifier.into(),
+            result: VerifyResult::Approved {
                 reason: format!("{verifier} approved"),
                 confidence,
             },
+            duration_ms: 0,
         }
     }
 
     fn rejected(verifier: &str, confidence: f64) -> VerifierVerdict {
         VerifierVerdict {
-            verifier: verifier.into(),
-            verdict: VerifyResult::Rejected {
+            adapter_name: verifier.into(),
+            result: VerifyResult::Rejected {
                 reason: format!("{verifier} rejected"),
                 category: RejectCategory::IncompleteImpl,
                 confidence,
             },
+            duration_ms: 0,
         }
     }
 
     fn needs_info(verifier: &str) -> VerifierVerdict {
         VerifierVerdict {
-            verifier: verifier.into(),
-            verdict: VerifyResult::NeedsInfo {
+            adapter_name: verifier.into(),
+            result: VerifyResult::NeedsInfo {
                 question: "what?".into(),
             },
+            duration_ms: 0,
         }
     }
 
