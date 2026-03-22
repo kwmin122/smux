@@ -10,8 +10,8 @@ use smux_core::health::{AgentHealth, HealthConfig, HealthMonitor};
 
 fn config_fast() -> HealthConfig {
     HealthConfig {
-        stuck_timeout: Duration::from_millis(100),
-        warning_threshold: Duration::from_millis(50),
+        stuck_timeout: Duration::from_millis(300),
+        warning_threshold: Duration::from_millis(150),
         auto_restart: true,
     }
 }
@@ -44,15 +44,15 @@ fn slow_after_warning_threshold() {
     mon.record_event();
 
     // Wait past the warning threshold but not the stuck timeout.
-    std::thread::sleep(Duration::from_millis(60));
+    std::thread::sleep(Duration::from_millis(200));
 
     let state = mon.check();
     match state {
         AgentHealth::Slow { since } => {
             // `since` should be approximately when the last event was recorded.
             assert!(
-                since.elapsed() >= Duration::from_millis(50),
-                "`since` should be at least 50ms ago"
+                since.elapsed() >= Duration::from_millis(150),
+                "`since` should be at least 150ms ago"
             );
         }
         other => panic!("expected Slow, got {other:?}"),
@@ -66,14 +66,14 @@ fn stuck_after_timeout() {
     mon.record_event();
 
     // Wait past the stuck timeout.
-    std::thread::sleep(Duration::from_millis(110));
+    std::thread::sleep(Duration::from_millis(400));
 
     let state = mon.check();
     match state {
         AgentHealth::Stuck { since } => {
             assert!(
-                since.elapsed() >= Duration::from_millis(100),
-                "`since` should be at least 100ms ago"
+                since.elapsed() >= Duration::from_millis(300),
+                "`since` should be at least 300ms ago"
             );
         }
         other => panic!("expected Stuck, got {other:?}"),
@@ -86,7 +86,7 @@ fn reset_clears_stuck() {
     let mut mon = HealthMonitor::new(config_fast());
     mon.record_event();
 
-    std::thread::sleep(Duration::from_millis(110));
+    std::thread::sleep(Duration::from_millis(400));
     let _ = mon.check();
     assert!(
         matches!(mon.state(), AgentHealth::Stuck { .. }),
@@ -149,7 +149,7 @@ fn slow_recovers_on_event() {
     let mut mon = HealthMonitor::new(config_fast());
     mon.record_event();
 
-    std::thread::sleep(Duration::from_millis(60));
+    std::thread::sleep(Duration::from_millis(200));
     let _ = mon.check();
     assert!(
         matches!(mon.state(), AgentHealth::Slow { .. }),
