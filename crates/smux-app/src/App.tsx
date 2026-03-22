@@ -47,6 +47,7 @@ function App() {
   const [showBrowser, setShowBrowser] = useState(false)
   const [crossVerify, setCrossVerify] = useState<CrossVerifyState | null>(null)
   const [layout, setLayout] = useState<LayoutPreset>('center')
+  const [panelOrder, setPanelOrder] = useState<['planner' | 'verifier', 'planner' | 'verifier']>(['planner', 'verifier'])
   const [gitBranch, setGitBranch] = useState('—')
   const [gitFilesChanged, setGitFilesChanged] = useState(0)
   const [showNewSession, setShowNewSession] = useState(false)
@@ -71,6 +72,7 @@ function App() {
         if (parsed.layout) setLayout(parsed.layout)
         if (typeof parsed.dividerPos === 'number') setDividerPos(parsed.dividerPos)
         if (typeof parsed.showBrowser === 'boolean') setShowBrowser(parsed.showBrowser)
+        if (Array.isArray(parsed.panelOrder) && parsed.panelOrder.length === 2) setPanelOrder(parsed.panelOrder)
       }
     } catch { /* ignore */ }
     // Request notification permission on first load
@@ -256,10 +258,15 @@ function App() {
         e.preventDefault()
         setFullscreen(prev => prev ? null : 'planner')
       }
-      if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === 's' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
         e.preventDefault()
-        localStorage.setItem('smux-layout', JSON.stringify({ layout, dividerPos, showBrowser }))
+        localStorage.setItem('smux-layout', JSON.stringify({ layout, dividerPos, showBrowser, panelOrder }))
         plannerRef.current?.writeln('\x1b[90m[layout saved]\x1b[0m')
+      }
+      // Cmd+Shift+S: swap panel positions
+      if (e.key === 'S' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault()
+        setPanelOrder(prev => [prev[1], prev[0]])
       }
       // Non-modifier shortcuts (only when no Cmd/Ctrl)
       if (!e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -272,7 +279,7 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [layout, dividerPos, showBrowser])
+  }, [layout, dividerPos, showBrowser, panelOrder])
 
   // Divider drag handling
   useEffect(() => {
