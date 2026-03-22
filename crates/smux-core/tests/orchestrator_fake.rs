@@ -9,6 +9,7 @@ fn config(task: &str, max_rounds: u32) -> OrchestratorConfig {
         max_rounds,
         max_tokens: 4000,
         health_config: None,
+        consensus_strategy: Default::default(),
     }
 }
 
@@ -376,6 +377,7 @@ async fn adapter_error_returns_outcome_error() {
         max_rounds: 5,
         max_tokens: 4000,
         health_config: None,
+        consensus_strategy: Default::default(),
     };
 
     let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);
@@ -410,6 +412,7 @@ async fn double_needs_info_falls_back_to_rejected() {
         max_rounds: 5,
         max_tokens: 4000,
         health_config: None,
+        consensus_strategy: Default::default(),
     };
 
     let mut orch = Orchestrator::new(Box::new(planner), Box::new(verifier), config);

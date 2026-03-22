@@ -83,6 +83,7 @@ async fn handle_test_client(
                     task: e.task.clone(),
                     planner: e.planner.clone(),
                     verifier: e.verifier.clone(),
+                    verifiers: vec![e.verifier.clone()],
                     current_round: e.current_round,
                     status: e.status.clone(),
                 })
@@ -96,6 +97,8 @@ async fn handle_test_client(
             verifier,
             task,
             max_rounds: _,
+            verifiers: _,
+            consensus: _,
         } => {
             let session_id = format!("test-{}", sessions.lock().await.len());
             sessions.lock().await.insert(
@@ -255,6 +258,8 @@ async fn start_session_returns_created() {
             verifier: "codex".into(),
             task: "test task".into(),
             max_rounds: 3,
+            verifiers: vec![],
+            consensus: "majority".into(),
         },
     )
     .await
@@ -308,6 +313,8 @@ async fn start_then_attach_receives_events() {
             verifier: "codex".into(),
             task: "implement feature".into(),
             max_rounds: 5,
+            verifiers: vec![],
+            consensus: "majority".into(),
         },
     )
     .await
@@ -387,6 +394,8 @@ async fn list_sessions_after_start() {
             verifier: "codex".into(),
             task: "my task".into(),
             max_rounds: 3,
+            verifiers: vec![],
+            consensus: "majority".into(),
         },
     )
     .await

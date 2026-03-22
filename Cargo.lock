@@ -3301,8 +3301,10 @@ version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
+ "smux-core",
  "tauri",
  "tauri-build",
+ "tokio",
 ]
 
 [[package]]

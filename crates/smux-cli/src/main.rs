@@ -29,6 +29,14 @@ enum Commands {
         #[arg(long)]
         verifier: Option<String>,
 
+        /// Multiple verifiers for cross-verify (comma-separated, e.g. claude,codex,gemini)
+        #[arg(long, value_delimiter = ',')]
+        verifiers: Option<Vec<String>>,
+
+        /// Consensus strategy (majority, weighted, unanimous, leader)
+        #[arg(long)]
+        consensus: Option<String>,
+
         /// Task description
         #[arg(long)]
         task: String,
@@ -123,6 +131,8 @@ async fn main() {
         Commands::Start {
             planner,
             verifier,
+            verifiers,
+            consensus,
             task,
             max_rounds,
         } => {
@@ -138,6 +148,8 @@ async fn main() {
             let planner = planner.unwrap_or(config.agents.planner.default.clone());
             let verifier = verifier.unwrap_or(config.agents.verifier.default.clone());
             let max_rounds = max_rounds.unwrap_or(config.defaults.max_rounds);
+            let verifiers_list = verifiers.unwrap_or_default();
+            let consensus_str = consensus.unwrap_or_else(|| "majority".into());
 
             // Ensure daemon is running.
             if let Err(e) = ensure_daemon_running().await {
@@ -158,6 +170,8 @@ async fn main() {
                 verifier: verifier.clone(),
                 task: task.clone(),
                 max_rounds,
+                verifiers: verifiers_list,
+                consensus: consensus_str,
             };
 
             if let Err(e) = send_message(&mut stream, &msg).await {

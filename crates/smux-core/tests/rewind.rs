@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 use smux_core::session_store::SessionStore;
-use smux_core::types::{RoundSnapshot, SessionMeta, SessionStatus, VerifyResult};
+use smux_core::types::{
+    ConsensusStrategy, RoundSnapshot, SessionMeta, SessionStatus, VerifyResult,
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,6 +32,7 @@ fn sample_snapshot(round: u32) -> RoundSnapshot {
         },
         files_changed: vec![format!("file-{round}.rs")],
         timestamp: format!("2026-03-21T12:00:{round:02}Z"),
+        cross_verify: None,
     }
 }
 
@@ -83,6 +86,8 @@ fn save_and_load_session_meta() {
         task: "fix the bug".into(),
         planner: "claude".into(),
         verifier: "codex".into(),
+        verifiers: vec!["codex".into()],
+        consensus_strategy: ConsensusStrategy::default(),
         current_round: 3,
         status: SessionStatus::InProgress,
         worktree_path: PathBuf::from("/tmp/wt-42"),
@@ -155,6 +160,7 @@ fn rewind_git_then_load_round_metadata() {
         },
         files_changed: vec!["data.txt".into()],
         timestamp: "2026-03-21T12:00:01Z".into(),
+        cross_verify: None,
     };
     store.save_round(&snap1).unwrap();
 
@@ -173,6 +179,7 @@ fn rewind_git_then_load_round_metadata() {
         },
         files_changed: vec!["data.txt".into()],
         timestamp: "2026-03-21T12:00:02Z".into(),
+        cross_verify: None,
     };
     store.save_round(&snap2).unwrap();
 

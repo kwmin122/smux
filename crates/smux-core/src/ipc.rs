@@ -19,6 +19,12 @@ pub enum ClientMessage {
         verifier: String,
         task: String,
         max_rounds: u32,
+        /// Additional verifiers for cross-verify mode (v0.3+).
+        #[serde(default)]
+        verifiers: Vec<String>,
+        /// Consensus strategy (v0.3+). Defaults to Majority.
+        #[serde(default)]
+        consensus: String,
     },
     /// Attach to a running session to receive streamed events.
     AttachSession { session_id: String },
@@ -55,10 +61,27 @@ pub enum DaemonMessage {
     RoundComplete { round: u32, verdict_summary: String },
     /// The session finished.
     SessionComplete { summary: String },
+    /// Cross-verify result from multiple verifiers (v0.3+).
+    CrossVerifyResult {
+        round: u32,
+        individual: Vec<VerifierVerdictInfo>,
+        final_verdict: String,
+        strategy: String,
+        agreement_ratio: f64,
+    },
     /// An error occurred.
     Error { message: String },
     /// Generic acknowledgement.
     Ok,
+}
+
+/// Individual verifier verdict info for IPC (simplified for wire format).
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct VerifierVerdictInfo {
+    pub verifier: String,
+    pub verdict: String,
+    pub confidence: f64,
+    pub reason: String,
 }
 
 /// Summary info about a session (for list display).
@@ -68,6 +91,9 @@ pub struct SessionInfo {
     pub task: String,
     pub planner: String,
     pub verifier: String,
+    /// All verifiers (v0.3+). Empty means single-verifier mode.
+    #[serde(default)]
+    pub verifiers: Vec<String>,
     pub current_round: u32,
     pub status: String,
 }

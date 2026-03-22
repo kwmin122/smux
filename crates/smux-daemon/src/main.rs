@@ -48,6 +48,8 @@ struct SessionHandle {
     task: String,
     planner: String,
     verifier: String,
+    /// All verifier names (v0.3+). Non-empty when using cross-verify.
+    verifiers: Vec<String>,
     current_round: Arc<Mutex<u32>>,
     status: Arc<Mutex<SessionStatus>>,
     /// Broadcast channel for events (AgentOutput, RoundComplete, SessionComplete).
@@ -214,7 +216,25 @@ async fn handle_client(
                 verifier,
                 task,
                 max_rounds,
+                verifiers,
+                consensus,
             } => {
+                // Build the effective verifier list. The primary `verifier` field
+                // is always included. If `verifiers` (extras) were provided, merge
+                // them: primary first, then extras (deduplicating the primary if the
+                // user also listed it in extras).
+                let effective_verifiers = if verifiers.is_empty() {
+                    vec![verifier.clone()]
+                } else {
+                    let mut merged = vec![verifier.clone()];
+                    for v in verifiers {
+                        if v != verifier {
+                            merged.push(v);
+                        }
+                    }
+                    merged
+                };
+
                 let session_id = uuid::Uuid::new_v4().to_string()[..8].to_string();
                 let (event_tx, _) = broadcast::channel(256);
 
@@ -222,7 +242,8 @@ async fn handle_client(
                     id: session_id.clone(),
                     task: task.clone(),
                     planner: planner.clone(),
-                    verifier: verifier.clone(),
+                    verifier: effective_verifiers.first().cloned().unwrap_or_default(),
+                    verifiers: effective_verifiers.clone(),
                     current_round: Arc::new(Mutex::new(0)),
                     status: Arc::new(Mutex::new(SessionStatus::Running)),
                     event_tx: event_tx.clone(),
@@ -234,8 +255,15 @@ async fn handle_client(
                     .sessions
                     .insert(session_id.clone(), handle.clone());
 
-                // Spawn the orchestrator task.
-                spawn_session(handle.clone(), planner, verifier, task, max_rounds);
+                // Spawn the orchestrator task with all verifiers.
+                spawn_session(
+                    handle.clone(),
+                    planner,
+                    effective_verifiers,
+                    consensus,
+                    task,
+                    max_rounds,
+                );
 
                 send_message(
                     &mut stream,
@@ -288,6 +316,7 @@ async fn handle_client(
                         task: handle.task.clone(),
                         planner: handle.planner.clone(),
                         verifier: handle.verifier.clone(),
+                        verifiers: handle.verifiers.clone(),
                         current_round: round,
                         status,
                     });
@@ -399,7 +428,8 @@ async fn stream_events_to_client(
 fn spawn_session(
     handle: Arc<SessionHandle>,
     planner: String,
-    verifier: String,
+    verifiers: Vec<String>,
+    consensus: String,
     task: String,
     max_rounds: u32,
 ) {
@@ -418,15 +448,27 @@ fn spawn_session(
                 }
             };
 
-        let verifier_adapter = match smux_core::adapter::create_adapter(&verifier, working_dir) {
-            Ok(a) => a,
-            Err(e) => {
-                let _ = handle.event_tx.send(DaemonMessage::SessionComplete {
-                    summary: format!("failed to create verifier adapter: {e}"),
-                });
-                *handle.status.lock().await = SessionStatus::Failed;
-                return;
+        // Create adapter for each verifier.
+        let mut verifier_adapters: Vec<Box<dyn smux_core::adapter::AgentAdapter>> = Vec::new();
+        for v_name in &verifiers {
+            match smux_core::adapter::create_adapter(v_name, working_dir.clone()) {
+                Ok(a) => verifier_adapters.push(a),
+                Err(e) => {
+                    let _ = handle.event_tx.send(DaemonMessage::SessionComplete {
+                        summary: format!("failed to create verifier adapter '{v_name}': {e}"),
+                    });
+                    *handle.status.lock().await = SessionStatus::Failed;
+                    return;
+                }
             }
+        }
+
+        // Parse consensus strategy from string.
+        let consensus_strategy = match consensus.to_lowercase().as_str() {
+            "weighted" => smux_core::types::ConsensusStrategy::Weighted,
+            "unanimous" => smux_core::types::ConsensusStrategy::Unanimous,
+            "leader" | "leaderdelegate" => smux_core::types::ConsensusStrategy::LeaderDelegate,
+            _ => smux_core::types::ConsensusStrategy::Majority,
         };
 
         let config = OrchestratorConfig {
@@ -434,9 +476,10 @@ fn spawn_session(
             max_rounds,
             max_tokens: 0,
             health_config: None,
+            consensus_strategy,
         };
 
-        // VG-008: Wire event streaming from orchestrator to daemon broadcast.
+        // Wire event streaming from orchestrator to daemon broadcast.
         let (event_tx, mut event_rx) =
             tokio::sync::mpsc::channel::<smux_core::orchestrator::OrchestratorEvent>(256);
         let broadcast_tx = handle.event_tx.clone();
@@ -469,6 +512,48 @@ fn spawn_session(
                             verdict_summary: summary,
                         });
                     }
+                    OrchestratorEvent::CrossVerifyResult { round, result } => {
+                        let individual = result
+                            .individual
+                            .iter()
+                            .map(|v| {
+                                let (verdict_str, confidence, reason) = match &v.verdict {
+                                    smux_core::types::VerifyResult::Approved {
+                                        reason,
+                                        confidence,
+                                    } => ("APPROVED".to_string(), *confidence, reason.clone()),
+                                    smux_core::types::VerifyResult::Rejected {
+                                        reason,
+                                        confidence,
+                                        ..
+                                    } => ("REJECTED".to_string(), *confidence, reason.clone()),
+                                    smux_core::types::VerifyResult::NeedsInfo { question } => {
+                                        ("NEEDS_INFO".to_string(), 0.0, question.clone())
+                                    }
+                                };
+                                smux_core::ipc::VerifierVerdictInfo {
+                                    verifier: v.verifier.clone(),
+                                    verdict: verdict_str,
+                                    confidence,
+                                    reason,
+                                }
+                            })
+                            .collect();
+
+                        let final_str = match &result.final_verdict {
+                            smux_core::types::VerifyResult::Approved { .. } => "APPROVED",
+                            smux_core::types::VerifyResult::Rejected { .. } => "REJECTED",
+                            smux_core::types::VerifyResult::NeedsInfo { .. } => "NEEDS_INFO",
+                        };
+
+                        let _ = broadcast_tx.send(DaemonMessage::CrossVerifyResult {
+                            round: *round,
+                            individual,
+                            final_verdict: final_str.to_string(),
+                            strategy: format!("{:?}", result.strategy),
+                            agreement_ratio: result.agreement_ratio,
+                        });
+                    }
                     OrchestratorEvent::HealthStateChanged { agent, state } => {
                         let _ = broadcast_tx.send(DaemonMessage::AgentOutput {
                             role: format!("health:{agent}"),
@@ -489,8 +574,8 @@ fn spawn_session(
             }
         });
 
-        let mut orchestrator =
-            Orchestrator::new(planner_adapter, verifier_adapter, config).with_event_sink(event_tx);
+        let mut orchestrator = Orchestrator::new_multi(planner_adapter, verifier_adapters, config)
+            .with_event_sink(event_tx);
         let outcome = orchestrator.run().await;
 
         let summary = match &outcome {

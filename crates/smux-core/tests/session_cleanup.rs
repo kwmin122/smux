@@ -17,6 +17,8 @@ fn sample_meta(id: &str, status: SessionStatus) -> SessionMeta {
         task: format!("task for {id}"),
         planner: "claude".into(),
         verifier: "codex".into(),
+        verifiers: vec!["codex".into()],
+        consensus_strategy: Default::default(),
         current_round: 1,
         status,
         worktree_path: PathBuf::from(format!("/tmp/wt-{id}")),

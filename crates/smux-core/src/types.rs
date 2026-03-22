@@ -25,11 +25,10 @@ pub struct RoundSnapshot {
     /// List of files changed in this round.
     pub files_changed: Vec<String>,
     /// ISO 8601 timestamp of when this round was committed.
-    ///
-    /// Spec calls for `DateTime<Utc>` (chrono). v0.1 uses String to avoid
-    /// adding the chrono dependency. Format is always "YYYY-MM-DDTHH:MM:SSZ".
-    /// Upgrade to chrono::DateTime<Utc> in v0.2 if type-safe parsing is needed.
     pub timestamp: String,
+    /// Cross-verification result (present when multiple verifiers are used).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cross_verify: Option<ConsensusResult>,
 }
 
 /// Metadata for an entire smux session.
@@ -41,8 +40,14 @@ pub struct SessionMeta {
     pub task: String,
     /// Planner adapter identifier (e.g. "claude", "codex").
     pub planner: String,
-    /// Verifier adapter identifier.
+    /// Verifier adapter identifier (backward compat: primary verifier).
     pub verifier: String,
+    /// All verifier adapter identifiers (v0.3+). If empty, falls back to `verifier`.
+    #[serde(default)]
+    pub verifiers: Vec<String>,
+    /// Consensus strategy for multi-verifier mode.
+    #[serde(default)]
+    pub consensus_strategy: ConsensusStrategy,
     /// Current round number.
     pub current_round: u32,
     /// Session status.
@@ -163,4 +168,44 @@ pub enum RejectCategory {
     IncompleteImpl,
     /// The change has a security vulnerability.
     SecurityIssue,
+}
+
+// ---------------------------------------------------------------------------
+// Cross-verify / consensus types (v0.3)
+// ---------------------------------------------------------------------------
+
+/// Strategy for combining multiple verifier verdicts.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ConsensusStrategy {
+    /// More than 50% must approve.
+    #[default]
+    Majority,
+    /// Confidence-weighted average > 0.5 → approved.
+    Weighted,
+    /// All verifiers must approve.
+    Unanimous,
+    /// Leader model decides after seeing other verdicts.
+    LeaderDelegate,
+}
+
+/// Individual verifier's verdict in a cross-verify round.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerifierVerdict {
+    /// Which verifier produced this verdict (e.g. "claude", "codex").
+    pub verifier: String,
+    /// The verdict itself.
+    pub verdict: VerifyResult,
+}
+
+/// Result of applying a consensus strategy to multiple verifier verdicts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsensusResult {
+    /// Individual verdicts from each verifier.
+    pub individual: Vec<VerifierVerdict>,
+    /// The final combined verdict.
+    pub final_verdict: VerifyResult,
+    /// Which strategy was used.
+    pub strategy: ConsensusStrategy,
+    /// Agreement ratio (0.0–1.0): fraction of verifiers that agreed with the final verdict.
+    pub agreement_ratio: f64,
 }

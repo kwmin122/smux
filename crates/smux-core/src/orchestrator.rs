@@ -6,10 +6,13 @@
 use futures::StreamExt;
 
 use crate::adapter::AgentAdapter;
+use crate::consensus;
 use crate::context::{DEFAULT_MAX_TOKENS, build_planner_feedback, build_verifier_prompt};
 use crate::health::{AgentHealth, HealthConfig, HealthMonitor};
 use crate::stop;
-use crate::types::{AgentEvent, SessionConfig, VerifyResult};
+use crate::types::{
+    AgentEvent, ConsensusResult, ConsensusStrategy, SessionConfig, VerifierVerdict, VerifyResult,
+};
 
 /// Events emitted by the orchestrator during execution.
 ///
@@ -27,6 +30,8 @@ pub enum OrchestratorEvent {
     RoundComplete { round: u32, verdict: VerifyResult },
     /// An agent health state changed.
     HealthStateChanged { agent: String, state: String },
+    /// Cross-verify consensus result from multiple verifiers.
+    CrossVerifyResult { round: u32, result: ConsensusResult },
     /// A post-hoc safety audit alert was triggered (Layer 3).
     SafetyAlert {
         round: u32,
@@ -46,6 +51,8 @@ pub struct OrchestratorConfig {
     pub max_tokens: usize,
     /// Health monitoring configuration. `None` disables health monitoring.
     pub health_config: Option<HealthConfig>,
+    /// Consensus strategy for multi-verifier mode.
+    pub consensus_strategy: ConsensusStrategy,
 }
 
 /// Outcome of an orchestrator run.
@@ -66,7 +73,7 @@ pub enum OrchestratorOutcome {
 /// occurs.
 pub struct Orchestrator {
     planner: Box<dyn AgentAdapter>,
-    verifier: Box<dyn AgentAdapter>,
+    verifiers: Vec<Box<dyn AgentAdapter>>,
     config: OrchestratorConfig,
     /// Optional channel to emit live events during orchestration.
     event_sink: Option<tokio::sync::mpsc::Sender<OrchestratorEvent>>,
@@ -74,6 +81,8 @@ pub struct Orchestrator {
 
 impl Orchestrator {
     /// Create a new orchestrator with the given adapters and configuration.
+    ///
+    /// Backward compatible: accepts a single verifier.
     pub fn new(
         planner: Box<dyn AgentAdapter>,
         verifier: Box<dyn AgentAdapter>,
@@ -81,7 +90,21 @@ impl Orchestrator {
     ) -> Self {
         Self {
             planner,
-            verifier,
+            verifiers: vec![verifier],
+            config,
+            event_sink: None,
+        }
+    }
+
+    /// Create an orchestrator with multiple verifiers for cross-verification.
+    pub fn new_multi(
+        planner: Box<dyn AgentAdapter>,
+        verifiers: Vec<Box<dyn AgentAdapter>>,
+        config: OrchestratorConfig,
+    ) -> Self {
+        Self {
+            planner,
+            verifiers,
             config,
             event_sink: None,
         }
@@ -119,21 +142,22 @@ impl Orchestrator {
             working_directory: std::path::PathBuf::from("/tmp"),
             prior_transcript: vec![],
         };
-        let verifier_config = SessionConfig {
-            system_prompt: "You are a verifier agent.".into(),
-            working_directory: std::path::PathBuf::from("/tmp"),
-            prior_transcript: vec![],
-        };
-
         if let Err(e) = self.planner.start_session(planner_config).await {
             return OrchestratorOutcome::Error {
                 message: format!("failed to start planner session: {e}"),
             };
         }
-        if let Err(e) = self.verifier.start_session(verifier_config).await {
-            return OrchestratorOutcome::Error {
-                message: format!("failed to start verifier session: {e}"),
+        for (i, verifier) in self.verifiers.iter_mut().enumerate() {
+            let v_config = SessionConfig {
+                system_prompt: "You are a verifier agent.".into(),
+                working_directory: std::path::PathBuf::from("/tmp"),
+                prior_transcript: vec![],
             };
+            if let Err(e) = verifier.start_session(v_config).await {
+                return OrchestratorOutcome::Error {
+                    message: format!("failed to start verifier[{i}] session: {e}"),
+                };
+            }
         }
 
         let max_tokens = if self.config.max_tokens == 0 {
@@ -193,7 +217,7 @@ impl Orchestrator {
             })
             .await;
 
-            // ── Step 3-5: Build verifier prompt and collect verdict ──
+            // ── Step 3-5: Build verifier prompt and collect verdict(s) ──
             let verifier_prompt =
                 build_verifier_prompt(round, &planner_output, &prior_rounds, max_tokens);
 
@@ -201,49 +225,115 @@ impl Orchestrator {
                 round,
                 prompt_tokens = crate::context::estimate_tokens(&verifier_prompt),
                 max_tokens,
-                "context passed to verifier"
+                num_verifiers = self.verifiers.len(),
+                "context passed to verifier(s)"
             );
 
-            let verifier_output = match send_and_collect_with_health(
-                &mut self.verifier,
-                &verifier_prompt,
-                &mut verifier_health,
-                "verifier",
-                &mut verifier_restarted_this_round,
-                &self.event_sink,
-            )
-            .await
-            {
-                Ok(output) => output,
-                Err(e) => {
-                    tracing::error!(round, error = %e, "verifier adapter failed");
-                    return OrchestratorOutcome::Error {
-                        message: format!("verifier error in round {round}: {e}"),
-                    };
+            // Collect output from all verifiers.
+            // For single verifier, this is equivalent to the v0.2 path.
+            let num_verifiers = self.verifiers.len();
+            let mut verifier_outputs: Vec<(usize, String)> = Vec::new();
+            for (i, verifier) in self.verifiers.iter_mut().enumerate() {
+                let agent_name = if num_verifiers == 1 {
+                    "verifier".to_string()
+                } else {
+                    format!("verifier[{i}]")
+                };
+                match send_and_collect_with_health(
+                    verifier,
+                    &verifier_prompt,
+                    &mut verifier_health,
+                    &agent_name,
+                    &mut verifier_restarted_this_round,
+                    &self.event_sink,
+                )
+                .await
+                {
+                    Ok(output) => {
+                        tracing::info!(
+                            round,
+                            verifier = i,
+                            output_len = output.len(),
+                            "verifier responded"
+                        );
+                        emit_event(
+                            &self.event_sink,
+                            OrchestratorEvent::VerifierOutput {
+                                round,
+                                content: output.clone(),
+                            },
+                        )
+                        .await;
+                        verifier_outputs.push((i, output));
+                    }
+                    Err(e) => {
+                        tracing::error!(round, verifier = i, error = %e, "verifier adapter failed");
+                        return OrchestratorOutcome::Error {
+                            message: format!("verifier[{i}] error in round {round}: {e}"),
+                        };
+                    }
                 }
+            }
+
+            // ── Step 6: Parse verdict(s) and apply consensus ──
+            let verdict = if verifier_outputs.len() == 1 {
+                // Single verifier — direct verdict, no consensus overhead.
+                let v = stop::detect(&verifier_outputs[0].1);
+                tracing::info!(round, ?v, "verdict detected");
+
+                self.emit(OrchestratorEvent::RoundComplete {
+                    round,
+                    verdict: v.clone(),
+                })
+                .await;
+                v
+            } else {
+                // Multi-verifier — parse each, apply consensus engine.
+                let individual_verdicts: Vec<VerifierVerdict> = verifier_outputs
+                    .iter()
+                    .map(|(i, output)| {
+                        let v = stop::detect(output);
+                        tracing::info!(round, verifier = i, ?v, "individual verdict");
+                        VerifierVerdict {
+                            verifier: format!("verifier[{i}]"),
+                            verdict: v,
+                        }
+                    })
+                    .collect();
+
+                let consensus_result =
+                    consensus::resolve(&self.config.consensus_strategy, individual_verdicts);
+                tracing::info!(
+                    round,
+                    strategy = ?self.config.consensus_strategy,
+                    agreement = consensus_result.agreement_ratio,
+                    ?consensus_result.final_verdict,
+                    "consensus verdict"
+                );
+
+                let final_v = consensus_result.final_verdict.clone();
+
+                self.emit(OrchestratorEvent::CrossVerifyResult {
+                    round,
+                    result: consensus_result,
+                })
+                .await;
+
+                self.emit(OrchestratorEvent::RoundComplete {
+                    round,
+                    verdict: final_v.clone(),
+                })
+                .await;
+
+                final_v
             };
 
-            tracing::info!(
-                round,
-                verifier_output_len = verifier_output.len(),
-                "verifier responded"
-            );
-
-            self.emit(OrchestratorEvent::VerifierOutput {
-                round,
-                content: verifier_output.clone(),
-            })
-            .await;
-
-            // ── Step 6: Parse verdict ──
-            let verdict = stop::detect(&verifier_output);
-            tracing::info!(round, ?verdict, "verdict detected");
-
-            self.emit(OrchestratorEvent::RoundComplete {
-                round,
-                verdict: verdict.clone(),
-            })
-            .await;
+            // Collect combined verifier output for feedback (use first verifier's output).
+            let verifier_output = verifier_outputs
+                .into_iter()
+                .next()
+                .map(|(_, o)| o)
+                .unwrap_or_default();
 
             match &verdict {
                 // ── Step 7: Approved -> done ──
@@ -259,9 +349,9 @@ impl Orchestrator {
                     planner_prompt =
                         build_planner_feedback(round, &verifier_output, &verdict, max_tokens);
                 }
-                // ── Step 9: NeedsInfo -> re-ask verifier once ──
+                // ── Step 9: NeedsInfo -> re-ask ALL verifiers once ──
                 VerifyResult::NeedsInfo { question } => {
-                    tracing::warn!(round, %question, "verifier returned NeedsInfo, re-asking");
+                    tracing::warn!(round, %question, "verdict returned NeedsInfo, re-asking all verifiers");
                     let re_ask_prompt = format!(
                         "Please provide a clear verdict. Your previous response did not contain one.\n\
                          Question that arose: {question}\n\n\
@@ -269,19 +359,42 @@ impl Orchestrator {
                          {{\"verdict\": \"APPROVED\"|\"REJECTED\", \"category\": \"...\", \"reason\": \"...\", \"confidence\": 0.0-1.0}}"
                     );
 
-                    let re_ask_output =
-                        match send_and_collect(&mut self.verifier, &re_ask_prompt).await {
-                            Ok(output) => output,
+                    // Re-ask ALL verifiers (not just [0]) to maintain consistency.
+                    let mut re_outputs: Vec<String> = Vec::new();
+                    for (i, verifier) in self.verifiers.iter_mut().enumerate() {
+                        match send_and_collect(verifier, &re_ask_prompt).await {
+                            Ok(output) => re_outputs.push(output),
                             Err(e) => {
-                                tracing::error!(round, error = %e, "verifier re-ask failed");
+                                tracing::error!(round, verifier = i, error = %e, "verifier re-ask failed");
                                 return OrchestratorOutcome::Error {
-                                    message: format!("verifier re-ask error in round {round}: {e}"),
+                                    message: format!(
+                                        "verifier[{i}] re-ask error in round {round}: {e}"
+                                    ),
                                 };
                             }
-                        };
+                        }
+                    }
 
-                    let re_verdict = stop::detect(&re_ask_output);
+                    // Apply consensus to re-ask results (same path as initial).
+                    let re_verdict = if re_outputs.len() == 1 {
+                        stop::detect(&re_outputs[0])
+                    } else {
+                        let re_individual: Vec<VerifierVerdict> = re_outputs
+                            .iter()
+                            .enumerate()
+                            .map(|(i, output)| VerifierVerdict {
+                                verifier: format!("verifier[{i}]"),
+                                verdict: stop::detect(output),
+                            })
+                            .collect();
+                        let re_consensus =
+                            consensus::resolve(&self.config.consensus_strategy, re_individual);
+                        re_consensus.final_verdict
+                    };
                     tracing::info!(round, ?re_verdict, "re-ask verdict detected");
+
+                    // Use first verifier's re-ask output for feedback text.
+                    let re_ask_output = re_outputs.into_iter().next().unwrap_or_default();
 
                     match &re_verdict {
                         VerifyResult::Approved { reason, .. } => {

@@ -2,6 +2,7 @@
 
 pub mod adapter;
 pub mod config;
+pub mod consensus;
 pub mod context;
 pub mod git_worktree;
 pub mod health;

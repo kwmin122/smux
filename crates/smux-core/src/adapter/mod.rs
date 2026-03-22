@@ -3,6 +3,7 @@
 pub mod claude;
 pub mod codex;
 pub mod fake;
+pub mod gemini;
 
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -73,7 +74,7 @@ pub enum AdapterError {
 
 /// Create an adapter for the given provider name.
 ///
-/// Supported providers: `"claude"`, `"codex"`.
+/// Supported providers: `"claude"`, `"codex"`, `"gemini"`.
 pub fn create_adapter(
     provider: &str,
     working_dir: PathBuf,
@@ -81,6 +82,7 @@ pub fn create_adapter(
     match provider {
         "claude" => Ok(Box::new(claude::ClaudeHeadlessAdapter::new(working_dir))),
         "codex" => Ok(Box::new(codex::CodexHeadlessAdapter::new(working_dir))),
+        "gemini" => Ok(Box::new(gemini::GeminiHeadlessAdapter::new(working_dir))),
         _ => Err(AdapterError::Other(format!("unknown provider: {provider}"))),
     }
 }
@@ -88,7 +90,7 @@ pub fn create_adapter(
 /// Create an adapter for the given provider name with safety configuration
 /// (Layer 2 permission flags).
 ///
-/// Supported providers: `"claude"`, `"codex"`.
+/// Supported providers: `"claude"`, `"codex"`, `"gemini"`.
 pub fn create_adapter_with_safety(
     provider: &str,
     working_dir: PathBuf,
@@ -100,6 +102,10 @@ pub fn create_adapter_with_safety(
             safety_config,
         ))),
         "codex" => Ok(Box::new(codex::CodexHeadlessAdapter::with_safety(
+            working_dir,
+            safety_config,
+        ))),
+        "gemini" => Ok(Box::new(gemini::GeminiHeadlessAdapter::with_safety(
             working_dir,
             safety_config,
         ))),

@@ -13,6 +13,8 @@ fn client_message_start_session_round_trip() {
         verifier: "codex".into(),
         task: "fix the bug".into(),
         max_rounds: 5,
+        verifiers: vec![],
+        consensus: "majority".into(),
     };
     let json = serde_json::to_string(&msg).unwrap();
     let decoded: ClientMessage = serde_json::from_str(&json).unwrap();
@@ -98,6 +100,7 @@ fn daemon_message_session_list_round_trip() {
             task: "fix bug".into(),
             planner: "claude".into(),
             verifier: "codex".into(),
+            verifiers: vec!["codex".into()],
             current_round: 2,
             status: "running".into(),
         }],
@@ -178,6 +181,8 @@ async fn send_recv_client_message_over_socket() {
             verifier: "codex".into(),
             task: "test task".into(),
             max_rounds: 3,
+            verifiers: vec![],
+            consensus: "majority".into(),
         };
         send_message(&mut client, &msg).await.unwrap();
     });
@@ -194,6 +199,8 @@ async fn send_recv_client_message_over_socket() {
             verifier: "codex".into(),
             task: "test task".into(),
             max_rounds: 3,
+            verifiers: vec![],
+            consensus: "majority".into(),
         }
     );
 }
