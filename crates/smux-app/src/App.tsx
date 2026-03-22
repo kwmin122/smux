@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { TerminalPanel, type TerminalPanelHandle } from './components/TerminalPanel'
 import { MissionControl, type RoundEntry, type EventLogEntry, type CrossVerifyState } from './components/MissionControl'
 import { BrowserPanel } from './components/BrowserPanel'
+import { WelcomeView } from './components/WelcomeView'
 
 declare global {
   interface Window {
@@ -58,6 +59,7 @@ function App() {
   const [inputConsensus, setInputConsensus] = useState('majority')
   const [inputMaxRounds, setInputMaxRounds] = useState(10)
   const [fullscreen, setFullscreen] = useState<FullscreenPanel>(null)
+  const [daemonRunning, setDaemonRunning] = useState(false)
 
   const plannerRef = useRef<TerminalPanelHandle>(null)
   const verifierRef = useRef<TerminalPanelHandle>(null)
@@ -79,11 +81,16 @@ function App() {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
-    // Fetch git info
+    // Fetch git info and check daemon
     if (isTauri) {
       fetchGitInfo()
-      const interval = setInterval(fetchGitInfo, 15000)
-      return () => clearInterval(interval)
+      checkDaemon()
+      const gitInterval = setInterval(fetchGitInfo, 15000)
+      const daemonInterval = setInterval(checkDaemon, 5000)
+      return () => {
+        clearInterval(gitInterval)
+        clearInterval(daemonInterval)
+      }
     }
   }, [])
 
@@ -102,6 +109,17 @@ function App() {
       setGitBranch(info.branch)
       setGitFilesChanged(info.files_changed)
     } catch { /* ignore */ }
+  }
+
+  async function checkDaemon() {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core')
+      const sessions = await invoke<unknown[]>('list_sessions')
+      setDaemonRunning(true)
+      void sessions // used for connection check
+    } catch {
+      setDaemonRunning(false)
+    }
   }
 
   function addLogEntry(kind: string, message: string) {
@@ -529,8 +547,13 @@ function App() {
 
         {/* Terminal Panels with optional Mission Control + Browser */}
         <main ref={mainRef} className={`flex-1 flex p-1 overflow-hidden ${isBottom ? 'flex-col' : 'flex-row'}`}>
-          {/* Fullscreen: show only one panel */}
-          {fullscreen ? (
+          {/* Welcome View when no active session */}
+          {!activeSession && !showNewSession ? (
+            <WelcomeView
+              onNewSession={() => setShowNewSession(true)}
+              daemonRunning={daemonRunning}
+            />
+          ) : fullscreen ? (
             <section className="flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden">
               <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                 <div className="flex items-center">

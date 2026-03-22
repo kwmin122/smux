@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html class="dark" lang="en"><head>
+<html class="dark" lang="ko"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>smux — AI-Multiplexed Terminal Sessions</title>
@@ -91,6 +91,12 @@
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
+        [data-ko] { display: none; }
+        [data-en] { display: none; }
+        html[lang="ko"] [data-ko] { display: revert; }
+        html[lang="en"] [data-en] { display: revert; }
+        .lang-btn { transition: all 0.15s; }
+        .lang-btn.active { color: #a4c9ff; border-bottom: 2px solid #a4c9ff; }
     </style>
 </head>
 <body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
@@ -103,9 +109,16 @@
 <a class="text-[#8b919d] hover:text-[#e1e2eb] transition-colors text-sm" href="#how-it-works">How It Works</a>
 <a class="text-[#8b919d] hover:text-[#e1e2eb] transition-colors text-sm" href="https://github.com/kwmin122/smux#readme">Documentation</a>
 </div>
+<div class="flex items-center gap-4">
+<div class="flex gap-1 font-label text-xs tracking-wider">
+<button onclick="setLang('ko')" id="btn-ko" class="lang-btn px-2 py-1 text-outline hover:text-on-surface active">한국어</button>
+<span class="text-outline-variant">/</span>
+<button onclick="setLang('en')" id="btn-en" class="lang-btn px-2 py-1 text-outline hover:text-on-surface">EN</button>
+</div>
 <a href="https://github.com/kwmin122/smux/releases/latest" class="bg-primary-container text-on-primary-container px-4 py-1.5 rounded-lg text-sm font-medium hover:active-glow active:scale-95 transition-all duration-200 no-underline">
                 Download
             </a>
+</div>
 </div>
 </nav>
 <main class="pt-16">
@@ -115,9 +128,8 @@
 <div class="z-10">
 <h1 class="font-headline text-5xl md:text-7xl font-bold tracking-tighter mb-4 text-on-surface">smux</h1>
 <p class="font-headline text-2xl md:text-3xl text-primary mb-6">AI-Multiplexed Terminal Sessions</p>
-<p class="text-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">
-                        여러 AI 에이전트가 동시에 검증하는 코딩 워크플로우
-                    </p>
+<p data-ko class="text-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">여러 AI 에이전트가 서로의 코드를 검증하는 자동화 워크플로우</p>
+<p data-en class="text-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">AI agents that debate and verify each other's code until consensus</p>
 <div class="flex flex-col gap-4">
 <a href="https://github.com/kwmin122/smux/releases/latest" class="bg-primary-container text-on-primary-container px-8 py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-3 hover:active-glow transition-all w-fit group no-underline">
 <span class="material-symbols-outlined" data-icon="download">download</span>
@@ -177,9 +189,8 @@
 <span class="material-symbols-outlined" data-icon="hub">hub</span>
 </div>
 <h3 class="font-headline text-xl font-bold mb-3">Cross-Verify</h3>
-<p class="text-on-surface-variant text-sm leading-relaxed">
-                            Claude, Codex, Gemini를 동시에 돌려 합의 도출. 여러 모델의 시각을 결합하여 무결점 코드를 생산합니다.
-                        </p>
+<p data-ko class="text-on-surface-variant text-sm leading-relaxed">Claude, Codex, Gemini를 동시에 돌려 합의 도출. 여러 모델의 시각을 결합하여 무결점 코드를 생산합니다.</p>
+<p data-en class="text-on-surface-variant text-sm leading-relaxed">Run Claude, Codex, and Gemini simultaneously for consensus. Combine perspectives from multiple models to produce bulletproof code.</p>
 </div>
 <!-- Feature 2 -->
 <div class="p-8 bg-surface-container rounded-xl group hover:bg-surface-container-high transition-all">
@@ -187,9 +198,8 @@
 <span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
 </div>
 <h3 class="font-headline text-xl font-bold mb-3">Focus &amp; Control</h3>
-<p class="text-on-surface-variant text-sm leading-relaxed">
-                            2-패널 Focus 모드와 Mission Control 대시보드 전환. 복잡한 멀티 에이전트 환경을 직관적으로 관리합니다.
-                        </p>
+<p data-ko class="text-on-surface-variant text-sm leading-relaxed">2-패널 Focus 모드와 Mission Control 대시보드 전환. 복잡한 멀티 에이전트 환경을 직관적으로 관리합니다.</p>
+<p data-en class="text-on-surface-variant text-sm leading-relaxed">Switch between 2-panel Focus mode and Mission Control dashboard. Manage complex multi-agent environments intuitively.</p>
 </div>
 <!-- Feature 3 -->
 <div class="p-8 bg-surface-container rounded-xl group hover:bg-surface-container-high transition-all">
@@ -197,9 +207,8 @@
 <span class="material-symbols-outlined" data-icon="keyboard">keyboard</span>
 </div>
 <h3 class="font-headline text-xl font-bold mb-3">Keyboard-First</h3>
-<p class="text-on-surface-variant text-sm leading-relaxed">
-                            Tab, Cmd+1/2/3으로 모든 조작. 마우스 없이도 완전한 컨트롤이 가능한 터미널 네이티브 경험.
-                        </p>
+<p data-ko class="text-on-surface-variant text-sm leading-relaxed">Tab, Cmd+1/2/3으로 모든 조작. 마우스 없이도 완전한 컨트롤이 가능한 터미널 네이티브 경험.</p>
+<p data-en class="text-on-surface-variant text-sm leading-relaxed">Full control with Tab, Cmd+1/2/3. A terminal-native experience that works entirely without a mouse.</p>
 </div>
 </div>
 </div>
@@ -210,7 +219,8 @@
 <div class="flex flex-col md:flex-row gap-12 items-start">
 <div class="md:w-1/3">
 <h2 class="font-headline text-4xl font-bold tracking-tighter mb-4">How It Works</h2>
-<p class="text-on-surface-variant leading-relaxed">AI 에이전트 합의 시스템을 통한 가장 안전한 자동화 워크플로우</p>
+<p data-ko class="text-on-surface-variant leading-relaxed">AI 에이전트 합의 시스템을 통한 가장 안전한 자동화 워크플로우</p>
+<p data-en class="text-on-surface-variant leading-relaxed">The safest automated workflow through AI agent consensus</p>
 </div>
 <div class="md:w-2/3 grid gap-12">
 <!-- Step 1 -->
@@ -221,7 +231,8 @@
 </div>
 <div class="pb-8">
 <h4 class="font-headline text-xl font-bold mb-2">Install</h4>
-<p class="text-on-surface-variant">다운로드하고 앱을 열면 바로 시작. 복잡한 설정 없이 로컬 환경에 즉시 통합됩니다.</p>
+<p data-ko class="text-on-surface-variant">다운로드하고 앱을 열면 바로 시작. 복잡한 설정 없이 로컬 환경에 즉시 통합됩니다.</p>
+<p data-en class="text-on-surface-variant">Download and open the app to get started instantly. Integrates into your local environment with zero configuration.</p>
 </div>
 </div>
 <!-- Step 2 -->
@@ -232,7 +243,8 @@
 </div>
 <div class="pb-8">
 <h4 class="font-headline text-xl font-bold mb-2">Configure</h4>
-<p class="text-on-surface-variant">Planner와 Verifier 선택, 합의 전략 설정. 프로젝트 성격에 맞는 최적의 AI 조합을 구성하세요.</p>
+<p data-ko class="text-on-surface-variant">Planner와 Verifier 선택, 합의 전략 설정. 프로젝트 성격에 맞는 최적의 AI 조합을 구성하세요.</p>
+<p data-en class="text-on-surface-variant">Choose your Planner and Verifier, set consensus strategy. Configure the optimal AI combination for your project.</p>
 </div>
 </div>
 <!-- Step 3 -->
@@ -242,7 +254,8 @@
 </div>
 <div>
 <h4 class="font-headline text-xl font-bold mb-2">Run</h4>
-<p class="text-on-surface-variant">에이전트들이 자동으로 코드를 작성하고 검증. 다수결 또는 만장일치 원칙에 따라 실시간으로 피드백을 주고받습니다.</p>
+<p data-ko class="text-on-surface-variant">에이전트들이 자동으로 코드를 작성하고 검증. 다수결 또는 만장일치 원칙에 따라 실시간으로 피드백을 주고받습니다.</p>
+<p data-en class="text-on-surface-variant">Agents automatically write and verify code. They exchange real-time feedback following majority vote or unanimous consensus.</p>
 </div>
 </div>
 </div>
@@ -281,14 +294,16 @@
 <!-- Download Section -->
 <section class="py-32 text-center relative overflow-hidden">
 <div class="max-w-7xl mx-auto px-8 relative z-10">
-<h2 class="font-headline text-5xl font-bold tracking-tighter mb-6">Elevate Your Workflow</h2>
+<h2 data-ko class="font-headline text-5xl font-bold tracking-tighter mb-6">워크플로우를 한 단계 높이세요</h2>
+<h2 data-en class="font-headline text-5xl font-bold tracking-tighter mb-6">Elevate Your Workflow</h2>
 <div class="flex flex-col items-center gap-6">
 <a href="https://github.com/kwmin122/smux/releases/latest" class="bg-primary-container text-on-primary-container px-12 py-5 rounded-2xl text-xl font-bold flex items-center gap-4 hover:active-glow transition-all no-underline">
 <span class="material-symbols-outlined text-3xl" data-icon="apple">ios</span>
                         Download for macOS (.dmg)
                     </a>
 <div class="text-outline text-sm font-label flex flex-col gap-2">
-<span>macOS 12+, Claude/Codex/Gemini CLI 중 하나 이상</span>
+<span data-ko>macOS 12+, Claude/Codex/Gemini CLI 중 하나 이상</span>
+<span data-en>macOS 12+, requires at least one of Claude/Codex/Gemini CLI</span>
 <a class="text-primary hover:underline flex items-center justify-center gap-1 mt-4" href="https://github.com/kwmin122/smux">
                             View Source on GitHub
                             <span class="material-symbols-outlined text-sm" data-icon="open_in_new">open_in_new</span>
@@ -313,6 +328,20 @@
 </div>
 </div>
 </footer>
+<script>
+function setLang(lang) {
+  document.documentElement.lang = lang;
+  document.getElementById('btn-ko').classList.toggle('active', lang === 'ko');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  try { localStorage.setItem('smux-lang', lang); } catch {}
+}
+(function() {
+  try {
+    var saved = localStorage.getItem('smux-lang');
+    if (saved === 'en') setLang('en');
+  } catch {}
+})();
+</script>
 <!-- Thread-Streamer Visual (Decoration) -->
 <div class="fixed right-0 top-0 bottom-0 w-1 pointer-events-none z-40 bg-surface-container-lowest">
 <div class="h-full w-full bg-gradient-to-b from-transparent via-secondary/20 to-transparent"></div>
