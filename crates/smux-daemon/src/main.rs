@@ -163,6 +163,34 @@ pub async fn run_daemon(socket_path: &PathBuf) -> Result<(), Box<dyn std::error:
             accept_result = listener.accept() => {
                 match accept_result {
                     Ok((stream, _addr)) => {
+                        // Validate peer credentials — reject connections from other UIDs.
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::io::AsRawFd;
+                            let fd = stream.as_raw_fd();
+                            let mut peer_uid: libc::uid_t = 0;
+                            let mut peer_gid: libc::gid_t = 0;
+                            let ret = unsafe {
+                                libc::getpeereid(fd, &mut peer_uid, &mut peer_gid)
+                            };
+                            if ret == 0 {
+                                let my_uid = unsafe { libc::getuid() };
+                                if peer_uid != my_uid {
+                                    tracing::warn!(
+                                        peer_uid,
+                                        my_uid,
+                                        "rejected connection from different UID"
+                                    );
+                                    continue; // drop the connection
+                                }
+                            } else {
+                                tracing::warn!(
+                                    errno = std::io::Error::last_os_error().to_string(),
+                                    "failed to get peer credentials, rejecting"
+                                );
+                                continue;
+                            }
+                        }
                         let state = state.clone();
                         tokio::spawn(async move {
                             if let Err(e) = handle_client(stream, state).await {
@@ -244,7 +272,7 @@ async fn handle_client(
                     merged
                 };
 
-                let session_id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+                let session_id = uuid::Uuid::new_v4().to_string();
                 let (event_tx, _) = broadcast::channel(256);
 
                 let handle = Arc::new(SessionHandle {

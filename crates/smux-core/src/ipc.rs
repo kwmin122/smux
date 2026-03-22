@@ -131,8 +131,8 @@ pub async fn recv_message<T: DeserializeOwned>(stream: &mut UnixStream) -> Resul
     }
     let len = u32::from_be_bytes(len_buf) as usize;
 
-    // Sanity limit: 16 MiB
-    if len > 16 * 1024 * 1024 {
+    // Sanity limit: 1 MiB (reduced from 16 MiB to limit local DoS surface)
+    if len > 1024 * 1024 {
         return Err(IpcError::MessageTooLarge(len));
     }
 

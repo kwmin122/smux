@@ -3342,6 +3342,7 @@ name = "smux-daemon"
 version = "0.2.0"
 dependencies = [
  "dirs",
+ "libc",
  "serde",
  "serde_json",
  "smux-core",
