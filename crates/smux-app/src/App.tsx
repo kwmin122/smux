@@ -60,6 +60,7 @@ function App() {
   const [inputMaxRounds, setInputMaxRounds] = useState(10)
   const [fullscreen, setFullscreen] = useState<FullscreenPanel>(null)
   const [daemonRunning, setDaemonRunning] = useState(false)
+  const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>('terminal')
 
   const plannerRef = useRef<TerminalPanelHandle>(null)
   const verifierRef = useRef<TerminalPanelHandle>(null)
@@ -547,10 +548,31 @@ function App() {
 
         {/* Terminal Panels with optional Mission Control + Browser */}
         <main ref={mainRef} className={`flex-1 flex p-1 overflow-hidden ${isBottom ? 'flex-col' : 'flex-row'}`}>
-          {/* Welcome View when no active session */}
-          {!activeSession && !showNewSession ? (
+          {/* Terminal Mode: full-screen PTY shell */}
+          {terminalMode === 'terminal' ? (
+            <section className="flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden">
+              <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+                <div className="flex items-center">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                    Terminal
+                  </span>
+                  <span className="ml-2 w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                </div>
+                <button
+                  onClick={() => setTerminalMode('idle')}
+                  className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
+                >
+                  CLOSE
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <TerminalPanel ref={plannerRef} role="terminal" ptyMode={true} />
+              </div>
+            </section>
+          ) : !activeSession && !showNewSession ? (
             <WelcomeView
               onNewSession={() => setShowNewSession(true)}
+              onOpenTerminal={() => setTerminalMode('terminal')}
               daemonRunning={daemonRunning}
             />
           ) : fullscreen ? (

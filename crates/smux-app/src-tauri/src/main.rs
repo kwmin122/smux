@@ -1,7 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::sync::Arc;
 
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::UnixStream;
@@ -10,6 +13,30 @@ use tokio::sync::Mutex;
 use smux_core::ipc::{
     ClientMessage, DaemonMessage, SessionInfo, default_socket_path, recv_message, send_message,
 };
+
+// ---------------------------------------------------------------------------
+// PTY management
+// ---------------------------------------------------------------------------
+
+struct PtySession {
+    #[allow(dead_code)]
+    master: Box<dyn MasterPty + Send>,
+    writer: Arc<std::sync::Mutex<Box<dyn Write + Send>>>,
+}
+
+struct PtyManager {
+    sessions: std::sync::Mutex<HashMap<String, PtySession>>,
+    pending_readers: std::sync::Mutex<HashMap<String, Box<dyn Read + Send>>>,
+}
+
+impl PtyManager {
+    fn new() -> Self {
+        Self {
+            sessions: std::sync::Mutex::new(HashMap::new()),
+            pending_readers: std::sync::Mutex::new(HashMap::new()),
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // App state
@@ -257,6 +284,148 @@ async fn close_browser_window(app: AppHandle) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// PTY commands
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn create_pty(
+    pty_mgr: tauri::State<PtyManager>,
+    rows: Option<u16>,
+    cols: Option<u16>,
+) -> Result<String, String> {
+    let rows = rows.unwrap_or(24);
+    let cols = cols.unwrap_or(80);
+
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| format!("openpty failed: {e}"))?;
+
+    let reader = pair.master.try_clone_reader().map_err(|e| format!("clone reader: {e}"))?;
+    let writer = pair.master.take_writer().map_err(|e| format!("take writer: {e}"))?;
+
+    // Detect user's shell
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let mut cmd = CommandBuilder::new(&shell);
+    cmd.env("TERM", "xterm-256color");
+    if let Ok(home) = std::env::var("HOME") {
+        cmd.cwd(&home);
+    }
+
+    let _child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|e| format!("spawn failed: {e}"))?;
+    drop(pair.slave); // must drop slave after spawn
+
+    let tab_id = uuid::Uuid::new_v4().to_string();
+
+    pty_mgr
+        .sessions
+        .lock()
+        .unwrap()
+        .insert(tab_id.clone(), PtySession {
+            master: pair.master,
+            writer: Arc::new(std::sync::Mutex::new(writer)),
+        });
+    pty_mgr
+        .pending_readers
+        .lock()
+        .unwrap()
+        .insert(tab_id.clone(), reader);
+
+    Ok(tab_id)
+}
+
+#[tauri::command]
+fn start_pty(
+    app: AppHandle,
+    pty_mgr: tauri::State<PtyManager>,
+    tab_id: String,
+) -> Result<(), String> {
+    let reader = pty_mgr
+        .pending_readers
+        .lock()
+        .unwrap()
+        .remove(&tab_id)
+        .ok_or("no pending reader for this tab")?;
+
+    let event_name = format!("pty-output-{tab_id}");
+    let exit_event = format!("pty-exit-{tab_id}");
+
+    std::thread::spawn(move || {
+        let mut reader = reader;
+        let mut buf = [0u8; 4096];
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) => {
+                    let _ = app.emit(&exit_event, ());
+                    break;
+                }
+                Ok(n) => {
+                    let text = String::from_utf8_lossy(&buf[..n]).to_string();
+                    let _ = app.emit(&event_name, text);
+                }
+                Err(_) => {
+                    let _ = app.emit(&exit_event, ());
+                    break;
+                }
+            }
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn write_pty(
+    pty_mgr: tauri::State<PtyManager>,
+    tab_id: String,
+    data: String,
+) -> Result<(), String> {
+    let sessions = pty_mgr.sessions.lock().unwrap();
+    let session = sessions.get(&tab_id).ok_or("session not found")?;
+    session
+        .writer
+        .lock()
+        .unwrap()
+        .write_all(data.as_bytes())
+        .map_err(|e| format!("write failed: {e}"))
+}
+
+#[tauri::command]
+fn resize_pty(
+    pty_mgr: tauri::State<PtyManager>,
+    tab_id: String,
+    rows: u16,
+    cols: u16,
+) -> Result<(), String> {
+    let sessions = pty_mgr.sessions.lock().unwrap();
+    let session = sessions.get(&tab_id).ok_or("session not found")?;
+    session
+        .master
+        .resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| format!("resize failed: {e}"))
+}
+
+#[tauri::command]
+fn close_pty(pty_mgr: tauri::State<PtyManager>, tab_id: String) -> Result<(), String> {
+    pty_mgr.sessions.lock().unwrap().remove(&tab_id);
+    pty_mgr.pending_readers.lock().unwrap().remove(&tab_id);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Event streaming
 // ---------------------------------------------------------------------------
 
@@ -329,6 +498,7 @@ fn main() {
         .manage(AppState {
             active_session: Arc::new(Mutex::new(None)),
         })
+        .manage(PtyManager::new())
         .invoke_handler(tauri::generate_handler![
             ping,
             start_session,
@@ -338,6 +508,11 @@ fn main() {
             get_git_info,
             open_browser_window,
             close_browser_window,
+            create_pty,
+            start_pty,
+            write_pty,
+            resize_pty,
+            close_pty,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

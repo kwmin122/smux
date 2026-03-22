@@ -4,6 +4,7 @@ type Lang = 'ko' | 'en'
 
 interface WelcomeViewProps {
   onNewSession: () => void
+  onOpenTerminal: () => void
   daemonRunning: boolean
 }
 
@@ -39,7 +40,8 @@ const content = {
     daemonRunning: '연결됨 — 세션을 시작할 수 있습니다',
     daemonStopped: '연결 안 됨 — 터미널에서 smux-daemon을 먼저 실행하세요',
     quickStart: '빠른 시작',
-    startSession: '새 세션 시작',
+    startSession: 'AI 세션',
+    openTerminal: '터미널 열기',
     features: '주요 기능',
     featureList: [
       { icon: '🔄', title: 'Cross-Verify', desc: '여러 AI가 서로의 코드를 검증' },
@@ -88,7 +90,8 @@ const content = {
     daemonRunning: 'Connected — you can start a session',
     daemonStopped: 'Not connected — run smux-daemon in your terminal first',
     quickStart: 'Quick Start',
-    startSession: 'New Session',
+    startSession: 'AI Session',
+    openTerminal: 'Open Terminal',
     features: 'Key Features',
     featureList: [
       { icon: '🔄', title: 'Cross-Verify', desc: 'Multiple AIs verify each other\'s code' },
@@ -108,7 +111,7 @@ const content = {
   },
 }
 
-export function WelcomeView({ onNewSession, daemonRunning }: WelcomeViewProps) {
+export function WelcomeView({ onNewSession, onOpenTerminal, daemonRunning }: WelcomeViewProps) {
   const [lang, setLang] = useState<Lang>(() => {
     try {
       return (localStorage.getItem('smux-lang') as Lang) || 'ko'
@@ -162,6 +165,39 @@ export function WelcomeView({ onNewSession, daemonRunning }: WelcomeViewProps) {
           <p className="text-on-surface-variant text-sm">{t.subtitle}</p>
         </div>
 
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 gap-3 mb-8">
+          <button
+            onClick={onOpenTerminal}
+            className="flex items-center gap-3 px-5 py-4 bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 transition-colors text-left"
+          >
+            <span className="text-2xl">{'>'}_</span>
+            <div>
+              <h3 className="font-mono text-[12px] font-bold text-on-surface">{t.openTerminal}</h3>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                {lang === 'ko' ? '일반 터미널 셸 열기' : 'Open a regular shell terminal'}
+              </p>
+            </div>
+          </button>
+          <button
+            onClick={onNewSession}
+            disabled={!daemonRunning}
+            className={`flex items-center gap-3 px-5 py-4 rounded-lg border text-left transition-colors ${
+              daemonRunning
+                ? 'bg-secondary/10 border-secondary/30 hover:bg-secondary/20'
+                : 'bg-surface-container-low border-outline-variant/20 opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <span className="text-2xl">AI</span>
+            <div>
+              <h3 className="font-mono text-[12px] font-bold text-on-surface">{t.startSession}</h3>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                {lang === 'ko' ? 'AI 에이전트 핑퐁 세션' : 'AI agent cross-verify session'}
+              </p>
+            </div>
+          </button>
+        </div>
+
         {/* Daemon Status */}
         <div
           className={`flex items-center gap-3 px-4 py-3 rounded-lg border mb-8 ${
@@ -183,14 +219,7 @@ export function WelcomeView({ onNewSession, daemonRunning }: WelcomeViewProps) {
               {daemonRunning ? t.daemonRunning : t.daemonStopped}
             </p>
           </div>
-          {daemonRunning && (
-            <button
-              onClick={onNewSession}
-              className="ml-auto px-4 py-1.5 bg-primary text-on-primary font-mono text-[11px] rounded-sm hover:opacity-90 transition-opacity"
-            >
-              {t.startSession}
-            </button>
-          )}
+          {/* Status only — action buttons are above */}
         </div>
 
         {/* What is smux */}

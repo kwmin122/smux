@@ -3,6 +3,14 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 
+declare global {
+  interface Window {
+    __TAURI_INTERNALS__?: unknown
+  }
+}
+
+const isTauri = !!window.__TAURI_INTERNALS__
+
 export interface TerminalPanelHandle {
   write: (data: string) => void
   writeln: (data: string) => void
@@ -10,7 +18,9 @@ export interface TerminalPanelHandle {
 }
 
 interface TerminalPanelProps {
-  role: 'planner' | 'verifier'
+  role: 'planner' | 'verifier' | 'terminal'
+  /** When true, creates a real PTY shell and connects input/output */
+  ptyMode?: boolean
 }
 
 function getThemeColors() {
@@ -41,9 +51,11 @@ function getThemeColors() {
 }
 
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
-  function TerminalPanel({ role }, ref) {
+  function TerminalPanel({ role, ptyMode = false }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRef = useRef<Terminal | null>(null)
+    const fitAddonRef = useRef<FitAddon | null>(null)
+    const ptyIdRef = useRef<string | null>(null)
 
     useImperativeHandle(ref, () => ({
       write(data: string) {
@@ -67,7 +79,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         cursorBlink: true,
         cursorStyle: 'block',
         scrollback: 10000,
-        convertEol: true,
+        convertEol: !ptyMode, // PTY handles EOL itself
         allowProposedApi: true,
         theme: getThemeColors(),
       })
@@ -78,21 +90,82 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       terminal.open(containerRef.current)
       fitAddon.fit()
 
-      terminal.writeln(`\x1b[90m> smux v0.3.0 — ${role}\x1b[0m`)
-      terminal.writeln('')
-
       terminalRef.current = terminal
+      fitAddonRef.current = fitAddon
 
-      const observer = new ResizeObserver(() => {
-        requestAnimationFrame(() => fitAddon.fit())
+      if (!ptyMode) {
+        terminal.writeln(`\x1b[90m> smux v0.3.0 — ${role}\x1b[0m`)
+        terminal.writeln('')
+      }
+
+      // PTY mode: create a real shell
+      let cleanupPty: (() => void) | null = null
+      if (ptyMode && isTauri) {
+        ;(async () => {
+          try {
+            const { invoke } = await import('@tauri-apps/api/core')
+            const { listen } = await import('@tauri-apps/api/event')
+
+            // Create PTY with current terminal dimensions
+            const tabId = await invoke<string>('create_pty', {
+              rows: terminal.rows,
+              cols: terminal.cols,
+            })
+            ptyIdRef.current = tabId
+
+            // Listen for output BEFORE starting read loop (prevent race)
+            const unlistenOutput = await listen<string>(`pty-output-${tabId}`, (event) => {
+              terminal.write(event.payload)
+            })
+
+            const unlistenExit = await listen(`pty-exit-${tabId}`, () => {
+              terminal.writeln('\x1b[90m\r\n[process exited]\x1b[0m')
+            })
+
+            // Start the PTY read loop
+            await invoke('start_pty', { tabId })
+
+            // Send keyboard input to PTY
+            const onDataDisposable = terminal.onData((data) => {
+              invoke('write_pty', { tabId, data }).catch(() => {})
+            })
+
+            cleanupPty = () => {
+              onDataDisposable.dispose()
+              unlistenOutput()
+              unlistenExit()
+              invoke('close_pty', { tabId }).catch(() => {})
+            }
+          } catch (e) {
+            terminal.writeln(`\x1b[31m[PTY error] ${e}\x1b[0m`)
+          }
+        })()
+      }
+
+      // Resize handling
+      const resizeObserver = new ResizeObserver(() => {
+        requestAnimationFrame(() => {
+          fitAddon.fit()
+          // Sync resize to PTY if in pty mode
+          if (ptyMode && ptyIdRef.current && isTauri) {
+            import('@tauri-apps/api/core').then(({ invoke }) => {
+              invoke('resize_pty', {
+                tabId: ptyIdRef.current,
+                rows: terminal.rows,
+                cols: terminal.cols,
+              }).catch(() => {})
+            })
+          }
+        })
       })
-      observer.observe(containerRef.current)
+      resizeObserver.observe(containerRef.current)
 
       return () => {
-        observer.disconnect()
+        resizeObserver.disconnect()
+        cleanupPty?.()
         terminal.dispose()
       }
-    }, [role])
+    }, [role, ptyMode])
 
     // Re-apply theme colors when the data-theme attribute changes
     useEffect(() => {
