@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::sync::Arc;
 
 use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::UnixStream;
 use tokio::sync::Mutex;
@@ -13,6 +13,126 @@ use tokio::sync::Mutex;
 use smux_core::ipc::{
     ClientMessage, DaemonMessage, SessionInfo, default_socket_path, recv_message, send_message,
 };
+
+// ---------------------------------------------------------------------------
+// App configuration (~/.smux/config.toml)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct AppConfig {
+    general: GeneralConfig,
+    appearance: AppearanceConfig,
+    ai: AiConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+struct GeneralConfig {
+    shell: String,
+    scrollback: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+struct AppearanceConfig {
+    font_family: String,
+    font_size: u32,
+    theme: String,
+    cursor_style: String,
+    cursor_blink: bool,
+    minimum_contrast_ratio: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+struct AiConfig {
+    auto_execution_level: String,
+    allow_commands: Vec<String>,
+    deny_commands: Vec<String>,
+    max_rounds: u32,
+    default_planner: String,
+    default_verifier: String,
+}
+
+impl Default for GeneralConfig {
+    fn default() -> Self {
+        Self {
+            shell: std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string()),
+            scrollback: 10000,
+        }
+    }
+}
+
+impl Default for AppearanceConfig {
+    fn default() -> Self {
+        Self {
+            font_family: "JetBrains Mono".to_string(),
+            font_size: 14,
+            theme: "deep-navy".to_string(),
+            cursor_style: "block".to_string(),
+            cursor_blink: true,
+            minimum_contrast_ratio: 4.5,
+        }
+    }
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        Self {
+            auto_execution_level: "auto".to_string(),
+            allow_commands: vec![
+                "git".to_string(),
+                "cargo".to_string(),
+                "npm".to_string(),
+                "pnpm".to_string(),
+                "yarn".to_string(),
+            ],
+            deny_commands: vec![
+                "rm -rf /".to_string(),
+                "sudo rm".to_string(),
+                "shutdown".to_string(),
+            ],
+            max_rounds: 5,
+            default_planner: "claude".to_string(),
+            default_verifier: "codex".to_string(),
+        }
+    }
+}
+
+fn config_path() -> std::path::PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join(".smux")
+        .join("config.toml")
+}
+
+fn load_config() -> AppConfig {
+    let path = config_path();
+    match std::fs::read_to_string(&path) {
+        Ok(content) => toml::from_str(&content).unwrap_or_default(),
+        Err(_) => AppConfig::default(),
+    }
+}
+
+fn save_config(config: &AppConfig) -> Result<(), String> {
+    let path = config_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir failed: {e}"))?;
+    }
+    let content = toml::to_string_pretty(config).map_err(|e| format!("serialize failed: {e}"))?;
+    std::fs::write(&path, content).map_err(|e| format!("write failed: {e}"))
+}
+
+#[tauri::command]
+fn load_app_config() -> AppConfig {
+    load_config()
+}
+
+#[tauri::command]
+fn save_app_config(config: AppConfig) -> Result<(), String> {
+    save_config(&config)
+}
 
 // ---------------------------------------------------------------------------
 // PTY management
@@ -81,7 +201,7 @@ fn ping() -> String {
     "pong".to_string()
 }
 
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StartSessionArgs {
     planner: String,
@@ -317,15 +437,53 @@ fn create_pty(
         .take_writer()
         .map_err(|e| format!("take writer: {e}"))?;
 
-    // Use provided shell command or detect user's default shell
-    let shell = shell_cmd
-        .unwrap_or_else(|| std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string()));
+    // Use provided shell command, or config shell, or detect default
+    let config = load_config();
+    let shell = shell_cmd.unwrap_or_else(|| config.general.shell.clone());
     let mut cmd = CommandBuilder::new(&shell);
     cmd.env("TERM", "xterm-256color");
+    cmd.env("SMUX_SHELL_INTEGRATION", "1");
     // Use provided cwd, or fall back to HOME
     let working_dir =
         cwd.unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| "/".to_string()));
     cmd.cwd(&working_dir);
+
+    // Install shell integration script for zsh
+    if shell.ends_with("zsh") || shell.ends_with("zsh\"") {
+        let smux_dir = dirs::home_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+            .join(".smux");
+        let _ = std::fs::create_dir_all(&smux_dir);
+        let integration_script = include_str!("../../src/shell-integration/shell-integration.zsh");
+        let script_path = smux_dir.join("shell-integration.zsh");
+        let _ = std::fs::write(&script_path, integration_script);
+        // Inject sourcing via ZDOTDIR trick or direct env
+        cmd.env("SMUX_INJECT_PROMPT", "1");
+        cmd.env(
+            "SMUX_INTEGRATION_PATH",
+            script_path.to_string_lossy().to_string(),
+        );
+        // Source the integration script at shell startup via zshenv
+        let zshenv_content = format!(
+            "source \"{}\"\n[ -f \"$HOME/.zshenv\" ] && source \"$HOME/.zshenv\"\n",
+            script_path.display()
+        );
+        let custom_zdotdir = smux_dir.join("zdotdir");
+        let _ = std::fs::create_dir_all(&custom_zdotdir);
+        let _ = std::fs::write(custom_zdotdir.join(".zshenv"), &zshenv_content);
+        // Copy real zshrc so user config still loads
+        if let Some(home) = dirs::home_dir() {
+            let real_zshrc = home.join(".zshrc");
+            if real_zshrc.exists() {
+                let _ = std::fs::copy(&real_zshrc, custom_zdotdir.join(".zshrc"));
+            }
+            let real_zprofile = home.join(".zprofile");
+            if real_zprofile.exists() {
+                let _ = std::fs::copy(&real_zprofile, custom_zdotdir.join(".zprofile"));
+            }
+        }
+        cmd.env("ZDOTDIR", custom_zdotdir.to_string_lossy().to_string());
+    }
 
     let _child = pair
         .slave
@@ -523,6 +681,8 @@ fn main() {
             write_pty,
             resize_pty,
             close_pty,
+            load_app_config,
+            save_app_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

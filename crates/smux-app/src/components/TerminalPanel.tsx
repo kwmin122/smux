@@ -1,6 +1,11 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { useShellIntegration, type CommandRecord } from '../hooks/useShellIntegration'
+import { useTerminalLinks } from '../hooks/useTerminalLinks'
+import { SearchOverlay } from './SearchOverlay'
+import { CommandGutter } from './CommandGutter'
+import { StickyScroll } from './StickyScroll'
 import '@xterm/xterm/css/xterm.css'
 
 declare global {
@@ -15,6 +20,9 @@ export interface TerminalPanelHandle {
   write: (data: string) => void
   writeln: (data: string) => void
   clear: () => void
+  getCommands: () => CommandRecord[]
+  getCurrentCwd: () => string
+  isShellIntegrated: () => boolean
 }
 
 interface TerminalPanelProps {
@@ -25,6 +33,10 @@ interface TerminalPanelProps {
   cwd?: string
   /** Custom shell command (e.g., 'claude -p "task"') */
   shellCmd?: string
+  /** Callback when shell integration detects a command completion */
+  onCommandComplete?: (cmd: CommandRecord) => void
+  /** Callback when CWD changes via shell integration */
+  onCwdChange?: (cwd: string) => void
 }
 
 function getThemeColors() {
@@ -55,11 +67,16 @@ function getThemeColors() {
 }
 
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
-  function TerminalPanel({ role, ptyMode = false, cwd, shellCmd }, ref) {
+  function TerminalPanel({ role, ptyMode = false, cwd, shellCmd, onCommandComplete, onCwdChange }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRef = useRef<Terminal | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
     const ptyIdRef = useRef<string | null>(null)
+    const shellIntegration = useShellIntegration()
+    const terminalLinks = useTerminalLinks()
+    const [showSearch, setShowSearch] = useState(false)
+    const [viewportTopLine, setViewportTopLine] = useState(0)
+    const [baseY, setBaseY] = useState(0)
 
     useImperativeHandle(ref, () => ({
       write(data: string) {
@@ -70,6 +87,15 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       },
       clear() {
         terminalRef.current?.clear()
+      },
+      getCommands() {
+        return shellIntegration.commands
+      },
+      getCurrentCwd() {
+        return shellIntegration.currentCwd
+      },
+      isShellIntegrated() {
+        return shellIntegration.isIntegrated
       },
     }))
 
@@ -96,6 +122,18 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
       terminalRef.current = terminal
       fitAddonRef.current = fitAddon
+
+      // Attach shell integration OSC 633 parser and clickable links
+      if (ptyMode) {
+        shellIntegration.attach(terminal)
+        terminalLinks.attach(terminal)
+      }
+
+      // Track scroll position for sticky scroll + command gutter
+      const scrollDisposable = terminal.onScroll(() => {
+        setViewportTopLine(terminal.buffer.active.viewportY)
+        setBaseY(terminal.buffer.active.baseY)
+      })
 
       if (!ptyMode) {
         terminal.writeln(`\x1b[90m> smux v0.3.0 — ${role}\x1b[0m`)
@@ -169,10 +207,41 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
       return () => {
         resizeObserver.disconnect()
+        scrollDisposable.dispose()
+        shellIntegration.detach()
+        terminalLinks.detach()
         cleanupPty?.()
         terminal.dispose()
       }
     }, [role, ptyMode, cwd, shellCmd])
+
+    // Fire callbacks when shell integration detects changes
+    useEffect(() => {
+      if (shellIntegration.commands.length > 0 && onCommandComplete) {
+        const latest = shellIntegration.commands[shellIntegration.commands.length - 1]
+        if (latest.endTime !== null) {
+          onCommandComplete(latest)
+        }
+      }
+    }, [shellIntegration.commands, onCommandComplete])
+
+    useEffect(() => {
+      if (shellIntegration.currentCwd && onCwdChange) {
+        onCwdChange(shellIntegration.currentCwd)
+      }
+    }, [shellIntegration.currentCwd, onCwdChange])
+
+    // ⌘F to open search
+    useEffect(() => {
+      const handler = (e: KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+          e.preventDefault()
+          setShowSearch(true)
+        }
+      }
+      window.addEventListener('keydown', handler)
+      return () => window.removeEventListener('keydown', handler)
+    }, [])
 
     // Re-apply theme colors when the data-theme attribute changes
     useEffect(() => {
@@ -186,6 +255,33 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       return () => observer.disconnect()
     }, [])
 
-    return <div ref={containerRef} className="w-full h-full" />
+    return (
+      <div className="relative w-full h-full">
+        {/* Sticky scroll header */}
+        {ptyMode && (
+          <StickyScroll
+            commands={shellIntegration.commands}
+            viewportTopLine={viewportTopLine}
+            visible={shellIntegration.isIntegrated}
+          />
+        )}
+        {/* Command exit code gutter */}
+        {ptyMode && shellIntegration.isIntegrated && (
+          <CommandGutter
+            commands={shellIntegration.commands}
+            terminalElement={containerRef.current}
+            lineHeight={terminalRef.current ? Math.round(terminalRef.current.options.lineHeight ?? 1.4 * (terminalRef.current.options.fontSize ?? 13)) : 18}
+            baseY={baseY}
+          />
+        )}
+        <div ref={containerRef} className="w-full h-full" />
+        {showSearch && terminalRef.current && (
+          <SearchOverlay
+            terminal={terminalRef.current}
+            onClose={() => setShowSearch(false)}
+          />
+        )}
+      </div>
+    )
   }
 )

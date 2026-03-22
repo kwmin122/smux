@@ -3,6 +3,8 @@ import { TerminalPanel, type TerminalPanelHandle } from './components/TerminalPa
 import { MissionControl, type RoundEntry, type EventLogEntry, type CrossVerifyState } from './components/MissionControl'
 import { BrowserPanel } from './components/BrowserPanel'
 import { WelcomeView } from './components/WelcomeView'
+import { TabBar, type TabInfo, type TabColor } from './components/TabBar'
+import { SplitContainer, type SplitNode, createLeaf, splitLeaf, removeLeaf } from './components/SplitContainer'
 
 declare global {
   interface Window {
@@ -63,6 +65,13 @@ function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [aiTask, setAiTask] = useState('')
   const [showAiPrompt, setShowAiPrompt] = useState(false)
+  // Tab management
+  const [tabs, setTabs] = useState<TabInfo[]>([])
+  const [activeTabId, setActiveTabId] = useState<string | null>(null)
+  const tabRefsMap = useRef<Map<string, TerminalPanelHandle>>(new Map())
+  // Split pane management
+  const [splitRoot, setSplitRoot] = useState<SplitNode | null>(null)
+  const [activeLeafId, setActiveLeafId] = useState<string | null>(null)
   const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
     // Auto-resume last project if available
     try {
@@ -266,6 +275,26 @@ function App() {
         e.preventDefault()
         setMode(m => m === 'focus' ? 'control' : 'focus')
       }
+      if (e.key === 't' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        if (terminalMode === 'terminal') createTab()
+      }
+      if (e.key === 'w' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault()
+        if (terminalMode === 'terminal' && activeLeafId && splitRoot?.type === 'split') {
+          handleClosePane(activeLeafId)
+        } else if (terminalMode === 'terminal' && activeTabId && tabs.length > 1) {
+          closeTab(activeTabId)
+        }
+      }
+      if (e.key === 'd' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault()
+        if (terminalMode === 'terminal') handleSplit('vertical')
+      }
+      if (e.key === 'D' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault()
+        if (terminalMode === 'terminal') handleSplit('horizontal')
+      }
       if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setShowBrowser(prev => !prev)
@@ -395,6 +424,131 @@ function App() {
     document.documentElement.setAttribute('data-theme', next)
   }
 
+  // --- Tab management ---
+  const createTab = useCallback(() => {
+    const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const dirName = projectDir ? projectDir.split('/').pop() || '~' : '~'
+    const newTab: TabInfo = {
+      id,
+      name: dirName,
+      cwd: projectDir || '',
+      color: 'default' as TabColor,
+      icon: 'terminal',
+      isActive: true,
+      status: 'running',
+    }
+    setTabs(prev => [
+      ...prev.map(t => ({ ...t, isActive: false })),
+      newTab,
+    ])
+    setActiveTabId(id)
+    return id
+  }, [projectDir])
+
+  const selectTab = useCallback((id: string) => {
+    setTabs(prev => prev.map(t => ({ ...t, isActive: t.id === id })))
+    setActiveTabId(id)
+  }, [])
+
+  const closeTab = useCallback((id: string) => {
+    setTabs(prev => {
+      const filtered = prev.filter(t => t.id !== id)
+      if (filtered.length === 0) return filtered
+      // If we're closing the active tab, activate the last one
+      if (id === activeTabId) {
+        const last = filtered[filtered.length - 1]
+        last.isActive = true
+        setActiveTabId(last.id)
+      }
+      return filtered
+    })
+    tabRefsMap.current.delete(id)
+  }, [activeTabId])
+
+  const renameTab = useCallback((id: string, name: string) => {
+    setTabs(prev => prev.map(t => t.id === id ? { ...t, name } : t))
+  }, [])
+
+  const changeTabColor = useCallback((id: string, color: TabColor) => {
+    setTabs(prev => prev.map(t => t.id === id ? { ...t, color } : t))
+  }, [])
+
+  const reorderTabs = useCallback((fromId: string, toId: string) => {
+    setTabs(prev => {
+      const arr = [...prev]
+      const fromIdx = arr.findIndex(t => t.id === fromId)
+      const toIdx = arr.findIndex(t => t.id === toId)
+      if (fromIdx < 0 || toIdx < 0) return prev
+      const [moved] = arr.splice(fromIdx, 1)
+      arr.splice(toIdx, 0, moved)
+      return arr
+    })
+  }, [])
+
+  // Auto-create first tab when entering terminal mode
+  useEffect(() => {
+    if (terminalMode === 'terminal' && tabs.length === 0) {
+      createTab()
+    }
+  }, [terminalMode, tabs.length, createTab])
+
+  // Initialize split root when first tab is created
+  useEffect(() => {
+    if (tabs.length > 0 && !splitRoot) {
+      const leaf = createLeaf(tabs[0].id)
+      setSplitRoot(leaf)
+      setActiveLeafId(leaf.id)
+    }
+  }, [tabs, splitRoot])
+
+  // Split the active pane
+  const handleSplit = useCallback((direction: 'horizontal' | 'vertical') => {
+    if (!splitRoot || !activeLeafId) return
+    const newTabId = createTab()
+    setSplitRoot(prev => prev ? splitLeaf(prev, activeLeafId, direction, newTabId) : prev)
+  }, [splitRoot, activeLeafId, createTab])
+
+  const handleSplitResize = useCallback((splitId: string, ratio: number) => {
+    setSplitRoot(prev => {
+      if (!prev) return prev
+      const update = (node: SplitNode): SplitNode => {
+        if (node.id === splitId && node.type === 'split') {
+          return { ...node, ratio }
+        }
+        if (node.type === 'split' && node.children) {
+          return { ...node, children: [update(node.children[0]), update(node.children[1])] }
+        }
+        return node
+      }
+      return update(prev)
+    })
+  }, [])
+
+  const handleClosePane = useCallback((leafId: string) => {
+    if (!splitRoot) return
+    // Find the tab associated with this leaf
+    const findTabId = (node: SplitNode): string | null => {
+      if (node.type === 'leaf' && node.id === leafId) return node.tabId || null
+      if (node.children) {
+        return findTabId(node.children[0]) || findTabId(node.children[1])
+      }
+      return null
+    }
+    const tabId = findTabId(splitRoot)
+
+    const newRoot = removeLeaf(splitRoot, leafId)
+    if (newRoot) {
+      setSplitRoot(newRoot)
+      // Set active to first remaining leaf
+      const findFirst = (n: SplitNode): string => n.type === 'leaf' ? n.id : findFirst(n.children![0])
+      setActiveLeafId(findFirst(newRoot))
+    } else {
+      setSplitRoot(null)
+      setActiveLeafId(null)
+    }
+    if (tabId) closeTab(tabId)
+  }, [splitRoot, closeTab])
+
   const statusBarBg = mode === 'focus'
     ? 'bg-primary/20 border-primary/30'
     : 'bg-tertiary/20 border-tertiary/30'
@@ -459,13 +613,29 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <nav className="w-56 bg-surface-container-low flex flex-col shrink-0 border-r border-outline-variant/20 z-40">
+          {/* Terminal tabs section */}
+          {terminalMode === 'terminal' && (
+            <TabBar
+              tabs={tabs}
+              onSelectTab={selectTab}
+              onCloseTab={closeTab}
+              onNewTab={createTab}
+              onRenameTab={renameTab}
+              onChangeColor={changeTabColor}
+              onReorder={reorderTabs}
+            />
+          )}
+
+          {/* AI Sessions section */}
+          {terminalMode !== 'terminal' && (
           <div className="px-3 py-2 border-b border-outline-variant/20">
             <div className="text-[10px] font-mono uppercase tracking-widest text-outline">
               Sessions
             </div>
           </div>
+          )}
           <div className="flex-1 overflow-y-auto py-1">
-            {activeSession && (
+            {terminalMode !== 'terminal' && activeSession && (
               <div className="flex items-center gap-2 px-3 py-2 text-sm bg-primary/10 text-primary border-l-2 border-primary">
                 <span className="material-symbols-outlined text-[16px]">terminal</span>
                 <div className="min-w-0">
@@ -476,7 +646,7 @@ function App() {
                 </div>
               </div>
             )}
-            {!activeSession && !showNewSession && (
+            {terminalMode !== 'terminal' && !activeSession && !showNewSession && (
               <button
                 onClick={() => setShowNewSession(true)}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-high w-full text-left border-l-2 border-transparent"
@@ -563,20 +733,15 @@ function App() {
 
         {/* Terminal Panels with optional Mission Control + Browser */}
         <main ref={mainRef} className={`flex-1 flex p-1 overflow-hidden ${isBottom ? 'flex-col' : 'flex-row'}`}>
-          {/* Terminal Mode: full-screen PTY shell */}
+          {/* Terminal Mode: multi-tab PTY shells */}
           {terminalMode === 'terminal' ? (
             <section className="flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden">
               <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                 <div className="flex items-center">
                   <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                    Terminal
+                    {tabs.find(t => t.id === activeTabId)?.name || 'Terminal'}
                   </span>
                   <span className="ml-2 w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
-                  {projectDir && (
-                    <span className="ml-2 font-mono text-[10px] text-outline truncate max-w-[200px]">
-                      {projectDir.split('/').pop()}
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -586,15 +751,62 @@ function App() {
                     AI PING-PONG
                   </button>
                   <button
-                    onClick={() => { setTerminalMode('idle'); setActiveSession(null); try { localStorage.removeItem('smux-last-project') } catch {} }}
+                    onClick={() => { setTerminalMode('idle'); setActiveSession(null); setTabs([]); setActiveTabId(null); try { localStorage.removeItem('smux-last-project') } catch {} }}
                     className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
                   >
                     HOME
                   </button>
                 </div>
               </div>
-              <div className="flex-1 overflow-hidden">
-                <TerminalPanel ref={plannerRef} role="terminal" ptyMode={true} cwd={projectDir || undefined} />
+              <div className="flex-1 overflow-hidden relative">
+                {splitRoot && splitRoot.type === 'split' ? (
+                  <SplitContainer
+                    root={splitRoot}
+                    activeLeafId={activeLeafId}
+                    onActivateLeaf={setActiveLeafId}
+                    onResizeRatio={handleSplitResize}
+                    renderLeaf={(node) => {
+                      const tabId = node.tabId || activeTabId || ''
+                      const tab = tabs.find(t => t.id === tabId)
+                      return (
+                        <TerminalPanel
+                          ref={(handle) => {
+                            if (handle) tabRefsMap.current.set(tabId, handle)
+                          }}
+                          role="terminal"
+                          ptyMode={true}
+                          cwd={tab?.cwd || projectDir || undefined}
+                          onCwdChange={(cwd) => {
+                            setTabs(prev => prev.map(t => t.id === tabId ? { ...t, cwd, name: cwd.split('/').pop() || t.name } : t))
+                          }}
+                        />
+                      )
+                    }}
+                  />
+                ) : (
+                  tabs.map(tab => (
+                    <div
+                      key={tab.id}
+                      className="absolute inset-0"
+                      style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
+                    >
+                      <TerminalPanel
+                        ref={(handle) => {
+                          if (handle) tabRefsMap.current.set(tab.id, handle)
+                          if (handle && tab.id === tabs[0]?.id) {
+                            (plannerRef as React.MutableRefObject<TerminalPanelHandle | null>).current = handle
+                          }
+                        }}
+                        role="terminal"
+                        ptyMode={true}
+                        cwd={tab.cwd || projectDir || undefined}
+                        onCwdChange={(cwd) => {
+                          setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, cwd, name: cwd.split('/').pop() || t.name } : t))
+                        }}
+                      />
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           ) : terminalMode === 'ai-session' && aiTask ? (
@@ -805,7 +1017,8 @@ function App() {
               <h2 className="font-headline text-sm font-bold text-on-surface">Settings</h2>
               <button onClick={() => setShowSettings(false)} className="material-symbols-outlined text-[18px] text-outline hover:text-on-surface">close</button>
             </div>
-            <div className="px-5 py-4 space-y-4">
+            <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Appearance */}
               <div>
                 <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Theme</label>
                 <div className="flex gap-2">
@@ -820,12 +1033,66 @@ function App() {
                   ))}
                 </div>
               </div>
+              {/* Font Family */}
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Font Family</label>
+                <select
+                  defaultValue="JetBrains Mono"
+                  onChange={async (e) => {
+                    const font = e.target.value
+                    document.documentElement.style.setProperty('--terminal-font', `"${font}", monospace`)
+                    if (isTauri) {
+                      try {
+                        const { invoke } = await import('@tauri-apps/api/core')
+                        const config = await invoke<Record<string, unknown>>('load_app_config') as { appearance?: { font_family?: string } }
+                        await invoke('save_app_config', { config: { ...config, appearance: { ...config.appearance, font_family: font } } })
+                      } catch { /* ignore */ }
+                    }
+                  }}
+                  className="w-full h-8 bg-surface-container-lowest border border-outline-variant/30 rounded px-2 font-mono text-[12px] text-on-surface-variant outline-none focus:border-primary"
+                >
+                  {['JetBrains Mono', 'SF Mono', 'Menlo', 'Fira Code', 'Cascadia Code', 'Monaco', 'Consolas'].map(f => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Font Size */}
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Font Size: <span id="font-size-val">14</span>px</label>
+                <input
+                  type="range"
+                  min={10}
+                  max={24}
+                  defaultValue={14}
+                  onChange={(e) => {
+                    const size = e.target.value
+                    document.documentElement.style.setProperty('--terminal-font-size', `${size}px`)
+                    const label = document.getElementById('font-size-val')
+                    if (label) label.textContent = size
+                  }}
+                  className="w-full accent-primary"
+                />
+              </div>
+              {/* Cursor */}
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Cursor Style</label>
+                <div className="flex gap-2">
+                  {['block', 'underline', 'bar'].map(s => (
+                    <button
+                      key={s}
+                      className="px-3 py-1.5 rounded font-mono text-[11px] border border-outline-variant/30 text-on-surface-variant hover:border-primary transition-colors"
+                    >{s}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Shell */}
               <div>
                 <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Shell</label>
                 <div className="font-mono text-[12px] text-on-surface-variant bg-surface-container-lowest px-3 py-2 rounded border border-outline-variant/20">
                   {typeof window !== 'undefined' ? '/bin/zsh' : 'default'}
                 </div>
               </div>
+              {/* Project */}
               <div>
                 <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Project</label>
                 <div className="font-mono text-[12px] text-on-surface-variant bg-surface-container-lowest px-3 py-2 rounded border border-outline-variant/20 truncate">

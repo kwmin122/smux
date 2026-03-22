@@ -17,6 +17,8 @@ smux-core = { path = "../../smux-core" }
 url = "2"
 portable-pty = "0.8"
 uuid = { version = "1", features = ["v4"] }
+dirs = "5"
+toml = "0.8"
 
 [features]
 default = ["custom-protocol"]
