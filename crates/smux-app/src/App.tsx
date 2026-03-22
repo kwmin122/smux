@@ -60,6 +60,9 @@ function App() {
   const [inputMaxRounds, setInputMaxRounds] = useState(10)
   const [fullscreen, setFullscreen] = useState<FullscreenPanel>(null)
   const [daemonRunning, setDaemonRunning] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [aiTask, setAiTask] = useState('')
+  const [showAiPrompt, setShowAiPrompt] = useState(false)
   const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
     // Auto-resume last project if available
     try {
@@ -443,9 +446,12 @@ function App() {
           >
             {theme}
           </button>
-          <span className="material-symbols-outlined text-[16px] text-outline hover:text-primary transition-colors cursor-pointer">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="material-symbols-outlined text-[16px] text-outline hover:text-primary transition-colors cursor-pointer"
+          >
             settings
-          </span>
+          </button>
         </div>
       </header>
 
@@ -574,7 +580,7 @@ function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setTerminalMode('ai-session')}
+                    onClick={() => setShowAiPrompt(true)}
                     className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 transition-colors"
                   >
                     AI PING-PONG
@@ -591,13 +597,13 @@ function App() {
                 <TerminalPanel ref={plannerRef} role="terminal" ptyMode={true} cwd={projectDir || undefined} />
               </div>
             </section>
-          ) : terminalMode === 'ai-session' ? (
+          ) : terminalMode === 'ai-session' && aiTask ? (
             <>
-              {/* Planner PTY Panel */}
+              {/* Planner PTY Panel — runs claude */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
                 <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Planner</span>
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Planner (Claude)</span>
                     <span className="ml-2 w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
                   </div>
                 </div>
@@ -611,15 +617,15 @@ function App() {
                 <div className="w-0.5 h-8 rounded-full bg-outline-variant/40" />
               </div>
 
-              {/* Verifier PTY Panel */}
+              {/* Verifier PTY Panel — runs codex */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
                 <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-tertiary">Verifier</span>
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-tertiary">Verifier (Codex)</span>
                     <span className="ml-2 w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
                   </div>
                   <button
-                    onClick={() => setTerminalMode('terminal')}
+                    onClick={() => { setTerminalMode('terminal'); setAiTask('') }}
                     className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
                   >
                     EXIT AI
@@ -765,26 +771,11 @@ function App() {
         </main>
       </div>
 
-      {/* Bottom Shortcut Bar */}
+      {/* Bottom Status Bar */}
       <footer className={`h-7 flex items-center justify-between px-4 border-t z-50 shrink-0 ${statusBarBg}`}>
         <div className="flex items-center gap-3">
           <span className="font-mono text-[10px] text-on-surface-variant">
             <span className="text-primary">[Tab]</span> {mode === 'focus' ? 'Control' : 'Focus'}
-          </span>
-          <span className="font-mono text-[10px] text-on-surface-variant">
-            <span className="text-primary">[i]</span> Intervene
-          </span>
-          <span className="font-mono text-[10px] text-on-surface-variant">
-            <span className="text-primary">[r]</span> Rewind
-          </span>
-          <span className="font-mono text-[10px] text-on-surface-variant">
-            <span className="text-primary">[d]</span> Diff
-          </span>
-          <span className="font-mono text-[10px] text-on-surface-variant">
-            <span className="text-primary">[q]</span> Quit
-          </span>
-          <span className="font-mono text-[10px] text-on-surface-variant">
-            <span className="text-primary">[⌘B]</span> Browser
           </span>
           <span className="font-mono text-[10px] text-on-surface-variant">
             <span className="text-primary">[⌘1/2/3]</span> Layout
@@ -798,11 +789,88 @@ function App() {
             <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-secondary' : 'bg-outline'}`} />
             {connected ? 'Connected' : 'Idle'}
           </span>
-          <span className="font-mono text-[10px] text-outline">
-            Git: {gitBranch}{gitFilesChanged > 0 ? ` (+${gitFilesChanged})` : ''}
-          </span>
+          {projectDir && (
+            <span className="font-mono text-[10px] text-outline truncate max-w-[200px]">
+              {projectDir.split('/').pop()}
+            </span>
+          )}
         </div>
       </footer>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={() => setShowSettings(false)}>
+          <div className="bg-surface-container-high rounded-xl border border-outline-variant/20 w-[400px] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-outline-variant/20 flex items-center justify-between">
+              <h2 className="font-headline text-sm font-bold text-on-surface">Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="material-symbols-outlined text-[18px] text-outline hover:text-on-surface">close</button>
+            </div>
+            <div className="px-5 py-4 space-y-4">
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Theme</label>
+                <div className="flex gap-2">
+                  {['deep-navy', 'amber', 'forest-green'].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => { setTheme(t); document.documentElement.setAttribute('data-theme', t) }}
+                      className={`px-3 py-1.5 rounded font-mono text-[11px] border transition-colors ${
+                        theme === t ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/30 text-on-surface-variant hover:border-primary'
+                      }`}
+                    >{t}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Shell</label>
+                <div className="font-mono text-[12px] text-on-surface-variant bg-surface-container-lowest px-3 py-2 rounded border border-outline-variant/20">
+                  {typeof window !== 'undefined' ? '/bin/zsh' : 'default'}
+                </div>
+              </div>
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Project</label>
+                <div className="font-mono text-[12px] text-on-surface-variant bg-surface-container-lowest px-3 py-2 rounded border border-outline-variant/20 truncate">
+                  {projectDir || 'No project open'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Task Prompt Modal */}
+      {showAiPrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={() => setShowAiPrompt(false)}>
+          <div className="bg-surface-container-high rounded-xl border border-outline-variant/20 w-[500px] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-outline-variant/20">
+              <h2 className="font-headline text-sm font-bold text-on-surface">AI Ping-Pong Session</h2>
+              <p className="text-[11px] text-on-surface-variant mt-1">Planner (Claude) will code, Verifier (Codex) will review</p>
+            </div>
+            <div className="px-5 py-4">
+              <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Task</label>
+              <textarea
+                value={aiTask}
+                onChange={e => setAiTask(e.target.value)}
+                placeholder="What should the AI agents work on?"
+                className="w-full h-20 bg-surface-container-lowest border border-outline-variant/30 rounded px-3 py-2 font-mono text-[12px] text-on-surface resize-none outline-none focus:border-primary"
+                autoFocus
+              />
+            </div>
+            <div className="px-5 py-3 border-t border-outline-variant/20 flex justify-end gap-2">
+              <button onClick={() => setShowAiPrompt(false)} className="px-4 py-1.5 font-mono text-[11px] text-outline hover:text-on-surface border border-outline-variant/30 rounded">Cancel</button>
+              <button
+                onClick={() => {
+                  if (aiTask.trim()) {
+                    setShowAiPrompt(false)
+                    setTerminalMode('ai-session')
+                  }
+                }}
+                disabled={!aiTask.trim()}
+                className="px-4 py-1.5 font-mono text-[11px] bg-primary text-on-primary rounded hover:opacity-90 disabled:opacity-40"
+              >Start</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
