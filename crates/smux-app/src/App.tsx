@@ -6,6 +6,7 @@ import { WelcomeView } from './components/WelcomeView'
 import { TabBar, type TabInfo, type TabColor } from './components/TabBar'
 import { SplitContainer, type SplitNode, createLeaf, splitLeaf, removeLeaf } from './components/SplitContainer'
 import { AiExecutionLevel, type ExecutionLevel } from './components/AiExecutionLevel'
+import { SettingsView } from './components/SettingsView'
 import { FailedCommandOverlay } from './components/FailedCommandOverlay'
 import { useAiPingPong, type AiSessionStatus } from './hooks/useAiPingPong'
 import type { CommandRecord } from './hooks/useShellIntegration'
@@ -574,7 +575,7 @@ function App() {
   return (
     <div className="flex flex-col h-screen">
       {/* Top Status Bar */}
-      <header className={`h-10 flex items-center justify-between px-4 border-b z-50 shrink-0 ${statusBarBg}`}>
+      <header className={`h-9 flex items-center justify-between px-3 border-b z-50 shrink-0 ${statusBarBg}`}>
         <div className="flex items-center gap-3">
           <span className="font-headline font-bold text-sm tracking-[-0.02em] text-on-surface">
             smux
@@ -621,7 +622,7 @@ function App() {
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <nav className="w-56 bg-surface-container-low flex flex-col shrink-0 border-r border-outline-variant/20 z-40">
+        <nav className="w-48 bg-surface-container-low flex flex-col shrink-0 border-r border-outline-variant/20 z-40">
           {/* Terminal tabs section */}
           {terminalMode === 'terminal' && (
             <TabBar
@@ -741,11 +742,11 @@ function App() {
         </nav>
 
         {/* Terminal Panels with optional Mission Control + Browser */}
-        <main ref={mainRef} className={`flex-1 flex p-1 overflow-hidden ${isBottom ? 'flex-col' : 'flex-row'}`}>
+        <main ref={mainRef} className={`flex-1 flex p-px overflow-hidden ${isBottom ? 'flex-col' : 'flex-row'}`}>
           {/* Terminal Mode: multi-tab PTY shells */}
           {terminalMode === 'terminal' ? (
             <section className="flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden">
-              <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+              <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                 <div className="flex items-center">
                   <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                     {tabs.find(t => t.id === activeTabId)?.name || 'Terminal'}
@@ -844,7 +845,7 @@ function App() {
             <>
               {/* Planner PTY Panel — runs claude */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
-                <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+                <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Planner (Claude)</span>
                     <span className={`w-1.5 h-1.5 rounded-full ${pingPong.status === 'planner-running' ? 'bg-secondary animate-pulse' : 'bg-outline'}`} />
@@ -925,7 +926,7 @@ function App() {
 
               {/* Verifier PTY Panel — runs codex */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
-                <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+                <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-tertiary">Verifier (Codex)</span>
                     <span className={`w-1.5 h-1.5 rounded-full ${pingPong.status === 'verifier-running' ? 'bg-tertiary animate-pulse' : 'bg-outline'}`} />
@@ -963,7 +964,7 @@ function App() {
             />
           ) : fullscreen ? (
             <section className="flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden">
-              <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+              <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                 <div className="flex items-center">
                   <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                     {fullscreen}
@@ -988,7 +989,7 @@ function App() {
                 className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden"
                 style={isBottom ? { height: `${plannerPct}%` } : { width: `${plannerPct}%` }}
               >
-                <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+                <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                       Planner
@@ -1050,7 +1051,7 @@ function App() {
                 className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden"
                 style={isBottom ? { height: `${verifierPct}%` } : { width: `${verifierPct}%` }}
               >
-                <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+                <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                       Verifier
@@ -1110,99 +1111,15 @@ function App() {
         </div>
       </footer>
 
-      {/* Settings Modal */}
+      {/* Full-screen Settings View */}
       {showSettings && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={() => setShowSettings(false)}>
-          <div className="bg-surface-container-high rounded-xl border border-outline-variant/20 w-[400px] shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="px-5 py-4 border-b border-outline-variant/20 flex items-center justify-between">
-              <h2 className="font-headline text-sm font-bold text-on-surface">Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="material-symbols-outlined text-[18px] text-outline hover:text-on-surface">close</button>
-            </div>
-            <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-              {/* Appearance */}
-              <div>
-                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Theme</label>
-                <div className="flex gap-2">
-                  {['deep-navy', 'amber', 'forest-green'].map(t => (
-                    <button
-                      key={t}
-                      onClick={() => { setTheme(t); document.documentElement.setAttribute('data-theme', t) }}
-                      className={`px-3 py-1.5 rounded font-mono text-[11px] border transition-colors ${
-                        theme === t ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/30 text-on-surface-variant hover:border-primary'
-                      }`}
-                    >{t}</button>
-                  ))}
-                </div>
-              </div>
-              {/* Font Family */}
-              <div>
-                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Font Family</label>
-                <select
-                  defaultValue="JetBrains Mono"
-                  onChange={async (e) => {
-                    const font = e.target.value
-                    document.documentElement.style.setProperty('--terminal-font', `"${font}", monospace`)
-                    if (isTauri) {
-                      try {
-                        const { invoke } = await import('@tauri-apps/api/core')
-                        const config = await invoke<Record<string, unknown>>('load_app_config') as { appearance?: { font_family?: string } }
-                        await invoke('save_app_config', { config: { ...config, appearance: { ...config.appearance, font_family: font } } })
-                      } catch { /* ignore */ }
-                    }
-                  }}
-                  className="w-full h-8 bg-surface-container-lowest border border-outline-variant/30 rounded px-2 font-mono text-[12px] text-on-surface-variant outline-none focus:border-primary"
-                >
-                  {['JetBrains Mono', 'SF Mono', 'Menlo', 'Fira Code', 'Cascadia Code', 'Monaco', 'Consolas'].map(f => (
-                    <option key={f} value={f}>{f}</option>
-                  ))}
-                </select>
-              </div>
-              {/* Font Size */}
-              <div>
-                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Font Size: <span id="font-size-val">14</span>px</label>
-                <input
-                  type="range"
-                  min={10}
-                  max={24}
-                  defaultValue={14}
-                  onChange={(e) => {
-                    const size = e.target.value
-                    document.documentElement.style.setProperty('--terminal-font-size', `${size}px`)
-                    const label = document.getElementById('font-size-val')
-                    if (label) label.textContent = size
-                  }}
-                  className="w-full accent-primary"
-                />
-              </div>
-              {/* Cursor */}
-              <div>
-                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Cursor Style</label>
-                <div className="flex gap-2">
-                  {['block', 'underline', 'bar'].map(s => (
-                    <button
-                      key={s}
-                      className="px-3 py-1.5 rounded font-mono text-[11px] border border-outline-variant/30 text-on-surface-variant hover:border-primary transition-colors"
-                    >{s}</button>
-                  ))}
-                </div>
-              </div>
-              {/* Shell */}
-              <div>
-                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Shell</label>
-                <div className="font-mono text-[12px] text-on-surface-variant bg-surface-container-lowest px-3 py-2 rounded border border-outline-variant/20">
-                  {typeof window !== 'undefined' ? '/bin/zsh' : 'default'}
-                </div>
-              </div>
-              {/* Project */}
-              <div>
-                <label className="font-mono text-[10px] uppercase tracking-widest text-outline block mb-1.5">Project</label>
-                <div className="font-mono text-[12px] text-on-surface-variant bg-surface-container-lowest px-3 py-2 rounded border border-outline-variant/20 truncate">
-                  {projectDir || 'No project open'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SettingsView
+          onClose={() => setShowSettings(false)}
+          theme={theme}
+          onThemeChange={(t) => { setTheme(t); document.documentElement.setAttribute('data-theme', t) }}
+          executionLevel={executionLevel}
+          onExecutionLevelChange={setExecutionLevel}
+        />
       )}
 
       {/* AI Task Prompt Modal */}

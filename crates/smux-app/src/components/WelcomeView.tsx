@@ -123,8 +123,19 @@ export function WelcomeView({ onOpenFolder, onNewSession, daemonRunning }: Welco
 
         {/* Hero */}
         <div className="text-center mb-10">
-          <h1 className="font-headline text-4xl font-bold text-on-surface tracking-tight mb-2">{t.title}</h1>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <h1 className="font-headline text-4xl font-bold text-on-surface tracking-tight">{t.title}</h1>
+            <span className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/20">v0.5</span>
+          </div>
           <p className="text-on-surface-variant text-sm">{t.subtitle}</p>
+          <div className="flex items-center justify-center gap-4 mt-3">
+            <span className="font-mono text-[9px] text-outline flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary" /> Cross-Verification Engine
+            </span>
+            <span className="font-mono text-[9px] text-outline flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" /> Multi-Agent Terminal
+            </span>
+          </div>
         </div>
 
         {/* Action Buttons */}
