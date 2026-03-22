@@ -292,6 +292,8 @@ fn create_pty(
     pty_mgr: tauri::State<PtyManager>,
     rows: Option<u16>,
     cols: Option<u16>,
+    cwd: Option<String>,
+    shell_cmd: Option<String>,
 ) -> Result<String, String> {
     let rows = rows.unwrap_or(24);
     let cols = cols.unwrap_or(80);
@@ -315,13 +317,15 @@ fn create_pty(
         .take_writer()
         .map_err(|e| format!("take writer: {e}"))?;
 
-    // Detect user's shell
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    // Use provided shell command or detect user's default shell
+    let shell = shell_cmd
+        .unwrap_or_else(|| std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string()));
     let mut cmd = CommandBuilder::new(&shell);
     cmd.env("TERM", "xterm-256color");
-    if let Ok(home) = std::env::var("HOME") {
-        cmd.cwd(&home);
-    }
+    // Use provided cwd, or fall back to HOME
+    let working_dir =
+        cwd.unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| "/".to_string()));
+    cmd.cwd(&working_dir);
 
     let _child = pair
         .slave
@@ -500,6 +504,7 @@ async fn stream_daemon_events(app: AppHandle, mut stream: UnixStream, _session_i
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState {
             active_session: Arc::new(Mutex::new(None)),
         })

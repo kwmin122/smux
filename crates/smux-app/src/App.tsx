@@ -60,7 +60,16 @@ function App() {
   const [inputMaxRounds, setInputMaxRounds] = useState(10)
   const [fullscreen, setFullscreen] = useState<FullscreenPanel>(null)
   const [daemonRunning, setDaemonRunning] = useState(false)
-  const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>('terminal')
+  const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
+    // Auto-resume last project if available
+    try {
+      const last = localStorage.getItem('smux-last-project')
+      return last ? 'terminal' : 'idle'
+    } catch { return 'idle' }
+  })
+  const [projectDir, setProjectDir] = useState<string>(() => {
+    try { return localStorage.getItem('smux-last-project') || '' } catch { return '' }
+  })
 
   const plannerRef = useRef<TerminalPanelHandle>(null)
   const verifierRef = useRef<TerminalPanelHandle>(null)
@@ -557,22 +566,80 @@ function App() {
                     Terminal
                   </span>
                   <span className="ml-2 w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                  {projectDir && (
+                    <span className="ml-2 font-mono text-[10px] text-outline truncate max-w-[200px]">
+                      {projectDir.split('/').pop()}
+                    </span>
+                  )}
                 </div>
-                <button
-                  onClick={() => setTerminalMode('idle')}
-                  className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
-                >
-                  CLOSE
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setTerminalMode('ai-session')}
+                    className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 transition-colors"
+                  >
+                    AI PING-PONG
+                  </button>
+                  <button
+                    onClick={() => { setTerminalMode('idle'); setActiveSession(null); try { localStorage.removeItem('smux-last-project') } catch {} }}
+                    className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
+                  >
+                    HOME
+                  </button>
+                </div>
               </div>
               <div className="flex-1 overflow-hidden">
-                <TerminalPanel ref={plannerRef} role="terminal" ptyMode={true} />
+                <TerminalPanel ref={plannerRef} role="terminal" ptyMode={true} cwd={projectDir || undefined} />
               </div>
             </section>
-          ) : !activeSession && !showNewSession ? (
+          ) : terminalMode === 'ai-session' ? (
+            <>
+              {/* Planner PTY Panel */}
+              <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
+                <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+                  <div className="flex items-center">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Planner</span>
+                    <span className="ml-2 w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" />
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} />
+                </div>
+              </section>
+
+              {/* Divider */}
+              <div className="w-1 shrink-0 flex items-center justify-center">
+                <div className="w-0.5 h-8 rounded-full bg-outline-variant/40" />
+              </div>
+
+              {/* Verifier PTY Panel */}
+              <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
+                <div className="h-7 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
+                  <div className="flex items-center">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-tertiary">Verifier</span>
+                    <span className="ml-2 w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
+                  </div>
+                  <button
+                    onClick={() => setTerminalMode('terminal')}
+                    className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
+                  >
+                    EXIT AI
+                  </button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} />
+                </div>
+              </section>
+            </>
+          ) : !activeSession && !showNewSession && terminalMode === 'idle' ? (
             <WelcomeView
+              onOpenFolder={(path: string) => {
+                if (path) {
+                  try { localStorage.setItem('smux-last-project', path) } catch { /* */ }
+                }
+                setProjectDir(path)
+                setTerminalMode('terminal')
+              }}
               onNewSession={() => setShowNewSession(true)}
-              onOpenTerminal={() => setTerminalMode('terminal')}
               daemonRunning={daemonRunning}
             />
           ) : fullscreen ? (

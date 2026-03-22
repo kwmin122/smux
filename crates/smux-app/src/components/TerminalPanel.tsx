@@ -21,6 +21,10 @@ interface TerminalPanelProps {
   role: 'planner' | 'verifier' | 'terminal'
   /** When true, creates a real PTY shell and connects input/output */
   ptyMode?: boolean
+  /** Working directory for the PTY shell */
+  cwd?: string
+  /** Custom shell command (e.g., 'claude -p "task"') */
+  shellCmd?: string
 }
 
 function getThemeColors() {
@@ -51,7 +55,7 @@ function getThemeColors() {
 }
 
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
-  function TerminalPanel({ role, ptyMode = false }, ref) {
+  function TerminalPanel({ role, ptyMode = false, cwd, shellCmd }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRef = useRef<Terminal | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -107,10 +111,13 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             const { listen } = await import('@tauri-apps/api/event')
 
             // Create PTY with current terminal dimensions
-            const tabId = await invoke<string>('create_pty', {
+            const ptyArgs: Record<string, unknown> = {
               rows: terminal.rows,
               cols: terminal.cols,
-            })
+            }
+            if (cwd) ptyArgs.cwd = cwd
+            if (shellCmd) ptyArgs.shellCmd = shellCmd
+            const tabId = await invoke<string>('create_pty', ptyArgs)
             ptyIdRef.current = tabId
 
             // Listen for output BEFORE starting read loop (prevent race)
@@ -165,7 +172,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         cleanupPty?.()
         terminal.dispose()
       }
-    }, [role, ptyMode])
+    }, [role, ptyMode, cwd, shellCmd])
 
     // Re-apply theme colors when the data-theme attribute changes
     useEffect(() => {
