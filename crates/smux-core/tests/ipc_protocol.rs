@@ -311,7 +311,7 @@ async fn connection_closed_returns_error() {
     client_handle.await.unwrap();
 
     // Give the drop a moment to propagate.
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     let result = recv_message::<ClientMessage>(&mut server).await;
     assert!(result.is_err(), "should fail on closed connection");
