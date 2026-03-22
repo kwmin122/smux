@@ -169,7 +169,10 @@ impl Orchestrator {
         // Set up health monitors.
         let health_cfg = self.config.health_config.clone().unwrap_or_default();
         let mut planner_health = HealthMonitor::new(health_cfg.clone());
-        let _verifier_health = HealthMonitor::new(health_cfg);
+        // Per-verifier health monitors (one per adapter).
+        let mut verifier_healths: Vec<HealthMonitor> = (0..self.verifiers.len())
+            .map(|_| HealthMonitor::new(health_cfg.clone()))
+            .collect();
 
         let mut prior_rounds: Vec<(u32, VerifyResult)> = Vec::new();
         let mut planner_prompt = self.config.task.clone();
@@ -293,6 +296,25 @@ impl Orchestrator {
 
             if let Some(err) = first_error {
                 return OrchestratorOutcome::Error { message: err };
+            }
+
+            // Update per-verifier health monitors.
+            for &(i, _, _) in &verifier_outputs {
+                if i < verifier_healths.len() {
+                    verifier_healths[i].record_event();
+                    let state = verifier_healths[i].check();
+                    if !matches!(state, AgentHealth::Healthy) {
+                        let state_str = format!("{state:?}");
+                        emit_event(
+                            &self.event_sink,
+                            OrchestratorEvent::HealthStateChanged {
+                                agent: format!("verifier[{i}]"),
+                                state: state_str,
+                            },
+                        )
+                        .await;
+                    }
+                }
             }
 
             // ── Step 6: Parse verdict(s) and apply consensus ──
