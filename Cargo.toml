@@ -3,4 +3,4 @@ resolver = "3"
 members = ["crates/smux-core", "crates/smux-cli", "crates/smux-daemon", "crates/smux-app/src-tauri"]
 
 [workspace.package]
-license = "MIT"
+license = "LicenseRef-smux-personal"

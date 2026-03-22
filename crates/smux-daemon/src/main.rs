@@ -553,6 +553,7 @@ fn spawn_session(
             max_tokens: 0,
             health_config: None,
             consensus_strategy,
+            verifier_names: verifiers.clone(),
         };
 
         // Wire event streaming from orchestrator to daemon broadcast.

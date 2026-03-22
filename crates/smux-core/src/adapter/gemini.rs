@@ -95,17 +95,32 @@ impl GeminiHeadlessAdapter {
     }
 
     fn build_full_prompt(&self, prompt: &str) -> String {
-        let mut parts: Vec<String> = Vec::new();
+        const MAX_PROMPT_BYTES: usize = 200_000;
 
+        let mut parts: Vec<String> = Vec::new();
         if !self.system_prompt.is_empty() {
             parts.push(format!("[System]\n{}\n", self.system_prompt));
         }
 
-        for turn in &self.transcript {
-            parts.push(format!("[{}]\n{}\n", turn.role, turn.content));
-        }
+        let user_part = format!("[user]\n{}", prompt);
+        let mut budget = MAX_PROMPT_BYTES
+            .saturating_sub(parts.iter().map(|p| p.len()).sum::<usize>())
+            .saturating_sub(user_part.len())
+            .saturating_sub(100);
 
-        parts.push(format!("[user]\n{}", prompt));
+        let mut transcript_parts: Vec<String> = Vec::new();
+        for turn in self.transcript.iter().rev() {
+            let part = format!("[{}]\n{}\n", turn.role, turn.content);
+            if part.len() > budget {
+                transcript_parts.push("[...transcript truncated...]\n".into());
+                break;
+            }
+            budget -= part.len();
+            transcript_parts.push(part);
+        }
+        transcript_parts.reverse();
+        parts.extend(transcript_parts);
+        parts.push(user_part);
 
         parts.join("\n")
     }

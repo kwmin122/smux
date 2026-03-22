@@ -244,6 +244,10 @@ pub const DEFAULT_CONFIG_TOML: &str = r#"# smux configuration
 max_rounds = 10      # maximum planner-verifier rounds per session
 browser = false      # open browser UI on session start
 layout = "center"    # tmux pane layout: center, left, right
+consensus = "majority"  # consensus strategy: majority, weighted, unanimous, leader
+
+[agents]
+verifiers = []       # extra verifiers for cross-verify (e.g. ["claude", "codex", "gemini"])
 
 [agents.planner]
 default = "claude"         # default planner provider

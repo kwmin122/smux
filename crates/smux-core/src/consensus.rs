@@ -9,10 +9,18 @@ use crate::types::{
 
 /// Resolve multiple verifier verdicts into a single consensus result.
 pub fn resolve(strategy: &ConsensusStrategy, verdicts: Vec<VerifierVerdict>) -> ConsensusResult {
-    assert!(
-        !verdicts.is_empty(),
-        "resolve requires at least one verdict"
-    );
+    if verdicts.is_empty() {
+        return ConsensusResult {
+            individual: vec![],
+            final_verdict: VerifyResult::Rejected {
+                reason: "no verifiers provided".into(),
+                category: RejectCategory::IncompleteImpl,
+                confidence: 0.0,
+            },
+            strategy: strategy.clone(),
+            agreement_ratio: 0.0,
+        };
+    }
 
     let final_verdict = match strategy {
         ConsensusStrategy::Majority => majority(&verdicts),

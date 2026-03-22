@@ -53,6 +53,9 @@ pub struct OrchestratorConfig {
     pub health_config: Option<HealthConfig>,
     /// Consensus strategy for multi-verifier mode.
     pub consensus_strategy: ConsensusStrategy,
+    /// Names of verifier adapters (e.g. ["codex", "claude", "gemini"]).
+    /// Used for labeling in CrossVerifyResult and logs.
+    pub verifier_names: Vec<String>,
 }
 
 /// Outcome of an orchestrator run.
@@ -337,7 +340,12 @@ impl Orchestrator {
                         let v = stop::detect(output);
                         tracing::info!(round, verifier = i, ?v, duration_ms, "individual verdict");
                         VerifierVerdict {
-                            adapter_name: format!("verifier[{i}]"),
+                            adapter_name: self
+                                .config
+                                .verifier_names
+                                .get(*i)
+                                .cloned()
+                                .unwrap_or_else(|| format!("verifier[{i}]")),
                             result: v,
                             duration_ms: *duration_ms,
                         }
@@ -434,7 +442,12 @@ impl Orchestrator {
                             .iter()
                             .enumerate()
                             .map(|(i, output)| VerifierVerdict {
-                                adapter_name: format!("verifier[{i}]"),
+                                adapter_name: self
+                                    .config
+                                    .verifier_names
+                                    .get(i)
+                                    .cloned()
+                                    .unwrap_or_else(|| format!("verifier[{i}]")),
                                 result: stop::detect(output),
                                 duration_ms: 0,
                             })
