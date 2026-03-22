@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>smux — AI-Multiplexed Terminal Sessions</title>
+<link rel="icon" type="image/png" href="favicon.png"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "surface-tint": "#a4c9ff",
+                "on-secondary-container": "#004a42",
+                "outline": "#8d919a",
+                "surface-bright": "#363941",
+                "surface": "#10131a",
+                "on-secondary-fixed-variant": "#005047",
+                "on-primary-fixed-variant": "#1f4876",
+                "surface-container-highest": "#32353c",
+                "background": "#10131a",
+                "primary-fixed": "#d3e3ff",
+                "surface-container-high": "#272a31",
+                "surface-variant": "#32353c",
+                "secondary-fixed-dim": "#3cddc8",
+                "surface-container-lowest": "#0b0e15",
+                "inverse-surface": "#e0e2ec",
+                "on-tertiary": "#512121",
+                "on-surface": "#e0e2ec",
+                "error-container": "#93000a",
+                "on-error": "#690005",
+                "on-primary-container": "#2d5483",
+                "on-tertiary-fixed": "#370d0e",
+                "tertiary-container": "#ffb4b1",
+                "tertiary": "#ffdbd9",
+                "on-surface-variant": "#c3c6d0",
+                "primary-container": "#a4c9ff",
+                "secondary-fixed": "#62fae4",
+                "on-error-container": "#ffdad6",
+                "outline-variant": "#43474f",
+                "surface-container": "#1d2027",
+                "primary-fixed-dim": "#a4c9ff",
+                "tertiary-fixed-dim": "#ffb3b0",
+                "on-primary-fixed": "#001c39",
+                "tertiary-fixed": "#ffdad8",
+                "on-primary": "#00315d",
+                "on-background": "#e0e2ec",
+                "primary": "#d4e4ff",
+                "surface-dim": "#10131a",
+                "on-secondary-fixed": "#00201c",
+                "inverse-primary": "#3a6090",
+                "on-secondary": "#003731",
+                "error": "#ffb4ab",
+                "on-tertiary-fixed-variant": "#6d3736",
+                "on-tertiary-container": "#7b4341",
+                "secondary": "#40e0cb",
+                "secondary-container": "#00c3af",
+                "surface-container-low": "#191b23",
+                "inverse-on-surface": "#2d3038"
+              },
+              fontFamily: {
+                "headline": ["Space Grotesk"],
+                "body": ["Inter"],
+                "label": ["JetBrains Mono"]
+              },
+              borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+            },
+          },
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(50, 53, 60, 0.8);
+            backdrop-filter: blur(12px);
+        }
+        .terminal-glow {
+            box-shadow: 0 0 40px -10px rgba(64, 224, 203, 0.2);
+        }
+        .active-glow {
+            box-shadow: 0 0 15px rgba(164, 201, 255, 0.3);
+        }
+        .mask-fade-bottom {
+            mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-[#10131a]/80 backdrop-blur-xl shadow-[0_20px_40px_rgba(0,0,0,0.4)]">
+<div class="flex justify-between items-center max-w-7xl mx-auto px-8 h-16">
+<div class="text-xl font-bold tracking-tighter text-[#e1e2eb] font-headline">smux</div>
+<div class="hidden md:flex items-center gap-8 font-['Space_Grotesk'] tracking-tight">
+<a class="text-[#a4c9ff] border-b-2 border-[#a4c9ff] pb-1 text-sm" href="#features">Features</a>
+<a class="text-[#8b919d] hover:text-[#e1e2eb] transition-colors text-sm" href="#how-it-works">How It Works</a>
+<a class="text-[#8b919d] hover:text-[#e1e2eb] transition-colors text-sm" href="https://github.com/kwmin122/smux#readme">Documentation</a>
+</div>
+<a href="https://github.com/kwmin122/smux/releases/latest" class="bg-primary-container text-on-primary-container px-4 py-1.5 rounded-lg text-sm font-medium hover:active-glow active:scale-95 transition-all duration-200 no-underline">
+                Download
+            </a>
+</div>
+</nav>
+<main class="pt-16">
+<!-- Hero Section -->
+<section class="relative overflow-hidden pt-20 pb-32">
+<div class="max-w-7xl mx-auto px-8 grid lg:grid-cols-2 gap-16 items-center">
+<div class="z-10">
+<h1 class="font-headline text-5xl md:text-7xl font-bold tracking-tighter mb-4 text-on-surface">smux</h1>
+<p class="font-headline text-2xl md:text-3xl text-primary mb-6">AI-Multiplexed Terminal Sessions</p>
+<p class="text-lg text-on-surface-variant mb-10 max-w-lg leading-relaxed">
+                        여러 AI 에이전트가 동시에 검증하는 코딩 워크플로우
+                    </p>
+<div class="flex flex-col gap-4">
+<a href="https://github.com/kwmin122/smux/releases/latest" class="bg-primary-container text-on-primary-container px-8 py-4 rounded-xl text-lg font-bold flex items-center justify-center gap-3 hover:active-glow transition-all w-fit group no-underline">
+<span class="material-symbols-outlined" data-icon="download">download</span>
+                            Download for macOS
+                        </a>
+<p class="font-label text-xs text-outline tracking-wider">
+                            v0.4 · macOS 12+ · Apple Silicon &amp; Intel
+                        </p>
+</div>
+</div>
+<div class="relative">
+<!-- Terminal Visual -->
+<div class="surface-container-low rounded-xl border border-secondary/20 terminal-glow overflow-hidden shadow-2xl transform rotate-1 lg:rotate-2">
+<div class="bg-surface-container-high px-4 py-2 flex items-center gap-2 border-b border-outline-variant/10">
+<div class="flex gap-1.5">
+<div class="w-3 h-3 rounded-full bg-[#ff5f57]"></div>
+<div class="w-3 h-3 rounded-full bg-[#febc2e]"></div>
+<div class="w-3 h-3 rounded-full bg-[#28c840]"></div>
+</div>
+<div class="mx-auto text-[10px] font-label text-outline uppercase tracking-widest">smux — zsh</div>
+</div>
+<div class="p-6 font-label text-sm leading-relaxed text-secondary/90">
+<div class="flex gap-3 mb-2">
+<span class="text-primary">$</span>
+<span class="text-on-surface">smux start --task "fix auth bug"</span>
+</div>
+<div class="text-outline-variant italic">smux: initializing multiplexer...</div>
+<div class="mt-4 flex flex-col gap-1">
+<div class="flex gap-2">
+<span class="text-secondary">[claude]</span>
+<span>Scanning repository...</span>
+</div>
+<div class="flex gap-2">
+<span class="text-primary-fixed-dim">[codex]</span>
+<span>Tracing call stack...</span>
+</div>
+<div class="w-full h-px bg-outline-variant/10 my-2"></div>
+<div class="animate-pulse flex gap-2 items-center text-secondary">
+<span class="material-symbols-outlined text-xs" data-icon="sync" style="font-variation-settings: 'FILL' 1;">sync</span>
+<span>Cross-verifying consensus...</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Decorative Gradient -->
+<div class="absolute -top-20 -right-20 w-64 h-64 bg-primary/10 blur-[100px] rounded-full"></div>
+</div>
+</div>
+</section>
+<!-- Features Section -->
+<section id="features" class="py-24 bg-surface-container-low">
+<div class="max-w-7xl mx-auto px-8">
+<div class="grid md:grid-cols-3 gap-8">
+<!-- Feature 1 -->
+<div class="p-8 bg-surface-container rounded-xl group hover:bg-surface-container-high transition-all">
+<div class="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center mb-6 text-secondary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-3">Cross-Verify</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">
+                            Claude, Codex, Gemini를 동시에 돌려 합의 도출. 여러 모델의 시각을 결합하여 무결점 코드를 생산합니다.
+                        </p>
+</div>
+<!-- Feature 2 -->
+<div class="p-8 bg-surface-container rounded-xl group hover:bg-surface-container-high transition-all">
+<div class="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-3">Focus &amp; Control</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">
+                            2-패널 Focus 모드와 Mission Control 대시보드 전환. 복잡한 멀티 에이전트 환경을 직관적으로 관리합니다.
+                        </p>
+</div>
+<!-- Feature 3 -->
+<div class="p-8 bg-surface-container rounded-xl group hover:bg-surface-container-high transition-all">
+<div class="w-12 h-12 bg-on-tertiary-container/10 rounded-lg flex items-center justify-center mb-6 text-tertiary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined" data-icon="keyboard">keyboard</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-3">Keyboard-First</h3>
+<p class="text-on-surface-variant text-sm leading-relaxed">
+                            Tab, Cmd+1/2/3으로 모든 조작. 마우스 없이도 완전한 컨트롤이 가능한 터미널 네이티브 경험.
+                        </p>
+</div>
+</div>
+</div>
+</section>
+<!-- How It Works -->
+<section id="how-it-works" class="py-24">
+<div class="max-w-7xl mx-auto px-8">
+<div class="flex flex-col md:flex-row gap-12 items-start">
+<div class="md:w-1/3">
+<h2 class="font-headline text-4xl font-bold tracking-tighter mb-4">How It Works</h2>
+<p class="text-on-surface-variant leading-relaxed">AI 에이전트 합의 시스템을 통한 가장 안전한 자동화 워크플로우</p>
+</div>
+<div class="md:w-2/3 grid gap-12">
+<!-- Step 1 -->
+<div class="flex gap-8 group">
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center font-label text-sm font-bold text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">01</div>
+<div class="flex-grow w-px bg-outline-variant/30 my-4"></div>
+</div>
+<div class="pb-8">
+<h4 class="font-headline text-xl font-bold mb-2">Install</h4>
+<p class="text-on-surface-variant">다운로드하고 앱을 열면 바로 시작. 복잡한 설정 없이 로컬 환경에 즉시 통합됩니다.</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="flex gap-8 group">
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center font-label text-sm font-bold text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">02</div>
+<div class="flex-grow w-px bg-outline-variant/30 my-4"></div>
+</div>
+<div class="pb-8">
+<h4 class="font-headline text-xl font-bold mb-2">Configure</h4>
+<p class="text-on-surface-variant">Planner와 Verifier 선택, 합의 전략 설정. 프로젝트 성격에 맞는 최적의 AI 조합을 구성하세요.</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="flex gap-8 group">
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center font-label text-sm font-bold text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors">03</div>
+</div>
+<div>
+<h4 class="font-headline text-xl font-bold mb-2">Run</h4>
+<p class="text-on-surface-variant">에이전트들이 자동으로 코드를 작성하고 검증. 다수결 또는 만장일치 원칙에 따라 실시간으로 피드백을 주고받습니다.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Terminal Demo -->
+<section class="py-24 bg-surface-container-lowest border-y border-outline-variant/5">
+<div class="max-w-4xl mx-auto px-8">
+<div class="bg-surface rounded-xl overflow-hidden shadow-2xl border border-outline-variant/10">
+<div class="bg-surface-container-high px-4 py-3 flex items-center justify-between border-b border-outline-variant/10">
+<div class="flex gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-outline-variant"></div>
+</div>
+<div class="text-[11px] font-label text-outline uppercase tracking-[0.2em]">Live Session Output</div>
+<div class="w-10"></div>
+</div>
+<pre class="p-8 font-label text-sm md:text-base leading-relaxed text-on-surface-variant overflow-x-auto"><span class="text-primary">$</span> <span class="text-on-surface">smux start --task "fix auth bug" --verifiers claude,codex --consensus majority</span>
+<span class="text-outline">smux: session created — a1b2c3d4-...</span>
+<span class="text-outline">smux: planner=claude verifier=codex verifiers=claude,codex consensus=majority</span>
+
+<span class="text-secondary">[planner]</span> <span class="text-on-surface">Analyzing authentication flow...</span>
+<span class="text-primary-fixed-dim">[verifier]</span> <span class="text-on-surface">Reviewing proposed changes...</span>
+
+<span class="text-secondary-fixed">=== Cross-Verify (round 1) ===</span>
+  <span class="text-secondary">claude:</span> <span class="text-secondary">APPROVED</span> (confidence: 92%) — clean fix
+  <span class="text-primary-fixed-dim">codex:</span> <span class="text-secondary">APPROVED</span> (confidence: 87%) — tests pass
+  <span class="text-on-surface">Final:</span> <span class="text-secondary font-bold">APPROVED</span> (Majority, 100% agreement)
+
+<span class="text-outline">smux: session complete — </span><span class="text-secondary">APPROVED at round 1</span></pre>
+</div>
+</div>
+</section>
+<!-- Download Section -->
+<section class="py-32 text-center relative overflow-hidden">
+<div class="max-w-7xl mx-auto px-8 relative z-10">
+<h2 class="font-headline text-5xl font-bold tracking-tighter mb-6">Elevate Your Workflow</h2>
+<div class="flex flex-col items-center gap-6">
+<a href="https://github.com/kwmin122/smux/releases/latest" class="bg-primary-container text-on-primary-container px-12 py-5 rounded-2xl text-xl font-bold flex items-center gap-4 hover:active-glow transition-all no-underline">
+<span class="material-symbols-outlined text-3xl" data-icon="apple">ios</span>
+                        Download for macOS (.dmg)
+                    </a>
+<div class="text-outline text-sm font-label flex flex-col gap-2">
+<span>macOS 12+, Claude/Codex/Gemini CLI 중 하나 이상</span>
+<a class="text-primary hover:underline flex items-center justify-center gap-1 mt-4" href="https://github.com/kwmin122/smux">
+                            View Source on GitHub
+                            <span class="material-symbols-outlined text-sm" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+</div>
+</div>
+<!-- Background Glow -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-t from-primary/5 to-transparent pointer-events-none"></div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-[#0b0e15] w-full py-12 border-t border-[#272a31]/15">
+<div class="flex flex-col md:flex-row justify-between items-center max-w-7xl mx-auto px-8 gap-4">
+<div class="text-[#8b919d] font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest">
+                © 2026 Kyungwook Min. Personal use only. Commercial licensing available.
+            </div>
+<div class="flex gap-8 font-['JetBrains_Mono'] text-[11px] uppercase tracking-widest">
+<a class="text-[#8b919d] hover:text-[#a4c9ff] transition-colors opacity-80 hover:opacity-100" href="https://github.com/kwmin122/smux">GitHub</a>
+<a class="text-[#8b919d] hover:text-[#a4c9ff] transition-colors opacity-80 hover:opacity-100" href="https://github.com/kwmin122/smux#readme">Docs</a>
+<a class="text-[#8b919d] hover:text-[#a4c9ff] transition-colors opacity-80 hover:opacity-100" href="https://github.com/kwmin122/smux/issues">Support</a>
+</div>
+</div>
+</footer>
+<!-- Thread-Streamer Visual (Decoration) -->
+<div class="fixed right-0 top-0 bottom-0 w-1 pointer-events-none z-40 bg-surface-container-lowest">
+<div class="h-full w-full bg-gradient-to-b from-transparent via-secondary/20 to-transparent"></div>
+</div>
+</body></html>
