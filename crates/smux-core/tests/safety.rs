@@ -205,12 +205,12 @@ fn codex_permission_args_from_config() {
     };
 
     let args = safety::codex_permission_args(&config);
-    assert_eq!(args, vec!["-a", "auto-approve", "-s", "full-write"]);
+    assert_eq!(args, vec!["--full-auto", "-s", "full-write"]);
 }
 
 #[test]
 fn codex_permission_args_default() {
     let config = SafetyConfig::default();
     let args = safety::codex_permission_args(&config);
-    assert_eq!(args, vec!["-a", "on-request", "-s", "workspace-write"]);
+    assert_eq!(args, vec!["--full-auto", "-s", "workspace-write"]);
 }
