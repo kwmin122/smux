@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::UnixStream;
 use tokio::sync::Mutex;
 
@@ -224,6 +224,38 @@ async fn get_git_info() -> Result<GitInfo, String> {
     })
 }
 
+#[tauri::command]
+async fn open_browser_window(app: AppHandle, url: String) -> Result<(), String> {
+    // Validate localhost-only.
+    let parsed = url::Url::parse(&url).map_err(|e| format!("invalid URL: {e}"))?;
+    let host = parsed.host_str().unwrap_or("");
+    if host != "localhost" && host != "127.0.0.1" && host != "[::1]" {
+        return Err("only localhost URLs are allowed".into());
+    }
+
+    // Close existing browser window if any.
+    if let Some(w) = app.get_webview_window("smux-browser") {
+        let _ = w.close();
+    }
+
+    // Open a new native WebView window.
+    tauri::WebviewWindowBuilder::new(&app, "smux-browser", tauri::WebviewUrl::External(parsed))
+        .title(format!("smux browser — {url}"))
+        .inner_size(1024.0, 768.0)
+        .build()
+        .map_err(|e| format!("failed to open browser window: {e}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn close_browser_window(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("smux-browser") {
+        w.close().map_err(|e| format!("failed to close: {e}"))?;
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Event streaming
 // ---------------------------------------------------------------------------
@@ -304,6 +336,8 @@ fn main() {
             list_sessions,
             get_active_session,
             get_git_info,
+            open_browser_window,
+            close_browser_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

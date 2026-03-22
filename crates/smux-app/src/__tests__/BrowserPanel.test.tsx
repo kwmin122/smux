@@ -3,17 +3,15 @@ import { render, screen } from '@testing-library/react'
 import { BrowserPanel } from '../components/BrowserPanel'
 
 describe('BrowserPanel', () => {
-  it('renders URL bar with default localhost URL', () => {
+  it('renders URL input with default localhost URL', () => {
     render(<BrowserPanel onClose={() => {}} />)
-    const input = screen.getByDisplayValue('http://localhost:3000')
+    const input = screen.getByPlaceholderText('http://localhost:3000')
     expect(input).toBeTruthy()
   })
 
-  it('renders navigation buttons', () => {
+  it('renders navigate button', () => {
     render(<BrowserPanel onClose={() => {}} />)
-    expect(screen.getByTitle('Back')).toBeTruthy()
-    expect(screen.getByTitle('Forward')).toBeTruthy()
-    expect(screen.getByTitle('Reload')).toBeTruthy()
+    expect(screen.getByTitle('Navigate')).toBeTruthy()
   })
 
   it('renders close button', () => {
@@ -21,11 +19,9 @@ describe('BrowserPanel', () => {
     expect(screen.getByTitle(/Close browser/)).toBeTruthy()
   })
 
-  it('renders iframe without allow-same-origin', () => {
+  it('does not render an iframe (uses native WebView)', () => {
     const { container } = render(<BrowserPanel onClose={() => {}} />)
     const iframe = container.querySelector('iframe')
-    expect(iframe).toBeTruthy()
-    expect(iframe?.getAttribute('sandbox')).not.toContain('allow-same-origin')
-    expect(iframe?.getAttribute('sandbox')).toContain('allow-scripts')
+    expect(iframe).toBeNull()
   })
 })
