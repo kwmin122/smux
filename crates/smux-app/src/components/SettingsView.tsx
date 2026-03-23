@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { AiExecutionLevel, type ExecutionLevel } from './AiExecutionLevel'
+import { useKeybindings, type KeyPreset } from '../hooks/useKeybindings'
 
 declare global {
   interface Window {
@@ -41,6 +42,7 @@ interface SettingsViewProps {
 export function SettingsView({ onClose, theme, onThemeChange, executionLevel, onExecutionLevelChange }: SettingsViewProps) {
   const [category, setCategory] = useState<SettingsCategory>('general')
   const [config, setConfig] = useState<AppConfig | null>(null)
+  const { bindings, preset, resetToPreset } = useKeybindings()
 
   // Load config on mount
   useEffect(() => {
@@ -229,21 +231,33 @@ export function SettingsView({ onClose, theme, onThemeChange, executionLevel, on
         {category === 'keybindings' && (
           <div className="space-y-6">
             <h3 className="font-headline text-lg font-bold text-on-surface">Keybindings</h3>
+
+            {/* Preset selector */}
+            <SettingRow label="Preset" description="Switch between keybinding presets">
+              <div className="flex gap-2">
+                {(['default', 'tmux', 'vim'] as KeyPreset[]).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => resetToPreset(p)}
+                    className={`px-3 py-1.5 rounded font-mono text-[11px] border transition-colors ${
+                      preset === p ? 'bg-primary text-on-primary border-primary' : 'border-outline-variant/30 text-on-surface-variant hover:border-primary'
+                    }`}
+                  >{p}</button>
+                ))}
+              </div>
+            </SettingRow>
+
+            {/* Binding rows */}
             <div className="space-y-2">
-              {[
-                ['New Tab', '⌘T'],
-                ['Close Tab/Pane', '⌘W'],
-                ['Split Vertical', '⌘D'],
-                ['Split Horizontal', '⌘⇧D'],
-                ['Search', '⌘F'],
-                ['Selection to AI', '⌘L'],
-                ['Toggle Browser', '⌘B'],
-                ['Save Layout', '⌘S'],
-                ['Swap Panels', '⌘⇧S'],
-              ].map(([action, key]) => (
-                <div key={action} className="flex items-center justify-between py-1.5 border-b border-outline-variant/10">
-                  <span className="font-mono text-[12px] text-on-surface-variant">{action}</span>
-                  <kbd className="font-mono text-[11px] px-2 py-0.5 rounded bg-surface-container-high border border-outline-variant/20 text-on-surface">{key}</kbd>
+              {bindings.map(binding => (
+                <div key={binding.id} className="flex items-center justify-between py-1.5 border-b border-outline-variant/10">
+                  <span className="font-mono text-[12px] text-on-surface-variant">{binding.action}</span>
+                  <div className="flex items-center gap-2">
+                    <kbd className="font-mono text-[11px] px-2 py-0.5 rounded bg-surface-container-high border border-outline-variant/20 text-on-surface">
+                      {binding.customKey || binding.defaultKey}
+                    </kbd>
+                    <span className="material-symbols-outlined text-[14px] text-outline/40 hover:text-primary cursor-pointer" title="Edit binding">edit</span>
+                  </div>
                 </div>
               ))}
             </div>

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { LaunchConfigs, DEFAULT_CONFIGS, type LaunchConfig } from './LaunchConfigs'
 
 type Lang = 'ko' | 'en'
 
@@ -75,6 +76,14 @@ export function WelcomeView({ onOpenFolder, onNewSession, daemonRunning }: Welco
   })
 
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
+  const [launchConfigs, setLaunchConfigs] = useState<LaunchConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem('smux-launch-configs')
+      return saved ? [...DEFAULT_CONFIGS, ...JSON.parse(saved)] : [...DEFAULT_CONFIGS]
+    } catch {
+      return [...DEFAULT_CONFIGS]
+    }
+  })
 
   useEffect(() => {
     try { localStorage.setItem('smux-lang', lang) } catch { /* ignore */ }
@@ -82,6 +91,32 @@ export function WelcomeView({ onOpenFolder, onNewSession, daemonRunning }: Welco
 
   useEffect(() => {
     setRecentProjects(getRecentProjects())
+  }, [])
+
+  const handleLaunch = useCallback((config: LaunchConfig) => {
+    const cwd = config.panes[0]?.command ? '' : (config.panes[0]?.name || '')
+    // Launching a config means opening a project — use first pane's cwd or empty string
+    onOpenFolder(cwd || '')
+  }, [onOpenFolder])
+
+  const handleSaveConfig = useCallback((config: LaunchConfig) => {
+    setLaunchConfigs(prev => {
+      const filtered = prev.filter(c => c.id !== config.id)
+      const next = [...filtered, config]
+      // Persist only custom configs
+      const custom = next.filter(c => !DEFAULT_CONFIGS.some(d => d.id === c.id))
+      try { localStorage.setItem('smux-launch-configs', JSON.stringify(custom)) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
+
+  const handleDeleteConfig = useCallback((id: string) => {
+    setLaunchConfigs(prev => {
+      const next = prev.filter(c => c.id !== id)
+      const custom = next.filter(c => !DEFAULT_CONFIGS.some(d => d.id === c.id))
+      try { localStorage.setItem('smux-launch-configs', JSON.stringify(custom)) } catch { /* ignore */ }
+      return next
+    })
   }, [])
 
   const t = text[lang]
@@ -189,6 +224,16 @@ export function WelcomeView({ onOpenFolder, onNewSession, daemonRunning }: Welco
               ))}
             </div>
           )}
+        </section>
+
+        {/* Launch Configs */}
+        <section className="mb-10">
+          <LaunchConfigs
+            configs={launchConfigs}
+            onLaunch={handleLaunch}
+            onSave={handleSaveConfig}
+            onDelete={handleDeleteConfig}
+          />
         </section>
 
         {/* Getting Started Steps */}

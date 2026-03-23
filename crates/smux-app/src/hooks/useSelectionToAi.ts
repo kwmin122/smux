@@ -1,32 +1,29 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { Terminal } from '@xterm/xterm'
+import { useEffect, useState } from 'react'
+
+interface HasSelection {
+  getSelection(): string
+}
 
 /**
  * Hook for Selection-to-AI (⌘L): select text in terminal, send to AI as context.
  *
  * When ⌘L is pressed and there's a selection in the terminal,
- * the selected text is captured and passed to the callback.
+ * the selected text is read directly from the terminal ref and passed to the callback.
  */
-export function useSelectionToAi(onSendToAi?: (text: string) => void) {
-  const [selectedText, setSelectedText] = useState<string>('')
+export function useSelectionToAi(
+  terminalRef: React.RefObject<HasSelection | null>,
+  onSendToAi?: (text: string) => void,
+) {
   const [showToast, setShowToast] = useState(false)
 
-  const captureSelection = useCallback((terminal: Terminal) => {
-    const selection = terminal.getSelection()
-    if (selection) {
-      setSelectedText(selection)
-      return selection
-    }
-    return ''
-  }, [])
-
-  // ⌘L keyboard handler
+  // ⌘L keyboard handler — reads selection directly from terminal to avoid stale closure
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'l') {
-        if (selectedText && onSendToAi) {
+        const selection = terminalRef.current?.getSelection()
+        if (selection && onSendToAi) {
           e.preventDefault()
-          onSendToAi(selectedText)
+          onSendToAi(selection)
           setShowToast(true)
           setTimeout(() => setShowToast(false), 2000)
         }
@@ -34,11 +31,9 @@ export function useSelectionToAi(onSendToAi?: (text: string) => void) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedText, onSendToAi])
+  }, [terminalRef, onSendToAi])
 
   return {
-    selectedText,
     showToast,
-    captureSelection,
   }
 }
