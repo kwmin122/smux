@@ -533,17 +533,12 @@ fn create_pty(
                 std::fs::set_permissions(&custom_zdotdir, std::fs::Permissions::from_mode(0o700));
         }
         let _ = std::fs::write(custom_zdotdir.join(".zshenv"), &zshenv_content);
-        // Copy real zshrc so user config still loads
-        if let Some(home) = dirs::home_dir() {
-            let real_zshrc = home.join(".zshrc");
-            if real_zshrc.exists() {
-                let _ = std::fs::copy(&real_zshrc, custom_zdotdir.join(".zshrc"));
-            }
-            let real_zprofile = home.join(".zprofile");
-            if real_zprofile.exists() {
-                let _ = std::fs::copy(&real_zprofile, custom_zdotdir.join(".zprofile"));
-            }
-        }
+        // Source real zshrc/zprofile instead of copying (avoids stale copies + conda issues)
+        let zshrc_content = "[ -f \"$HOME/.zshrc\" ] && source \"$HOME/.zshrc\" 2>/dev/null\n";
+        let _ = std::fs::write(custom_zdotdir.join(".zshrc"), zshrc_content);
+        let zprofile_content =
+            "[ -f \"$HOME/.zprofile\" ] && source \"$HOME/.zprofile\" 2>/dev/null\n";
+        let _ = std::fs::write(custom_zdotdir.join(".zprofile"), zprofile_content);
         cmd.env("ZDOTDIR", custom_zdotdir.to_string_lossy().to_string());
     }
 
@@ -836,6 +831,48 @@ async fn stream_daemon_events(app: AppHandle, mut stream: UnixStream, _session_i
 }
 
 // ---------------------------------------------------------------------------
+// File explorer commands
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Serialize)]
+struct DirEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+}
+
+#[tauri::command]
+fn list_directory(path: String) -> Result<Vec<DirEntry>, String> {
+    let dir = std::path::Path::new(&path);
+    if !dir.is_dir() {
+        return Err(format!("not a directory: {path}"));
+    }
+    let mut entries = Vec::new();
+    for entry in std::fs::read_dir(dir).map_err(|e| format!("read_dir: {e}"))? {
+        let entry = entry.map_err(|e| format!("entry: {e}"))?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        let file_path = entry.path().to_string_lossy().to_string();
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        entries.push(DirEntry {
+            name,
+            path: file_path,
+            is_dir,
+        });
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+fn read_file(path: String) -> Result<String, String> {
+    // Limit file size to 1MB to prevent OOM
+    let metadata = std::fs::metadata(&path).map_err(|e| format!("metadata: {e}"))?;
+    if metadata.len() > 1_048_576 {
+        return Err("file too large (>1MB)".into());
+    }
+    std::fs::read_to_string(&path).map_err(|e| format!("read: {e}"))
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -863,6 +900,8 @@ fn main() {
             load_app_config,
             save_app_config,
             list_pty_sessions,
+            list_directory,
+            read_file,
             save_session_metadata,
             load_session_metadata,
             api_exec,

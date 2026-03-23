@@ -8,6 +8,8 @@ import { SplitContainer, type SplitNode, createLeaf, splitLeaf, removeLeaf } fro
 import { AiExecutionLevel, type ExecutionLevel } from './components/AiExecutionLevel'
 import { SettingsView } from './components/SettingsView'
 import { FailedCommandOverlay } from './components/FailedCommandOverlay'
+import { FileExplorer } from './components/FileExplorer'
+import { FileViewer } from './components/FileViewer'
 import { usePingPongOrchestrator } from './hooks/usePingPongOrchestrator'
 import type { CommandRecord } from './hooks/useShellIntegration'
 
@@ -79,6 +81,7 @@ function App() {
   const [executionLevel, setExecutionLevel] = useState<ExecutionLevel>('auto')
   const [failedCommand, setFailedCommand] = useState<CommandRecord | null>(null)
   const pingPong = usePingPongOrchestrator()
+  const [viewingFile, setViewingFile] = useState<string | null>(null)
   const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
     // Auto-resume last project if available
     try {
@@ -634,15 +637,48 @@ function App() {
         <nav className="w-48 bg-surface-container-low flex flex-col shrink-0 border-r border-outline-variant/20 z-40">
           {/* Terminal tabs section */}
           {terminalMode === 'terminal' && (
-            <TabBar
-              tabs={tabs}
-              onSelectTab={selectTab}
-              onCloseTab={closeTab}
-              onNewTab={createTab}
-              onRenameTab={renameTab}
-              onChangeColor={changeTabColor}
-              onReorder={reorderTabs}
-            />
+            <>
+              <TabBar
+                tabs={tabs}
+                onSelectTab={selectTab}
+                onCloseTab={closeTab}
+                onNewTab={createTab}
+                onRenameTab={renameTab}
+                onChangeColor={changeTabColor}
+                onReorder={reorderTabs}
+              />
+              {/* File Explorer */}
+              <div className="flex-1 overflow-hidden border-t border-outline-variant/20">
+                <FileExplorer
+                  rootPath={projectDir}
+                  onFileSelect={setViewingFile}
+                  onNavigateBack={() => {
+                    setTerminalMode('idle')
+                    setTabs([])
+                    setActiveTabId(null)
+                    setSplitRoot(null)
+                    setActiveLeafId(null)
+                    setProjectDir('')
+                    setViewingFile(null)
+                    try { localStorage.removeItem('smux-last-project') } catch {}
+                  }}
+                  onOpenFolder={async () => {
+                    try {
+                      const { open } = await import('@tauri-apps/plugin-dialog')
+                      const selected = await open({ directory: true, multiple: false, title: 'Open Folder' })
+                      if (selected && typeof selected === 'string') {
+                        setProjectDir(selected)
+                        setTabs([])
+                        setActiveTabId(null)
+                        setSplitRoot(null)
+                        setViewingFile(null)
+                        try { localStorage.setItem('smux-last-project', selected) } catch {}
+                      }
+                    } catch { /* non-Tauri */ }
+                  }}
+                />
+              </div>
+            </>
           )}
 
           {/* AI Sessions section */}
@@ -754,7 +790,14 @@ function App() {
         <main ref={mainRef} className={`flex-1 flex p-px overflow-hidden ${isBottom ? 'flex-col' : 'flex-row'}`}>
           {/* Terminal Mode: multi-tab PTY shells */}
           {terminalMode === 'terminal' ? (
-            <section className="flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden">
+            {/* File Viewer (shown when a file is selected from explorer) */}
+            {viewingFile && (
+              <div className="border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ height: '50%' }}>
+                <FileViewer filePath={viewingFile} onClose={() => setViewingFile(null)} />
+              </div>
+            )}
+            <section className={`flex-1 flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden ${viewingFile ? 'mt-px' : ''}`}>
               <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                 <div className="flex items-center">
                   <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -844,6 +887,7 @@ function App() {
                 )}
               </div>
             </section>
+            </div>
           ) : terminalMode === 'ai-session' ? (
             <>
               {/* Planner Terminal (Claude) — user can type here too */}
