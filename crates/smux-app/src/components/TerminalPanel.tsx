@@ -43,6 +43,10 @@ interface TerminalPanelProps {
   onCommandComplete?: (cmd: CommandRecord) => void
   /** Callback when CWD changes via shell integration */
   onCwdChange?: (cwd: string) => void
+  /** Font family override (from config) */
+  fontFamily?: string
+  /** Font size override (from config) */
+  fontSize?: number
   /** Callback for every PTY output chunk (used by orchestrator to capture output) */
   onPtyOutput?: (data: string) => void
 }
@@ -75,7 +79,7 @@ function getThemeColors() {
 }
 
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
-  function TerminalPanel({ role, ptyMode = false, cwd, shellCmd, onCommandComplete, onCwdChange, onPtyOutput }, ref) {
+  function TerminalPanel({ role, ptyMode = false, cwd, shellCmd, onCommandComplete, onCwdChange, onPtyOutput, fontFamily, fontSize }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRef = useRef<Terminal | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -123,8 +127,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       if (!containerRef.current) return
 
       const terminal = new Terminal({
-        fontFamily: '"JetBrains Mono", monospace',
-        fontSize: 13,
+        fontFamily: fontFamily ? `"${fontFamily}", monospace` : '"JetBrains Mono", monospace',
+        fontSize: fontSize || 14,
         lineHeight: 1.4,
         cursorBlink: true,
         cursorStyle: 'block',

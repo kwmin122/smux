@@ -194,7 +194,7 @@ export function usePingPongOrchestrator() {
     const output = stopCapture()
 
     // Cleanup temp file
-    terminal.write(`rm -f "${tmpFile}"\n`)
+    terminal.writeToPty(`rm -f "${tmpFile}"\n`)
 
     return output
   }, [startCapture, stopCapture])
