@@ -884,7 +884,7 @@ function App() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedCapture} />
+                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedPlannerOutput} />
                 </div>
               </section>
 
@@ -919,7 +919,7 @@ function App() {
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedCapture} />
+                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedVerifierOutput} />
                 </div>
               </section>
             </>

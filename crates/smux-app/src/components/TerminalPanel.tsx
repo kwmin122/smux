@@ -82,6 +82,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const [showSearch, setShowSearch] = useState(false)
     const [viewportTopLine, setViewportTopLine] = useState(0)
     const [baseY, setBaseY] = useState(0)
+    // Ref to always hold latest onPtyOutput callback (avoids stale closure in PTY listener)
+    const onPtyOutputRef = useRef(onPtyOutput)
+    useEffect(() => { onPtyOutputRef.current = onPtyOutput })
 
     useImperativeHandle(ref, () => ({
       write(data: string) {
@@ -182,8 +185,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               // Apply secret redaction to terminal output before rendering
               const output = redactSecrets(event.payload)
               terminal.write(output)
-              // Feed output to orchestrator for capture (AI ping-pong)
-              onPtyOutput?.(output)
+              // Feed output to orchestrator via ref (avoids stale closure)
+              onPtyOutputRef.current?.(output)
             })
 
             const unlistenExit = await listen(`pty-exit-${tabId}`, () => {

@@ -716,6 +716,15 @@ fn api_exec(
         "pane.write" => {
             let tab_id = params["id"].as_str().ok_or("missing id")?.to_string();
             let data = params["data"].as_str().ok_or("missing data")?.to_string();
+            // Enforce deny-list (same as write_pty)
+            let config = load_config();
+            if data.contains('\n') || data.contains('\r') {
+                for denied in &config.ai.deny_commands {
+                    if data.contains(denied.as_str()) {
+                        return Err(format!("blocked by deny-list: '{denied}'"));
+                    }
+                }
+            }
             let sessions = pty_mgr.sessions.lock().unwrap();
             let session = sessions.get(&tab_id).ok_or("session not found")?;
             session

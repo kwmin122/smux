@@ -30,7 +30,19 @@ export interface PingPongState {
 
 /** Escape content for safe shell echo (double-quote context) */
 function shellEscape(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/!/g, '\\!')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+}
+
+/** Strip ANSI escape sequences from text before feeding to AI */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '')
 }
 
 /** Build the command to run an agent with a prompt from a temp file */
@@ -43,7 +55,7 @@ function agentCmd(agent: string, promptFile: string): string {
     case 'gemini':
       return `cat "${promptFile}" | gemini -p -`
     default:
-      return `echo "Unknown agent: ${agent}"`
+      return `echo "Unknown agent"`
   }
 }
 
@@ -103,23 +115,47 @@ export function usePingPongOrchestrator() {
   // Output capture buffer — filled by the PTY output listener
   const captureBufferRef = useRef('')
   const capturingRef = useRef(false)
+  const capturingTerminalRef = useRef<'planner' | 'verifier' | null>(null)
+  const tempFilesRef = useRef<string[]>([])
+  const MAX_CAPTURE = 1024 * 512 // 512KB cap
 
-  /** Start capturing terminal output */
-  const startCapture = useCallback(() => {
+  /** Start capturing output from a specific terminal */
+  const startCapture = useCallback((terminal?: 'planner' | 'verifier') => {
     captureBufferRef.current = ''
     capturingRef.current = true
+    capturingTerminalRef.current = terminal || null
   }, [])
 
-  /** Stop capturing and return collected output */
+  /** Stop capturing and return collected output (stripped of ANSI) */
   const stopCapture = useCallback((): string => {
     capturingRef.current = false
-    return captureBufferRef.current
+    capturingTerminalRef.current = null
+    return stripAnsi(captureBufferRef.current)
   }, [])
 
-  /** Feed data into capture buffer (call this from PTY output listener) */
-  const feedCapture = useCallback((data: string) => {
-    if (capturingRef.current) {
-      captureBufferRef.current += data
+  /** Feed data into capture buffer — only from the active terminal */
+  const feedPlannerOutput = useCallback((data: string) => {
+    if (capturingRef.current && (capturingTerminalRef.current === 'planner' || capturingTerminalRef.current === null)) {
+      if (captureBufferRef.current.length < MAX_CAPTURE) {
+        captureBufferRef.current += data
+      }
+    }
+  }, [])
+
+  const feedVerifierOutput = useCallback((data: string) => {
+    if (capturingRef.current && (capturingTerminalRef.current === 'verifier' || capturingTerminalRef.current === null)) {
+      if (captureBufferRef.current.length < MAX_CAPTURE) {
+        captureBufferRef.current += data
+      }
+    }
+  }, [])
+
+  /** Clean up all temp files */
+  const cleanupTempFiles = useCallback(() => {
+    if (plannerRef.current && tempFilesRef.current.length > 0) {
+      const files = tempFilesRef.current.join(' ')
+      plannerRef.current.write(`rm -f ${files} 2>/dev/null\n`)
+      tempFilesRef.current = []
     }
   }, [])
 
@@ -129,23 +165,24 @@ export function usePingPongOrchestrator() {
     agent: string,
     prompt: string,
     label: string,
+    which: 'planner' | 'verifier' = 'planner',
   ): Promise<string> => {
-    const tmpFile = `/tmp/smux-pp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.txt`
+    // Use secure temp dir with crypto random name
+    const rnd = crypto.getRandomValues(new Uint8Array(16))
+    const hex = Array.from(rnd).map(b => b.toString(16).padStart(2, '0')).join('')
+    const tmpFile = `$HOME/.smux/tmp/smux-pp-${hex}.txt`
     const escaped = shellEscape(prompt)
 
-    // Write prompt to temp file
-    terminal.write(`printf '%s' "${escaped}" > "${tmpFile}"\n`)
-    await new Promise(r => setTimeout(r, 300))
-
-    // Show what we're doing
+    // Ensure temp dir exists, write prompt, then run agent — all chained with &&
+    tempFilesRef.current.push(tmpFile)
     terminal.writeln(`\x1b[36m━━━ ${label} ━━━\x1b[0m`)
 
-    // Start capturing output
-    startCapture()
+    // Start capturing output from this specific terminal only
+    startCapture(which)
 
-    // Run agent
+    // Chain: mkdir → write prompt → run agent (no race condition)
     const cmd = agentCmd(agent, tmpFile)
-    terminal.write(cmd + '\n')
+    terminal.write(`mkdir -p "$HOME/.smux/tmp" && chmod 700 "$HOME/.smux/tmp" && printf '%s' "${escaped}" > "${tmpFile}" && chmod 600 "${tmpFile}" && ${cmd}\n`)
 
     // Wait for completion (output stabilizes)
     await waitForStable(45000)
@@ -210,7 +247,7 @@ export function usePingPongOrchestrator() {
       }
 
       // Run planner
-      const plannerOutput = await runAgent(planner, plannerAgent.current, plannerPrompt, `${phase} R${round} / Planner`)
+      const plannerOutput = await runAgent(planner, plannerAgent.current, plannerPrompt, `${phase} R${round} / Planner`, 'planner')
       if (abortRef.current) return
 
       updateStatus(phase, round, `${phase} R${round} — Verifier reviewing...`, true)
@@ -226,7 +263,7 @@ export function usePingPongOrchestrator() {
       }
 
       // Run verifier
-      const verifierOutput = await runAgent(verifier, verifierAgent.current, verifierPrompt, `${phase} R${round} / Verifier`)
+      const verifierOutput = await runAgent(verifier, verifierAgent.current, verifierPrompt, `${phase} R${round} / Verifier`, 'verifier')
       if (abortRef.current) return
 
       const verdict = detectVerdict(verifierOutput)
@@ -285,13 +322,16 @@ export function usePingPongOrchestrator() {
   const abort = useCallback(() => {
     abortRef.current = true
     capturingRef.current = false
+    capturingTerminalRef.current = null
+    cleanupTempFiles()
     updateStatus('idle', 0, 'Aborted', false)
-  }, [updateStatus])
+  }, [updateStatus, cleanupTempFiles])
 
   return {
     ...state,
     start,
     abort,
-    feedCapture,
+    feedPlannerOutput,
+    feedVerifierOutput,
   }
 }
