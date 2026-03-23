@@ -365,7 +365,9 @@ async fn get_git_info(cwd: Option<String>) -> Result<GitInfo, String> {
     let branch = tokio::process::Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(&work_dir)
-        .env("GIT_TERMINAL_PROMPT", "0") // Suppress credential popups
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "echo") // Suppress macOS keychain popup
+        .env("SSH_ASKPASS", "echo") // Suppress SSH credential popup
         .output()
         .await
         .map_err(|e| format!("git error: {e}"))
@@ -380,6 +382,8 @@ async fn get_git_info(cwd: Option<String>) -> Result<GitInfo, String> {
         .args(["status", "--short"])
         .current_dir(&work_dir)
         .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "echo")
+        .env("SSH_ASKPASS", "echo")
         .output()
         .await
         .map(|o| {
