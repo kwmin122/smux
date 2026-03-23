@@ -593,6 +593,93 @@ fn close_pty(pty_mgr: tauri::State<PtyManager>, tab_id: String) -> Result<(), St
 }
 
 // ---------------------------------------------------------------------------
+// Session persistence & API
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Serialize)]
+struct PtySessionInfo {
+    id: String,
+    active: bool,
+}
+
+/// List all active PTY sessions (for session persistence / detach-reattach).
+#[tauri::command]
+fn list_pty_sessions(pty_mgr: tauri::State<PtyManager>) -> Vec<PtySessionInfo> {
+    pty_mgr
+        .sessions
+        .lock()
+        .unwrap()
+        .keys()
+        .map(|id| PtySessionInfo {
+            id: id.clone(),
+            active: true,
+        })
+        .collect()
+}
+
+/// Save session metadata for persistence across app restarts.
+#[tauri::command]
+fn save_session_metadata(sessions: Vec<serde_json::Value>) -> Result<(), String> {
+    let path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join(".smux")
+        .join("sessions.json");
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let content = serde_json::to_string_pretty(&sessions).map_err(|e| format!("serialize: {e}"))?;
+    std::fs::write(&path, content).map_err(|e| format!("write: {e}"))
+}
+
+/// Load saved session metadata.
+#[tauri::command]
+fn load_session_metadata() -> Vec<serde_json::Value> {
+    let path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+        .join(".smux")
+        .join("sessions.json");
+    match std::fs::read_to_string(&path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(_) => vec![],
+    }
+}
+
+/// Socket API handler — execute a JSON-RPC style command.
+/// This enables external tools/agents to control smux programmatically.
+#[tauri::command]
+fn api_exec(
+    pty_mgr: tauri::State<PtyManager>,
+    method: String,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    match method.as_str() {
+        "session.list" => {
+            let sessions: Vec<String> = pty_mgr.sessions.lock().unwrap().keys().cloned().collect();
+            Ok(serde_json::json!({ "sessions": sessions }))
+        }
+        "pane.write" => {
+            let tab_id = params["id"].as_str().ok_or("missing id")?.to_string();
+            let data = params["data"].as_str().ok_or("missing data")?.to_string();
+            let sessions = pty_mgr.sessions.lock().unwrap();
+            let session = sessions.get(&tab_id).ok_or("session not found")?;
+            session
+                .writer
+                .lock()
+                .unwrap()
+                .write_all(data.as_bytes())
+                .map_err(|e| format!("write: {e}"))?;
+            Ok(serde_json::json!({ "ok": true }))
+        }
+        "pane.close" => {
+            let tab_id = params["id"].as_str().ok_or("missing id")?.to_string();
+            pty_mgr.sessions.lock().unwrap().remove(&tab_id);
+            Ok(serde_json::json!({ "ok": true }))
+        }
+        _ => Err(format!("unknown method: {method}")),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Event streaming
 // ---------------------------------------------------------------------------
 
@@ -683,6 +770,10 @@ fn main() {
             close_pty,
             load_app_config,
             save_app_config,
+            list_pty_sessions,
+            save_session_metadata,
+            load_session_metadata,
+            api_exec,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
