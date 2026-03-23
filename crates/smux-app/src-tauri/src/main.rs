@@ -362,12 +362,37 @@ async fn get_git_info(cwd: Option<String>) -> Result<GitInfo, String> {
         .or_else(|| std::env::var("HOME").ok())
         .unwrap_or_else(|| "/".to_string());
 
-    let branch = tokio::process::Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+    // First check if this is even a git repo (fast, no network, no credentials)
+    let is_git_repo = tokio::process::Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
         .current_dir(&work_dir)
         .env("GIT_TERMINAL_PROMPT", "0")
-        .env("GIT_ASKPASS", "echo") // Suppress macOS keychain popup
-        .env("SSH_ASKPASS", "echo") // Suppress SSH credential popup
+        .env("GIT_ASKPASS", "/usr/bin/true")
+        .output()
+        .await
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if !is_git_repo {
+        return Ok(GitInfo {
+            branch: "—".to_string(),
+            files_changed: 0,
+        });
+    }
+
+    let branch = tokio::process::Command::new("git")
+        .args([
+            "-c",
+            "credential.helper=",
+            "rev-parse",
+            "--abbrev-ref",
+            "HEAD",
+        ])
+        .current_dir(&work_dir)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_ASKPASS", "/usr/bin/true")
+        .env("SSH_ASKPASS", "/usr/bin/true")
+        .env("DISPLAY", "") // Prevent X11 askpass
         .output()
         .await
         .map_err(|e| format!("git error: {e}"))
@@ -379,11 +404,12 @@ async fn get_git_info(cwd: Option<String>) -> Result<GitInfo, String> {
         .unwrap_or_else(|_| "unknown".into());
 
     let files_changed = tokio::process::Command::new("git")
-        .args(["status", "--short"])
+        .args(["-c", "credential.helper=", "status", "--short"])
         .current_dir(&work_dir)
         .env("GIT_TERMINAL_PROMPT", "0")
-        .env("GIT_ASKPASS", "echo")
-        .env("SSH_ASKPASS", "echo")
+        .env("GIT_ASKPASS", "/usr/bin/true")
+        .env("SSH_ASKPASS", "/usr/bin/true")
+        .env("DISPLAY", "")
         .output()
         .await
         .map(|o| {
