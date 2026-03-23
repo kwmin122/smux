@@ -10,6 +10,7 @@ import { SettingsView } from './components/SettingsView'
 import { FailedCommandOverlay } from './components/FailedCommandOverlay'
 import { FileExplorer } from './components/FileExplorer'
 import { FileViewer } from './components/FileViewer'
+import { AgentSetup } from './components/AgentSetup'
 import { usePingPongOrchestrator } from './hooks/usePingPongOrchestrator'
 import type { CommandRecord } from './hooks/useShellIntegration'
 
@@ -82,6 +83,9 @@ function App() {
   const [failedCommand, setFailedCommand] = useState<CommandRecord | null>(null)
   const pingPong = usePingPongOrchestrator()
   const [viewingFile, setViewingFile] = useState<string | null>(null)
+  const [showAgentSetup, setShowAgentSetup] = useState(false)
+  const [selectedPlanner, setSelectedPlanner] = useState('claude')
+  const [selectedVerifier, setSelectedVerifier] = useState('claude')
   const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
     // Auto-resume last project if available
     try {
@@ -807,7 +811,7 @@ function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setTerminalMode('ai-session')}
+                    onClick={() => setShowAgentSetup(true)}
                     className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 transition-colors"
                   >
                     AI PING-PONG
@@ -988,11 +992,10 @@ function App() {
                   if (selected && typeof selected === 'string') {
                     setProjectDir(selected)
                     try { localStorage.setItem('smux-last-project', selected) } catch {}
-                    setTerminalMode('ai-session')
+                    setShowAgentSetup(true)
                   }
                 } catch {
-                  // Non-Tauri fallback
-                  setTerminalMode('ai-session')
+                  setShowAgentSetup(true)
                 }
               }}
               daemonRunning={daemonRunning}
@@ -1160,7 +1163,25 @@ function App() {
       )}
 
       {/* AI Task Prompt Modal */}
-      {/* AI prompt modal removed — chat UI handles input directly */}
+      {/* Agent Setup Modal */}
+      {showAgentSetup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={() => setShowAgentSetup(false)}>
+          <div className="bg-surface-container-high rounded-lg border border-outline-variant/20 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <AgentSetup
+              onReady={(p, v) => {
+                setSelectedPlanner(p)
+                setSelectedVerifier(v)
+                setShowAgentSetup(false)
+                setTerminalMode('ai-session')
+              }}
+              onSkip={() => {
+                setShowAgentSetup(false)
+                setTerminalMode('ai-session')
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

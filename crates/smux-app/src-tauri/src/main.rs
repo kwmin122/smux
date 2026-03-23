@@ -831,6 +831,42 @@ async fn stream_daemon_events(app: AppHandle, mut stream: UnixStream, _session_i
 }
 
 // ---------------------------------------------------------------------------
+// Agent detection
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Serialize)]
+struct AgentStatus {
+    name: String,
+    installed: bool,
+    path: Option<String>,
+}
+
+#[tauri::command]
+async fn detect_agents() -> Vec<AgentStatus> {
+    let agents = ["claude", "codex", "gemini"];
+    let mut results = Vec::new();
+    for agent in &agents {
+        let output = tokio::process::Command::new("which")
+            .arg(agent)
+            .output()
+            .await;
+        let (installed, path) = match output {
+            Ok(o) if o.status.success() => {
+                let p = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                (true, Some(p))
+            }
+            _ => (false, None),
+        };
+        results.push(AgentStatus {
+            name: agent.to_string(),
+            installed,
+            path,
+        });
+    }
+    results
+}
+
+// ---------------------------------------------------------------------------
 // File explorer commands
 // ---------------------------------------------------------------------------
 
@@ -902,6 +938,7 @@ fn main() {
             list_pty_sessions,
             list_directory,
             read_file,
+            detect_agents,
             save_session_metadata,
             load_session_metadata,
             api_exec,
