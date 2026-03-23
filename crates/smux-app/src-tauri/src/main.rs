@@ -119,9 +119,22 @@ fn save_config(config: &AppConfig) -> Result<(), String> {
     let path = config_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir failed: {e}"))?;
+        // Set restrictive permissions on ~/.smux directory
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700));
+        }
     }
     let content = toml::to_string_pretty(config).map_err(|e| format!("serialize failed: {e}"))?;
-    std::fs::write(&path, content).map_err(|e| format!("write failed: {e}"))
+    std::fs::write(&path, content).map_err(|e| format!("write failed: {e}"))?;
+    // Set restrictive permissions on config file
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -413,12 +426,16 @@ async fn close_browser_window(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn create_pty(
+    window: tauri::Window,
     pty_mgr: tauri::State<PtyManager>,
     rows: Option<u16>,
     cols: Option<u16>,
     cwd: Option<String>,
     shell_cmd: Option<String>,
 ) -> Result<String, String> {
+    if window.label() != "main" {
+        return Err("create_pty restricted to main window".into());
+    }
     let rows = rows.unwrap_or(24);
     let cols = cols.unwrap_or(80);
 
@@ -459,12 +476,8 @@ fn create_pty(
         "/opt/homebrew/bin/bash",
         "/opt/homebrew/bin/fish",
     ];
-    if !allowed_shells.iter().any(|s| shell == *s)
-        && !shell.ends_with("/zsh")
-        && !shell.ends_with("/bash")
-        && !shell.ends_with("/sh")
-        && !shell.ends_with("/fish")
-    {
+    // Strict allowlist — no ends_with fallback (prevents /tmp/evil/zsh bypass)
+    if !allowed_shells.iter().any(|s| shell == *s) {
         return Err(format!("shell not in allowlist: {shell}"));
     }
 
@@ -590,10 +603,15 @@ fn start_pty(
 
 #[tauri::command]
 fn write_pty(
+    window: tauri::Window,
     pty_mgr: tauri::State<PtyManager>,
     tab_id: String,
     data: String,
 ) -> Result<(), String> {
+    // Block calls from browser WebView (prevent XSS→RCE)
+    if window.label() != "main" {
+        return Err("write_pty restricted to main window".into());
+    }
     // Enforce deny-list: block commands that match dangerous patterns
     let config = load_config();
     if data.contains('\n') || data.contains('\r') {

@@ -47,11 +47,14 @@ function stripAnsi(s: string): string {
 
 /** Build the command to run an agent with a prompt from a temp file */
 function agentCmd(agent: string, promptFile: string): string {
+  // NOTE: Do NOT hardcode --dangerously-skip-permissions or --full-auto.
+  // The user must explicitly opt-in via execution level settings.
+  // Default: agents run in interactive/safe mode requiring confirmation.
   switch (agent) {
     case 'claude':
-      return `cat "${promptFile}" | claude -p --dangerously-skip-permissions -`
+      return `cat "${promptFile}" | claude -p -`
     case 'codex':
-      return `cat "${promptFile}" | codex exec --full-auto -`
+      return `cat "${promptFile}" | codex exec -`
     case 'gemini':
       return `cat "${promptFile}" | gemini -p -`
     default:

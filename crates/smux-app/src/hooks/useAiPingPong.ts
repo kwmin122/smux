@@ -37,12 +37,12 @@ function buildAgentCommand(agent: string, promptFile: string, mode: 'plan' | 're
   switch (agent) {
     case 'claude':
       return reviewPrefix
-        ? `(echo "${reviewPrefix}" && cat "${promptFile}") | claude -p --dangerously-skip-permissions -`
-        : `cat "${promptFile}" | claude -p --dangerously-skip-permissions -`
+        ? `(echo "${reviewPrefix}" && cat "${promptFile}") | claude -p -`
+        : `cat "${promptFile}" | claude -p -`
     case 'codex':
       return reviewPrefix
-        ? `(echo "${reviewPrefix}" && cat "${promptFile}") | codex exec --full-auto -`
-        : `cat "${promptFile}" | codex exec --full-auto -`
+        ? `(echo "${reviewPrefix}" && cat "${promptFile}") | codex exec -`
+        : `cat "${promptFile}" | codex exec -`
     case 'gemini':
       return reviewPrefix
         ? `(echo "${reviewPrefix}" && cat "${promptFile}") | gemini -p -`
