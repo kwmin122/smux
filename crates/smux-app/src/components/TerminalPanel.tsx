@@ -163,10 +163,15 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         terminalLinks.attach(terminal)
       }
 
-      // Track scroll position for sticky scroll + command gutter
+      // Track scroll position (throttled to ~20fps to avoid excessive React re-renders)
+      let scrollRaf = 0
       const scrollDisposable = terminal.onScroll(() => {
-        setViewportTopLine(terminal.buffer.active.viewportY)
-        setBaseY(terminal.buffer.active.baseY)
+        if (scrollRaf) return
+        scrollRaf = requestAnimationFrame(() => {
+          scrollRaf = 0
+          setViewportTopLine(terminal.buffer.active.viewportY)
+          setBaseY(terminal.buffer.active.baseY)
+        })
       })
 
       if (!ptyMode) {

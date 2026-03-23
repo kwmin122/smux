@@ -143,7 +143,9 @@ fn load_app_config() -> AppConfig {
 }
 
 #[tauri::command]
-fn save_app_config(config: AppConfig) -> Result<(), String> {
+fn save_app_config(pty_mgr: tauri::State<PtyManager>, config: AppConfig) -> Result<(), String> {
+    // Refresh cached deny-list
+    *pty_mgr.deny_list.lock().unwrap() = config.ai.deny_commands.clone();
     save_config(&config)
 }
 
@@ -160,13 +162,17 @@ struct PtySession {
 struct PtyManager {
     sessions: std::sync::Mutex<HashMap<String, PtySession>>,
     pending_readers: std::sync::Mutex<HashMap<String, Box<dyn Read + Send>>>,
+    /// Cached deny-list from config (refreshed on save_app_config)
+    deny_list: std::sync::Mutex<Vec<String>>,
 }
 
 impl PtyManager {
     fn new() -> Self {
+        let config = load_config();
         Self {
             sessions: std::sync::Mutex::new(HashMap::new()),
             pending_readers: std::sync::Mutex::new(HashMap::new()),
+            deny_list: std::sync::Mutex::new(config.ai.deny_commands),
         }
     }
 }
@@ -612,11 +618,10 @@ fn write_pty(
     if window.label() != "main" {
         return Err("write_pty restricted to main window".into());
     }
-    // Enforce deny-list: block commands that match dangerous patterns
-    let config = load_config();
+    // Enforce deny-list from cached config (no disk read per keystroke)
     if data.contains('\n') || data.contains('\r') {
-        // Only check command-like input (lines ending with newline = command execution)
-        for denied in &config.ai.deny_commands {
+        let deny_list = pty_mgr.deny_list.lock().unwrap();
+        for denied in deny_list.iter() {
             if data.contains(denied.as_str()) {
                 return Err(format!("blocked by deny-list: command contains '{denied}'"));
             }
@@ -734,10 +739,10 @@ fn api_exec(
         "pane.write" => {
             let tab_id = params["id"].as_str().ok_or("missing id")?.to_string();
             let data = params["data"].as_str().ok_or("missing data")?.to_string();
-            // Enforce deny-list (same as write_pty)
-            let config = load_config();
+            // Enforce deny-list from cache (same as write_pty)
             if data.contains('\n') || data.contains('\r') {
-                for denied in &config.ai.deny_commands {
+                let deny_list = pty_mgr.deny_list.lock().unwrap();
+                for denied in deny_list.iter() {
                     if data.contains(denied.as_str()) {
                         return Err(format!("blocked by deny-list: '{denied}'"));
                     }
