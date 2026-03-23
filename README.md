@@ -27,14 +27,41 @@ Planner (Claude) → writes code → Verifier (Codex) → "That's a workaround, 
 
 ## Features
 
-- **Auto ping-pong** — Planner ↔ Verifier loop with automatic context passing
-- **Stop detection** — JSON verdict parsing with keyword fallback
-- **Rewind** — `git reset --hard` + `git clean -fd` to any previous round
-- **Git worktree isolation** — Every session on its own branch
-- **Daemon** — Sessions survive terminal close (`smux attach/detach`)
-- **Self-healing** — Stuck agent detection, auto-restart with state restore
-- **Safety** — Provider permission flags + post-hoc git diff audit
-- **Multi-provider** — Claude Code + Codex CLI (Gemini planned)
+### Terminal Basics
+- **Multi-tab terminals** — Create, rename, color-code, reorder tabs
+- **Split panes (⌘D / ⌘⇧D)** — Recursive H/V splits with resize handles and pane zoom
+- **Terminal search (⌘F)** — Regex, case-sensitive, match count
+- **Clickable links** — URLs open in browser, `file:line:col` patterns detected
+- **Shell Integration (OSC 633)** — Command boundaries, exit codes, CWD tracking
+- **Command decorations** — Exit code gutter dots (green/red/yellow)
+- **Sticky scroll** — Pinned command header when scrolling through output
+- **WebGL rendering** — GPU-accelerated with canvas fallback
+- **CJK/Korean support** — Unicode 11 character widths + IME composition
+
+### AI Ping-Pong
+- **3-phase orchestration** — Ideation → Planning → Execution, auto-advance on APPROVED
+- **Terminal-to-terminal** — Both panels are real PTYs; user can type in either at any time
+- **Auto ping-pong** — Left output captured → piped to right → verdict detected → iterate
+- **4-tier safety** — Disabled / Allowlist / Auto / Turbo execution levels
+- **Failed command analysis** — Non-zero exit → "Fix with AI" overlay
+- **Selection-to-AI (⌘L)** — Select text, send to AI as context
+- **Cross-verification consensus** — Multiple verifiers, voting strategies
+
+### Configuration & UX
+- **Config file** — `~/.smux/config.toml` with all settings
+- **Full settings view** — 5 categories: General, Appearance, Terminal, AI, Keybindings
+- **Keybinding presets** — Default / tmux / vim, custom overrides
+- **Launch configurations** — Saved workspace presets with auto-commands
+- **Secret redaction** — API keys, tokens, credentials auto-masked in output
+- **Git integration** — Branch + changed files in sidebar
+- **macOS notifications** — Phase transitions, errors, completion
+
+### Security
+- **Shell injection prevention** — Prompts via temp files + stdin pipe
+- **Deny-list enforcement** — Dangerous commands blocked at PTY write level
+- **API access control** — Socket API restricted to main window
+- **Path validation** — Shell allowlist, CWD existence check, link path validation
+- **ZDOTDIR hardening** — 0700 permissions on shell integration files
 
 ## Quick Start
 
