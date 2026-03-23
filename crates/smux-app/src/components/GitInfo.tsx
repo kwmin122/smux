@@ -95,7 +95,7 @@ export function GitInfo({ branch, filesChanged, onAutoCommit }: GitInfoProps) {
       <span
         className={`inline-flex items-center justify-center rounded-full px-1.5 min-w-[18px] h-[16px] text-[9px] font-bold leading-none ${
           filesChanged > 0
-            ? 'bg-yellow-400/20 text-yellow-400'
+            ? 'bg-tertiary/20 text-tertiary'
             : 'bg-outline-variant/20 text-outline'
         }`}
         title={`${filesChanged} file${filesChanged !== 1 ? 's' : ''} changed`}

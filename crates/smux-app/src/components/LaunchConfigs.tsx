@@ -190,6 +190,7 @@ export function LaunchConfigs({ configs, onLaunch, onSave, onDelete }: LaunchCon
                   onClick={() => onDelete(config.id)}
                   className="flex items-center px-1.5 py-1 rounded text-outline hover:text-error hover:bg-error/10 transition-colors opacity-0 group-hover:opacity-100"
                   title="Delete config"
+                  aria-label="Delete config"
                 >
                   <span className="material-symbols-outlined text-[14px]">delete</span>
                 </button>

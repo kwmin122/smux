@@ -59,8 +59,8 @@ export function StickyScroll({ commands, viewportTopLine, visible }: StickyScrol
           <span
             className={`font-mono text-[10px] font-medium px-1.5 rounded-sm ${
               exitCode === 0
-                ? 'bg-green-500/15 text-green-400'
-                : 'bg-red-500/15 text-red-400'
+                ? 'bg-secondary/15 text-secondary'
+                : 'bg-error/15 text-error'
             }`}
           >
             {exitCode}

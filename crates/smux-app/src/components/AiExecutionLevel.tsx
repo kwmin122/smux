@@ -4,7 +4,7 @@ export type ExecutionLevel = 'disabled' | 'allowlist' | 'auto' | 'turbo'
 
 const LEVEL_INFO: Record<ExecutionLevel, { label: string; color: string; description: string }> = {
   disabled: { label: 'OFF', color: 'text-outline', description: 'AI suggests only, no auto-execution' },
-  allowlist: { label: 'SAFE', color: 'text-yellow-400', description: 'Only allowed commands auto-execute' },
+  allowlist: { label: 'SAFE', color: 'text-tertiary', description: 'Only allowed commands auto-execute' },
   auto: { label: 'AUTO', color: 'text-secondary', description: 'AI judges safety before executing' },
   turbo: { label: 'TURBO', color: 'text-error', description: 'All commands auto-execute (YOLO)' },
 }
@@ -31,6 +31,7 @@ export function AiExecutionLevel({ level, onChange, compact = false }: AiExecuti
         <button
           onClick={() => setShowPicker(!showPicker)}
           className={`font-mono text-[9px] font-bold px-2 py-0.5 rounded border border-outline-variant/30 ${info.color} hover:opacity-80 transition-colors cursor-pointer`}
+          aria-label={`AI execution level: ${info.label}`}
         >
           {info.label}
         </button>
@@ -91,6 +92,7 @@ export function AiExecutionLevel({ level, onChange, compact = false }: AiExecuti
 /**
  * Check if a command is allowed to auto-execute based on the current level.
  */
+// TODO: Wire this into the orchestrator's command execution path
 export function isCommandAllowed(
   command: string,
   level: ExecutionLevel,

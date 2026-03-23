@@ -84,14 +84,18 @@ export function TabBar({ tabs, onSelectTab, onCloseTab, onNewTab, onRenameTab, o
             onClick={onNewTab}
             className="material-symbols-outlined text-[14px] text-outline hover:text-primary transition-colors cursor-pointer"
             title="New Terminal (⌘T)"
+            aria-label="New tab"
           >
             add
           </button>
         </div>
-        <div className="space-y-0.5">
+        <div className="space-y-0.5" role="tablist">
           {tabs.map(tab => (
             <div
               key={tab.id}
+              role="tab"
+              aria-selected={tab.isActive}
+              tabIndex={tab.isActive ? 0 : -1}
               draggable
               onDragStart={() => handleDragStart(tab.id)}
               onDragOver={(e) => handleDragOver(e, tab.id)}
@@ -130,6 +134,7 @@ export function TabBar({ tabs, onSelectTab, onCloseTab, onNewTab, onRenameTab, o
                 <button
                   onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id) }}
                   className="material-symbols-outlined text-[12px] text-outline hover:text-error opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Close tab"
                 >
                   close
                 </button>
@@ -170,6 +175,7 @@ export function TabBar({ tabs, onSelectTab, onCloseTab, onNewTab, onRenameTab, o
                       c === 'cyan' ? 'bg-cyan-400' :
                       'bg-orange-400'
                     }`}
+                    aria-label={`Set tab color to ${c}`}
                   />
                 ))}
               </div>

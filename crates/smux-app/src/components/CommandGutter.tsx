@@ -14,11 +14,11 @@ const DOT_SIZE = 6
 function statusClasses(status: CommandRecord['status']): string {
   switch (status) {
     case 'success':
-      return 'bg-green-400'
+      return 'bg-secondary'
     case 'error':
-      return 'bg-red-400'
+      return 'bg-error'
     case 'running':
-      return 'bg-yellow-400 animate-pulse'
+      return 'bg-tertiary animate-pulse'
     case 'unknown':
     default:
       return 'bg-outline/50'
@@ -60,7 +60,7 @@ export function CommandGutter({ commands, terminalElement, lineHeight, baseY }: 
             {/* Faint red row highlight for errors */}
             {isError && (
               <div
-                className="absolute inset-0 bg-red-400/10 rounded-sm"
+                className="absolute inset-0 bg-error/10 rounded-sm"
                 style={{ width: 'calc(100% + 1000px)' }}
               />
             )}
@@ -79,6 +79,7 @@ export function CommandGutter({ commands, terminalElement, lineHeight, baseY }: 
                 left: (GUTTER_WIDTH - DOT_SIZE) / 2,
               }}
               title={`${cmd.command || '(empty)'} — exit ${cmd.exitCode ?? '?'}`}
+              aria-label={`Command: ${cmd.command || '(empty)'}, exit ${cmd.exitCode ?? '?'}`}
               onClick={() => handleDotClick(cmd)}
             />
           </div>

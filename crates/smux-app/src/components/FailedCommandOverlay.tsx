@@ -26,6 +26,7 @@ export function FailedCommandOverlay({ command, onFixWithAi, onDismiss }: Failed
         <button
           onClick={onDismiss}
           className="ml-auto material-symbols-outlined text-[14px] text-outline hover:text-on-surface cursor-pointer"
+          aria-label="Dismiss"
         >
           close
         </button>

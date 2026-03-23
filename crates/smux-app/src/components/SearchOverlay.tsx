@@ -117,6 +117,7 @@ export function SearchOverlay({ terminal, onClose }: SearchOverlayProps) {
         disabled={resultCount === 0}
         className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary disabled:text-outline/40 transition-colors"
         title="Previous match (Shift+Enter)"
+        aria-label="Previous match"
       >
         <span className="material-symbols-outlined text-[16px]">keyboard_arrow_up</span>
       </button>
@@ -127,6 +128,7 @@ export function SearchOverlay({ terminal, onClose }: SearchOverlayProps) {
         disabled={resultCount === 0}
         className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary disabled:text-outline/40 transition-colors"
         title="Next match (Enter)"
+        aria-label="Next match"
       >
         <span className="material-symbols-outlined text-[16px]">keyboard_arrow_down</span>
       </button>
@@ -140,6 +142,8 @@ export function SearchOverlay({ terminal, onClose }: SearchOverlayProps) {
             : 'border-transparent text-outline hover:text-on-surface-variant'
         }`}
         title="Use regular expression"
+        aria-label="Toggle regular expression"
+        aria-pressed={regex}
       >
         .*
       </button>
@@ -153,6 +157,8 @@ export function SearchOverlay({ terminal, onClose }: SearchOverlayProps) {
             : 'border-transparent text-outline hover:text-on-surface-variant'
         }`}
         title="Match case"
+        aria-label="Toggle case sensitivity"
+        aria-pressed={caseSensitive}
       >
         Aa
       </button>
@@ -162,6 +168,7 @@ export function SearchOverlay({ terminal, onClose }: SearchOverlayProps) {
         onClick={onClose}
         className="w-6 h-6 flex items-center justify-center text-outline hover:text-error transition-colors"
         title="Close (Esc)"
+        aria-label="Close search"
       >
         <span className="material-symbols-outlined text-[14px]">close</span>
       </button>

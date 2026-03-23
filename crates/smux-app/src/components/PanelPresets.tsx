@@ -1,3 +1,4 @@
+// TODO: Integrate into AI session setup UI
 export interface PanelPreset {
   id: string
   name: string

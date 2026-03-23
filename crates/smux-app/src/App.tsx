@@ -621,6 +621,7 @@ function App() {
           <button
             onClick={() => setShowSettings(true)}
             className="material-symbols-outlined text-[16px] text-outline hover:text-primary transition-colors cursor-pointer"
+            aria-label="Settings"
           >
             settings
           </button>
@@ -990,6 +991,7 @@ function App() {
                     onClick={() => setFullscreen('planner')}
                     className="material-symbols-outlined text-[14px] text-outline hover:text-primary transition-colors"
                     title="Fullscreen (Cmd+F)"
+                    aria-label="Fullscreen planner"
                   >
                     fullscreen
                   </button>
@@ -1052,6 +1054,7 @@ function App() {
                     onClick={() => setFullscreen('verifier')}
                     className="material-symbols-outlined text-[14px] text-outline hover:text-primary transition-colors"
                     title="Fullscreen (Cmd+F)"
+                    aria-label="Fullscreen verifier"
                   >
                     fullscreen
                   </button>

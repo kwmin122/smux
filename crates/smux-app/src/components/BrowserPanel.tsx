@@ -91,6 +91,7 @@ export function BrowserPanel({ onClose }: BrowserPanelProps) {
           onClick={() => openInWebview(inputUrl)}
           className="w-6 h-6 flex items-center justify-center text-outline hover:text-primary transition-colors"
           title="Navigate"
+          aria-label="Navigate"
         >
           <span className="material-symbols-outlined text-[14px]">open_in_new</span>
         </button>
@@ -98,6 +99,7 @@ export function BrowserPanel({ onClose }: BrowserPanelProps) {
           onClick={closeBrowserWindow}
           className="w-6 h-6 flex items-center justify-center text-outline hover:text-error transition-colors"
           title="Close browser (Cmd+B)"
+          aria-label="Close browser"
         >
           <span className="material-symbols-outlined text-[14px]">close</span>
         </button>

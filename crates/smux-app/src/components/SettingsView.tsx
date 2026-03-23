@@ -85,7 +85,7 @@ export function SettingsView({ onClose, theme, onThemeChange, executionLevel, on
       <nav className="w-48 bg-surface-container-low border-r border-outline-variant/20 py-4">
         <div className="px-4 mb-4 flex items-center justify-between">
           <h2 className="font-headline text-sm font-bold text-on-surface">Settings</h2>
-          <button onClick={onClose} className="material-symbols-outlined text-[16px] text-outline hover:text-on-surface cursor-pointer">close</button>
+          <button onClick={onClose} className="material-symbols-outlined text-[16px] text-outline hover:text-on-surface cursor-pointer" aria-label="Close settings">close</button>
         </div>
         <div className="space-y-0.5 px-2">
           {CATEGORIES.map(c => (
@@ -289,6 +289,9 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (v: b
       className={`w-10 h-5 rounded-full relative transition-colors ${
         checked ? 'bg-primary' : 'bg-outline/30'
       }`}
+      role="switch"
+      aria-checked={checked}
+      aria-label="Toggle"
     >
       <div className={`w-4 h-4 rounded-full bg-white shadow absolute top-0.5 transition-transform ${
         checked ? 'translate-x-5' : 'translate-x-0.5'
