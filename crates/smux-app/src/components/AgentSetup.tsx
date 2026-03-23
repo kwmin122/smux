@@ -32,6 +32,8 @@ const isTauri = !!window.__TAURI_INTERNALS__
 interface AgentSetupProps {
   onReady: (planner: string, verifier: string) => void
   onSkip: () => void
+  /** Run a command in the user's terminal (for one-click install) */
+  onRunInTerminal?: (cmd: string) => void
 }
 
 /**
@@ -39,7 +41,7 @@ interface AgentSetupProps {
  * Detects which agents are installed and guides the user through setup.
  * If only one agent is available, uses it for both planner and verifier.
  */
-export function AgentSetup({ onReady, onSkip }: AgentSetupProps) {
+export function AgentSetup({ onReady, onSkip, onRunInTerminal }: AgentSetupProps) {
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [planner, setPlanner] = useState('claude')
@@ -108,9 +110,29 @@ export function AgentSetup({ onReady, onSkip }: AgentSetupProps) {
             const guide = INSTALL_GUIDES[a.name]
             return (
               <div key={a.name} className="px-2 py-2 bg-surface-container rounded space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-outline" />
-                  <span className="font-mono text-[11px] text-on-surface-variant">{a.name}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-outline" />
+                    <span className="font-mono text-[11px] text-on-surface-variant">{a.name}</span>
+                  </div>
+                  {guide && onRunInTerminal && (
+                    <button
+                      onClick={() => {
+                        onRunInTerminal(guide.cmd)
+                        // Re-detect after a delay
+                        setTimeout(() => {
+                          if (isTauri) {
+                            import('@tauri-apps/api/core').then(({ invoke }) => {
+                              invoke<AgentInfo[]>('detect_agents').then(setAgents)
+                            })
+                          }
+                        }, 15000)
+                      }}
+                      className="font-mono text-[9px] px-2 py-0.5 rounded bg-primary text-on-primary hover:opacity-90"
+                    >
+                      Install
+                    </button>
+                  )}
                 </div>
                 {guide && (
                   <>

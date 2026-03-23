@@ -1178,6 +1178,16 @@ function App() {
                 setShowAgentSetup(false)
                 setTerminalMode('ai-session')
               }}
+              onRunInTerminal={(cmd) => {
+                // Run install command in the active terminal
+                const activeRef = tabRefsMap.current.get(activeTabId || '')
+                if (activeRef) {
+                  activeRef.writeToPty(cmd + '\n')
+                } else if (plannerRef.current) {
+                  plannerRef.current.writeToPty(cmd + '\n')
+                }
+                setShowAgentSetup(false)
+              }}
             />
           </div>
         </div>
