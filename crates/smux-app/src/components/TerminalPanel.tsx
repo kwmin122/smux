@@ -284,6 +284,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     }, [shellIntegration.currentCwd, onCwdChange])
 
     // ⌘F to open search, Ctrl+I to toggle IME input
+    // Auto-detect Korean keystrokes and activate IME input bar
     useEffect(() => {
       const handler = (e: KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
@@ -294,10 +295,29 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           e.preventDefault()
           setShowImeInput(prev => !prev)
         }
+        // Auto-activate IME when Korean input is detected
+        // Korean jamo keystrokes have key values like 'ㄱ', 'ㅎ', 'Process', etc.
+        // In WKWebView, Korean keys may come as 'Process' or actual jamo characters
+        if (ptyMode && !showImeInput && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          const code = e.key.charCodeAt(0)
+          const isKorean = (code >= 0x1100 && code <= 0x11FF) || // Jamo
+                           (code >= 0x3130 && code <= 0x318F) || // Compatibility Jamo
+                           (code >= 0xAC00 && code <= 0xD7AF) || // Syllables
+                           e.key === 'Process' // IME processing key
+          if (isKorean) {
+            e.preventDefault()
+            e.stopPropagation()
+            setShowImeInput(true)
+            // Pre-fill with the jamo that triggered it (if it's an actual character)
+            if (e.key !== 'Process' && e.key.length === 1) {
+              setImeText(e.key)
+            }
+          }
+        }
       }
-      window.addEventListener('keydown', handler)
-      return () => window.removeEventListener('keydown', handler)
-    }, [])
+      window.addEventListener('keydown', handler, true) // capture phase to intercept before xterm
+      return () => window.removeEventListener('keydown', handler, true)
+    }, [ptyMode, showImeInput])
 
     // Re-apply theme colors when the data-theme attribute changes
     useEffect(() => {
@@ -337,10 +357,10 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             onClose={() => setShowSearch(false)}
           />
         )}
-        {/* Korean/CJK IME input bar — press Ctrl+I to toggle */}
+        {/* Korean/CJK IME input bar — auto-activates on Korean input, Ctrl+I to toggle */}
         {showImeInput && ptyMode && (
-          <div className="absolute bottom-0 left-0 right-0 z-30 bg-surface-container border-t border-outline-variant/30 px-2 py-1 flex gap-2">
-            <span className="font-mono text-[9px] text-outline self-center shrink-0">IME</span>
+          <div className="absolute bottom-0 left-0 right-0 z-30 bg-surface-container-high border-t border-primary/30 px-3 py-1.5 flex gap-2 items-center shadow-lg">
+            <span className="font-mono text-[9px] font-bold text-primary self-center shrink-0">한글</span>
             <input
               autoFocus
               value={imeText}
@@ -348,22 +368,42 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   e.preventDefault()
-                  // Send composed text to PTY
                   if (imeText && ptyIdRef.current && isTauri) {
                     import('@tauri-apps/api/core').then(({ invoke }) => {
                       invoke('write_pty', { tabId: ptyIdRef.current, data: imeText }).catch(() => {})
                     })
                   }
                   setImeText('')
+                  // Stay open for continuous Korean input
                 }
                 if (e.key === 'Escape') {
                   setShowImeInput(false)
                   setImeText('')
                 }
               }}
-              placeholder="한글 입력 후 Enter (ESC로 닫기)"
-              className="flex-1 h-6 bg-surface-container-lowest border border-outline-variant/30 rounded px-2 font-mono text-[11px] text-on-surface outline-none focus:border-primary"
+              placeholder="한글 입력 → Enter 전송 · ESC 닫기"
+              className="flex-1 h-7 bg-surface-container-lowest border border-primary/30 rounded px-3 font-mono text-[12px] text-on-surface outline-none focus:border-primary"
             />
+            <button
+              onClick={() => {
+                if (imeText && ptyIdRef.current && isTauri) {
+                  import('@tauri-apps/api/core').then(({ invoke }) => {
+                    invoke('write_pty', { tabId: ptyIdRef.current, data: imeText + '\n' }).catch(() => {})
+                  })
+                }
+                setImeText('')
+              }}
+              className="font-mono text-[9px] px-2 py-1 rounded bg-primary text-on-primary hover:opacity-90 shrink-0"
+            >
+              Enter
+            </button>
+            <button
+              onClick={() => { setShowImeInput(false); setImeText('') }}
+              className="material-symbols-outlined text-[14px] text-outline hover:text-on-surface cursor-pointer shrink-0"
+              aria-label="Close IME input"
+            >
+              close
+            </button>
           </div>
         )}
       </div>
