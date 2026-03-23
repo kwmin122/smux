@@ -11,7 +11,7 @@ import { FailedCommandOverlay } from './components/FailedCommandOverlay'
 import { FileExplorer } from './components/FileExplorer'
 import { FileViewer } from './components/FileViewer'
 // AgentSetup removed — users run agents directly in terminals
-// usePingPongOrchestrator kept for future auto-mode
+import { useKeybindings } from './hooks/useKeybindings'
 import type { CommandRecord } from './hooks/useShellIntegration'
 
 declare global {
@@ -81,7 +81,7 @@ function App() {
   // AI session state
   const [executionLevel, setExecutionLevel] = useState<ExecutionLevel>('auto')
   const [failedCommand, setFailedCommand] = useState<CommandRecord | null>(null)
-  // Orchestrator removed from main render — available as separate feature
+  const keybindings = useKeybindings()
   const [viewingFile, setViewingFile] = useState<string | null>(null)
   // Agent setup state removed — users run agents directly
   const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
@@ -278,7 +278,7 @@ function App() {
     }
   }, [])
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — uses keybindings hook for customizable shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -288,11 +288,11 @@ function App() {
         e.preventDefault()
         setMode(m => m === 'focus' ? 'control' : 'focus')
       }
-      if (e.key === 't' && (e.metaKey || e.ctrlKey)) {
+      if (keybindings.matchesAction('new-tab', e)) {
         e.preventDefault()
         if (terminalMode === 'terminal') createTab()
       }
-      if (e.key === 'w' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      if (keybindings.matchesAction('close-tab', e)) {
         e.preventDefault()
         if (terminalMode === 'terminal' && activeLeafId && splitRoot?.type === 'split') {
           handleClosePane(activeLeafId)
@@ -300,15 +300,15 @@ function App() {
           closeTab(activeTabId)
         }
       }
-      if (e.key === 'd' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      if (keybindings.matchesAction('split-vertical', e)) {
         e.preventDefault()
         if (terminalMode === 'terminal') handleSplit('vertical')
       }
-      if (e.key === 'D' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      if (keybindings.matchesAction('split-horizontal', e)) {
         e.preventDefault()
         if (terminalMode === 'terminal') handleSplit('horizontal')
       }
-      if (e.key === 'b' && (e.metaKey || e.ctrlKey)) {
+      if (keybindings.matchesAction('toggle-browser', e)) {
         e.preventDefault()
         setShowBrowser(prev => !prev)
       }
@@ -333,13 +333,12 @@ function App() {
         e.preventDefault()
         setFullscreen(prev => prev ? null : 'planner')
       }
-      if (e.key === 's' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      if (keybindings.matchesAction('save-layout', e)) {
         e.preventDefault()
         localStorage.setItem('smux-layout', JSON.stringify({ layout, dividerPos, showBrowser, panelOrder }))
         plannerRef.current?.writeln('\x1b[90m[layout saved]\x1b[0m')
       }
-      // Cmd+Shift+S: swap panel positions
-      if (e.key === 'S' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      if (keybindings.matchesAction('swap-panels', e)) {
         e.preventDefault()
         setPanelOrder(prev => [prev[1], prev[0]])
       }
@@ -354,7 +353,7 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [layout, dividerPos, showBrowser, panelOrder])
+  }, [layout, dividerPos, showBrowser, panelOrder, keybindings, terminalMode, activeLeafId, splitRoot, activeTabId, tabs, createTab, closeTab, handleClosePane, handleSplit])
 
   // Divider drag handling
   useEffect(() => {

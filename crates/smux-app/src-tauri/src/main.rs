@@ -365,6 +365,7 @@ async fn get_git_info(cwd: Option<String>) -> Result<GitInfo, String> {
     let branch = tokio::process::Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(&work_dir)
+        .env("GIT_TERMINAL_PROMPT", "0") // Suppress credential popups
         .output()
         .await
         .map_err(|e| format!("git error: {e}"))
@@ -378,6 +379,7 @@ async fn get_git_info(cwd: Option<String>) -> Result<GitInfo, String> {
     let files_changed = tokio::process::Command::new("git")
         .args(["status", "--short"])
         .current_dir(&work_dir)
+        .env("GIT_TERMINAL_PROMPT", "0")
         .output()
         .await
         .map(|o| {

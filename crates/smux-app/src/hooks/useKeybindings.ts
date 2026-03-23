@@ -137,11 +137,41 @@ export function useKeybindings() {
     setPreset(newPreset)
   }, [])
 
+  /** Check if a KeyboardEvent matches a specific action's keybinding */
+  const matchesAction = useCallback(
+    (actionId: string, e: KeyboardEvent): boolean => {
+      const keyStr = getKey(actionId)
+      if (!keyStr) return false
+      return matchKeyString(keyStr, e)
+    },
+    [getKey],
+  )
+
   return {
     bindings,
     preset,
     getKey,
     setCustomKey,
     resetToPreset,
+    matchesAction,
   }
+}
+
+/** Parse a key string like "Meta+t" or "Ctrl+b %" and match against a KeyboardEvent */
+function matchKeyString(keyStr: string, e: KeyboardEvent): boolean {
+  // For now, handle simple combinations like "Meta+t", "Ctrl+Shift+d"
+  // tmux-style "Ctrl+b %" (prefix mode) is not supported in this simple matcher
+  if (keyStr.includes(' ')) return false // Skip prefix-mode keybindings
+
+  const parts = keyStr.split('+')
+  const key = parts[parts.length - 1].toLowerCase()
+  const needsMeta = parts.some(p => p === 'Meta')
+  const needsCtrl = parts.some(p => p === 'Ctrl')
+  const needsShift = parts.some(p => p === 'Shift')
+
+  if (needsMeta && !e.metaKey) return false
+  if (needsCtrl && !e.ctrlKey) return false
+  if (needsShift && !e.shiftKey) return false
+
+  return e.key.toLowerCase() === key
 }
