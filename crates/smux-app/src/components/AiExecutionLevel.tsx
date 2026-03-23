@@ -107,8 +107,12 @@ export function isCommandAllowed(
       return false
     case 'turbo':
       return true
-    case 'allowlist':
-      return allowList.some(allowed => command.startsWith(allowed) || command.includes(`/${allowed} `))
+    case 'allowlist': {
+      // Extract the binary name (first token) for precise matching
+      const binary = command.trim().split(/\s+/)[0]
+      const binaryName = binary.split('/').pop() || binary
+      return allowList.some(allowed => binaryName === allowed)
+    }
     case 'auto':
       // In auto mode, block obviously dangerous commands
       const dangerous = ['rm -rf /', 'sudo rm', 'mkfs', 'dd if=', ':(){:|:&};:', 'shutdown', 'reboot']

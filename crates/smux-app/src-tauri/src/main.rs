@@ -338,9 +338,14 @@ struct GitInfo {
 }
 
 #[tauri::command]
-async fn get_git_info() -> Result<GitInfo, String> {
+async fn get_git_info(cwd: Option<String>) -> Result<GitInfo, String> {
+    let work_dir = cwd
+        .or_else(|| std::env::var("HOME").ok())
+        .unwrap_or_else(|| "/".to_string());
+
     let branch = tokio::process::Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(&work_dir)
         .output()
         .await
         .map_err(|e| format!("git error: {e}"))
@@ -351,10 +356,9 @@ async fn get_git_info() -> Result<GitInfo, String> {
         })
         .unwrap_or_else(|_| "unknown".into());
 
-    // Use `git status --short` to capture the full worktree state:
-    // modified, staged, untracked, and deleted files.
     let files_changed = tokio::process::Command::new("git")
         .args(["status", "--short"])
+        .current_dir(&work_dir)
         .output()
         .await
         .map(|o| {

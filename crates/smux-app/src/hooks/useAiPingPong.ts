@@ -196,32 +196,26 @@ export function useAiPingPong() {
     return new Promise(resolve => {
       let lastLength = 0
       let stableCount = 0
+      let resolved = false
+      const done = () => {
+        if (resolved) return
+        resolved = true
+        clearInterval(checkInterval)
+        clearTimeout(timeoutId)
+        resolve()
+      }
       const checkInterval = setInterval(() => {
-        if (abortRef.current) {
-          clearInterval(checkInterval)
-          resolve()
-          return
-        }
+        if (abortRef.current) { done(); return }
         const currentLength = outputBufferRef.current.length
         if (currentLength === lastLength && currentLength > 0) {
           stableCount++
-          // If output hasn't changed for 3 seconds, consider it complete
-          if (stableCount >= 6) {
-            clearInterval(checkInterval)
-            resolve()
-            return
-          }
+          if (stableCount >= 6) { done(); return }
         } else {
           stableCount = 0
         }
         lastLength = currentLength
       }, 500)
-
-      // Hard timeout
-      setTimeout(() => {
-        clearInterval(checkInterval)
-        resolve()
-      }, timeoutMs)
+      const timeoutId = setTimeout(done, timeoutMs)
     })
   }
 

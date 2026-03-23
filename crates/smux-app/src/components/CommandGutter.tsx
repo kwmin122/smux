@@ -61,7 +61,7 @@ export function CommandGutter({ commands, terminalElement, lineHeight, baseY }: 
             {isError && (
               <div
                 className="absolute inset-0 bg-red-400/10 rounded-sm"
-                style={{ width: '100vw' }}
+                style={{ width: 'calc(100% + 1000px)' }}
               />
             )}
 

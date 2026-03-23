@@ -289,7 +289,7 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
           <CommandGutter
             commands={shellIntegration.commands}
             terminalElement={containerRef.current}
-            lineHeight={terminalRef.current ? Math.round(terminalRef.current.options.lineHeight ?? 1.4 * (terminalRef.current.options.fontSize ?? 13)) : 18}
+            lineHeight={terminalRef.current ? Math.round((terminalRef.current.options.lineHeight ?? 1.4) * (terminalRef.current.options.fontSize ?? 13)) : 18}
             baseY={baseY}
           />
         )}

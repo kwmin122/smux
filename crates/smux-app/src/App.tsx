@@ -137,7 +137,7 @@ function App() {
   async function fetchGitInfo() {
     try {
       const { invoke } = await import('@tauri-apps/api/core')
-      const info = await invoke<{ branch: string; files_changed: number }>('get_git_info')
+      const info = await invoke<{ branch: string; files_changed: number }>('get_git_info', { cwd: projectDir || undefined })
       setGitBranch(info.branch)
       setGitFilesChanged(info.files_changed)
     } catch { /* ignore */ }

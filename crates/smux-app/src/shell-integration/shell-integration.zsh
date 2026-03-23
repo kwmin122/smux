@@ -2,9 +2,9 @@
 # Emits OSC 633 escape sequences for command tracking.
 # Sourced automatically by smux PTY sessions.
 
-# Guard: only load once and only inside smux
-[[ -n "$SMUX_SHELL_INTEGRATION" ]] && return
-export SMUX_SHELL_INTEGRATION=1
+# Guard: only load once (use a different var than the env marker)
+[[ -n "$__SMUX_INTEGRATION_LOADED" ]] && return
+export __SMUX_INTEGRATION_LOADED=1
 
 # OSC 633 helpers
 __smux_osc633() {

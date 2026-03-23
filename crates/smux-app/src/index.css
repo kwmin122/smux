@@ -119,6 +119,11 @@ html, body, #root {
   font-family: var(--font-body);
 }
 
+/* Fix IME input (Korean/CJK) — ensure textarea is detectable by IME engines */
+.xterm-helper-textarea {
+  padding: 1px !important;
+}
+
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: var(--surface-dim); }
 ::-webkit-scrollbar-thumb { background: var(--surface-container-highest); }

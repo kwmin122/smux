@@ -23,9 +23,8 @@ export interface SplitNode {
 // Helper utilities
 // ---------------------------------------------------------------------------
 
-let _idCounter = 0
 function uid(): string {
-  return `split-${Date.now()}-${++_idCounter}`
+  return `split-${crypto.randomUUID()}`
 }
 
 /** Create a new leaf node for a given tab. */

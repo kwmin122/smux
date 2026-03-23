@@ -66,9 +66,11 @@ export function TabBar({ tabs, onSelectTab, onCloseTab, onNewTab, onRenameTab, o
     dragRef.current = id
   }, [])
 
+  const lastDragTargetRef = useRef<string | null>(null)
   const handleDragOver = useCallback((e: React.DragEvent, targetId: string) => {
     e.preventDefault()
-    if (dragRef.current && dragRef.current !== targetId) {
+    if (dragRef.current && dragRef.current !== targetId && lastDragTargetRef.current !== targetId) {
+      lastDragTargetRef.current = targetId
       onReorder(dragRef.current, targetId)
     }
   }, [onReorder])
