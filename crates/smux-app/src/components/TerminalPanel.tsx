@@ -87,6 +87,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
     const shellIntegration = useShellIntegration()
     const terminalLinks = useTerminalLinks()
     const [showSearch, setShowSearch] = useState(false)
+    const [showImeInput, setShowImeInput] = useState(false)
+    const [imeText, setImeText] = useState('')
     const [viewportTopLine, setViewportTopLine] = useState(0)
     const [baseY, setBaseY] = useState(0)
     // Ref to always hold latest onPtyOutput callback (avoids stale closure in PTY listener)
@@ -217,51 +219,16 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             // Start the PTY read loop
             await invoke('start_pty', { tabId })
 
-            // --- Korean / CJK IME composition guard ---
-            // In WKWebView (Tauri v2 macOS), xterm.js's internal CompositionHelper
-            // may not reliably suppress onData during IME composition, causing
-            // individual jamo (ㅈ ㅓ ㅇ) to be sent instead of composed syllables (정).
-            // We track composition state on the textarea and gate PTY writes.
-            let isComposing = false
-            let compositionEndData: string | null = null
-            const textarea = terminal.textarea
-            const onCompositionStart = () => { isComposing = true }
-            const onCompositionEnd = (e: CompositionEvent) => {
-              isComposing = false
-              // Store the composed text; the next onData call should deliver it.
-              // If onData fires with the same text, we let it through (normal path).
-              // If onData doesn't fire (WKWebView bug), we send it after a microtask.
-              compositionEndData = e.data || null
-              if (compositionEndData) {
-                Promise.resolve().then(() => {
-                  // If onData already sent this, compositionEndData was cleared.
-                  // Otherwise, WKWebView swallowed it — send directly.
-                  if (compositionEndData) {
-                    invoke('write_pty', { tabId, data: compositionEndData }).catch(() => {})
-                    compositionEndData = null
-                  }
-                })
-              }
-            }
-            textarea?.addEventListener('compositionstart', onCompositionStart)
-            textarea?.addEventListener('compositionend', onCompositionEnd)
-
-            // Send keyboard input to PTY (skip during IME composition)
+            // Send keyboard input to PTY
+            // xterm.js handles IME composition internally via CompositionHelper.
+            // Do NOT add custom composition event handlers — they cause triple-fire
+            // (compositionend + onData + microtask = 3x input).
             const onDataDisposable = terminal.onData((data) => {
-              if (!isComposing) {
-                // Clear compositionEndData if onData delivers the composed result,
-                // preventing the microtask fallback from sending a duplicate.
-                if (compositionEndData && data === compositionEndData) {
-                  compositionEndData = null
-                }
-                invoke('write_pty', { tabId, data }).catch(() => {})
-              }
+              invoke('write_pty', { tabId, data }).catch(() => {})
             })
 
             cleanupPty = () => {
               onDataDisposable.dispose()
-              textarea?.removeEventListener('compositionstart', onCompositionStart)
-              textarea?.removeEventListener('compositionend', onCompositionEnd)
               unlistenOutput()
               unlistenExit()
               invoke('close_pty', { tabId }).catch(() => {})
@@ -316,12 +283,16 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       }
     }, [shellIntegration.currentCwd, onCwdChange])
 
-    // ⌘F to open search
+    // ⌘F to open search, Ctrl+I to toggle IME input
     useEffect(() => {
       const handler = (e: KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
           e.preventDefault()
           setShowSearch(true)
+        }
+        if (e.ctrlKey && e.key === 'i') {
+          e.preventDefault()
+          setShowImeInput(prev => !prev)
         }
       }
       window.addEventListener('keydown', handler)
@@ -365,6 +336,35 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             terminal={terminalRef.current}
             onClose={() => setShowSearch(false)}
           />
+        )}
+        {/* Korean/CJK IME input bar — press Ctrl+I to toggle */}
+        {showImeInput && ptyMode && (
+          <div className="absolute bottom-0 left-0 right-0 z-30 bg-surface-container border-t border-outline-variant/30 px-2 py-1 flex gap-2">
+            <span className="font-mono text-[9px] text-outline self-center shrink-0">IME</span>
+            <input
+              autoFocus
+              value={imeText}
+              onChange={e => setImeText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  // Send composed text to PTY
+                  if (imeText && ptyIdRef.current && isTauri) {
+                    import('@tauri-apps/api/core').then(({ invoke }) => {
+                      invoke('write_pty', { tabId: ptyIdRef.current, data: imeText }).catch(() => {})
+                    })
+                  }
+                  setImeText('')
+                }
+                if (e.key === 'Escape') {
+                  setShowImeInput(false)
+                  setImeText('')
+                }
+              }}
+              placeholder="한글 입력 후 Enter (ESC로 닫기)"
+              className="flex-1 h-6 bg-surface-container-lowest border border-outline-variant/30 rounded px-2 font-mono text-[11px] text-on-surface outline-none focus:border-primary"
+            />
+          </div>
         )}
       </div>
     )
