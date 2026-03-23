@@ -80,6 +80,7 @@ function App() {
   const [activeLeafId, setActiveLeafId] = useState<string | null>(null)
   // AI session state
   const [executionLevel, setExecutionLevel] = useState<ExecutionLevel>('auto')
+  const [configFont, setConfigFont] = useState<{ family: string; size: number }>({ family: 'JetBrains Mono', size: 14 })
   const [failedCommand, setFailedCommand] = useState<CommandRecord | null>(null)
   const keybindings = useKeybindings()
   const [viewingFile, setViewingFile] = useState<string | null>(null)
@@ -115,8 +116,20 @@ function App() {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
-    // Fetch git info and check daemon
+    // Load config + fetch git info + check daemon
     if (isTauri) {
+      import('@tauri-apps/api/core').then(({ invoke }) => {
+        invoke<{ appearance?: { font_family?: string; font_size?: number } }>('load_app_config')
+          .then(config => {
+            if (config?.appearance) {
+              setConfigFont({
+                family: config.appearance.font_family || 'JetBrains Mono',
+                size: config.appearance.font_size || 14,
+              })
+            }
+          })
+          .catch(() => {})
+      })
       fetchGitInfo()
       checkDaemon()
       const gitInterval = setInterval(fetchGitInfo, 15000)
@@ -353,7 +366,7 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [layout, dividerPos, showBrowser, panelOrder, keybindings, terminalMode, activeLeafId, splitRoot, activeTabId, tabs, createTab, closeTab, handleClosePane, handleSplit])
+  }, [layout, dividerPos, showBrowser, panelOrder, keybindings])
 
   // Divider drag handling
   useEffect(() => {
@@ -900,7 +913,7 @@ function App() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} />
+                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} fontFamily={configFont.family} fontSize={configFont.size} />
                 </div>
               </section>
 
@@ -924,7 +937,7 @@ function App() {
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} />
+                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} fontFamily={configFont.family} fontSize={configFont.size} />
                 </div>
               </section>
             </>
