@@ -40,6 +40,8 @@ interface TerminalPanelProps {
   onCommandComplete?: (cmd: CommandRecord) => void
   /** Callback when CWD changes via shell integration */
   onCwdChange?: (cwd: string) => void
+  /** Callback for every PTY output chunk (used by orchestrator to capture output) */
+  onPtyOutput?: (data: string) => void
 }
 
 function getThemeColors() {
@@ -70,7 +72,7 @@ function getThemeColors() {
 }
 
 export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
-  function TerminalPanel({ role, ptyMode = false, cwd, shellCmd, onCommandComplete, onCwdChange }, ref) {
+  function TerminalPanel({ role, ptyMode = false, cwd, shellCmd, onCommandComplete, onCwdChange, onPtyOutput }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const terminalRef = useRef<Terminal | null>(null)
     const fitAddonRef = useRef<FitAddon | null>(null)
@@ -180,6 +182,8 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
               // Apply secret redaction to terminal output before rendering
               const output = redactSecrets(event.payload)
               terminal.write(output)
+              // Feed output to orchestrator for capture (AI ping-pong)
+              onPtyOutput?.(output)
             })
 
             const unlistenExit = await listen(`pty-exit-${tabId}`, () => {

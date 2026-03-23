@@ -852,19 +852,26 @@ function App() {
                   <div className="flex items-center gap-2">
                     <AiExecutionLevel level={executionLevel} onChange={setExecutionLevel} compact />
                     {!pingPong.isRunning && pingPong.phase === 'idle' && (
-                      <button
-                        onClick={() => {
-                          if (plannerRef.current && verifierRef.current) {
-                            const goal = prompt('What do you want to build?')
-                            if (goal) {
-                              pingPong.start(goal, plannerRef.current, verifierRef.current)
-                            }
+                      <form
+                        className="flex items-center gap-1"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          const input = (e.currentTarget.elements.namedItem('goal') as HTMLInputElement)
+                          const goal = input?.value.trim()
+                          if (goal && plannerRef.current && verifierRef.current) {
+                            pingPong.start(goal, plannerRef.current, verifierRef.current)
+                            input.value = ''
                           }
                         }}
-                        className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary text-on-primary hover:opacity-90"
                       >
-                        START
-                      </button>
+                        <input
+                          name="goal"
+                          placeholder="What to build?"
+                          className="w-40 h-5 bg-surface-container-lowest border border-outline-variant/30 rounded px-2 font-mono text-[9px] text-on-surface outline-none focus:border-primary"
+                          autoFocus
+                        />
+                        <button type="submit" className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary text-on-primary hover:opacity-90">GO</button>
+                      </form>
                     )}
                     {pingPong.isRunning && (
                       <button
@@ -877,7 +884,7 @@ function App() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} />
+                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedCapture} />
                 </div>
               </section>
 
@@ -912,7 +919,7 @@ function App() {
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} />
+                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedCapture} />
                 </div>
               </section>
             </>
