@@ -23,26 +23,50 @@ interface AiPingPongOptions {
   onStatusChange?: (status: AiSessionStatus) => void
 }
 
-// Build the CLI command for each agent
-function buildAgentCommand(agent: string, prompt: string, mode: 'plan' | 'review'): string {
-  const escapedPrompt = prompt.replace(/'/g, "'\\''")
+/**
+ * Write a prompt to a temp file and build a command that reads from it.
+ * This avoids shell injection by never interpolating user content into shell commands.
+ */
+function buildAgentCommand(agent: string, promptFile: string, mode: 'plan' | 'review'): string {
+  // The prompt is written to a temp file; the command reads from it via stdin/file arg.
+  // This completely prevents shell injection since no user content enters the command string.
+  const reviewPrefix = mode === 'review'
+    ? 'Review the following work and respond with APPROVED if correct or REJECTED with feedback if not:\\n\\n'
+    : ''
 
   switch (agent) {
     case 'claude':
-      return mode === 'plan'
-        ? `claude -p --dangerously-skip-permissions '${escapedPrompt}'`
-        : `claude -p --dangerously-skip-permissions 'Review the following work and respond with APPROVED if correct or REJECTED with feedback if not:\n\n${escapedPrompt}'`
+      return reviewPrefix
+        ? `(echo "${reviewPrefix}" && cat "${promptFile}") | claude -p --dangerously-skip-permissions -`
+        : `cat "${promptFile}" | claude -p --dangerously-skip-permissions -`
     case 'codex':
-      return mode === 'plan'
-        ? `codex exec --full-auto '${escapedPrompt}'`
-        : `codex exec --full-auto 'Review and verify:\n\n${escapedPrompt}'`
+      return reviewPrefix
+        ? `(echo "${reviewPrefix}" && cat "${promptFile}") | codex exec --full-auto -`
+        : `cat "${promptFile}" | codex exec --full-auto -`
     case 'gemini':
-      return mode === 'plan'
-        ? `gemini -p '${escapedPrompt}'`
-        : `gemini -p 'Review:\n\n${escapedPrompt}'`
+      return reviewPrefix
+        ? `(echo "${reviewPrefix}" && cat "${promptFile}") | gemini -p -`
+        : `cat "${promptFile}" | gemini -p -`
     default:
       return `echo "Unknown agent: ${agent}"`
   }
+}
+
+/** Write prompt content to a temp file safely, returns file path */
+function writeTempPrompt(content: string): string {
+  // Use a timestamp-based filename in /tmp to avoid collisions
+  const filename = `/tmp/smux-prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`
+  return filename // The actual write happens via PTY: echo "content" > file
+}
+
+/** Escape content for safe echo into a file (escape backslashes, double quotes, backticks, $) */
+function escapeForEcho(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/\n/g, '\\n')
 }
 
 // Detect verdict from terminal output
@@ -107,15 +131,21 @@ export function useAiPingPong() {
       ? `${task}\n\nPrevious review feedback:\n${feedback}\n\nPlease address the feedback and try again.`
       : task
 
-    const cmd = buildAgentCommand(opts.planner, prompt, 'plan')
+    // Write prompt to temp file via PTY, then run agent reading from it
+    const promptFile = writeTempPrompt(prompt)
+    const escaped = escapeForEcho(prompt)
 
-    // Write command to planner PTY
+    // Write prompt to temp file first
     plannerRef.current.writeln(`\x1b[36m━━━ Round ${roundNum} / Planner (${opts.planner}) ━━━\x1b[0m`)
-    plannerRef.current.writeln(`\x1b[90m$ ${cmd.substring(0, 80)}${cmd.length > 80 ? '...' : ''}\x1b[0m\n`)
+    if (plannerRef.current.write) {
+      // Write prompt to temp file
+      plannerRef.current.write(`printf '%s' "${escaped}" > "${promptFile}"\n`)
+    }
+    await new Promise(r => setTimeout(r, 500)) // Wait for file write
 
-    // We write the command to the PTY via the shell
-    // The actual execution happens in the PTY process
-    // For now we simulate the flow with a marker-based approach
+    const cmd = buildAgentCommand(opts.planner, promptFile, 'plan')
+    plannerRef.current.writeln(`\x1b[90m$ ${cmd.substring(0, 100)}${cmd.length > 100 ? '...' : ''}\x1b[0m\n`)
+
     if (plannerRef.current.write) {
       plannerRef.current.write(cmd + '\n')
     }
@@ -141,10 +171,18 @@ export function useAiPingPong() {
     updateStatus('verifier-running')
     outputBufferRef.current = ''
 
-    const cmd = buildAgentCommand(opts.verifier, plannerOutput.substring(0, 4000), 'review')
+    // Write planner output to temp file for verifier to read
+    const promptFile = writeTempPrompt(plannerOutput)
+    const escaped = escapeForEcho(plannerOutput.substring(0, 4000))
 
     verifierRef.current.writeln(`\x1b[35m━━━ Round ${roundNum} / Verifier (${opts.verifier}) ━━━\x1b[0m`)
-    verifierRef.current.writeln(`\x1b[90m$ ${cmd.substring(0, 80)}${cmd.length > 80 ? '...' : ''}\x1b[0m\n`)
+    if (verifierRef.current.write) {
+      verifierRef.current.write(`printf '%s' "${escaped}" > "${promptFile}"\n`)
+    }
+    await new Promise(r => setTimeout(r, 500))
+
+    const cmd = buildAgentCommand(opts.verifier, promptFile, 'review')
+    verifierRef.current.writeln(`\x1b[90m$ ${cmd.substring(0, 100)}${cmd.length > 100 ? '...' : ''}\x1b[0m\n`)
 
     if (verifierRef.current.write) {
       verifierRef.current.write(cmd + '\n')

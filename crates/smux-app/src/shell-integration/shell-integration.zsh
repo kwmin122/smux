@@ -21,11 +21,22 @@ __smux_prompt_end() {
   __smux_osc633 "B"
 }
 
+# Sanitize text for OSC sequences (strip BEL, ESC, and other control chars)
+__smux_sanitize() {
+  local text="$1"
+  # Remove ESC (\e / \x1b), BEL (\a / \x07), and ST (\e\\) to prevent OSC injection
+  text="${text//[$'\e']/}"
+  text="${text//[$'\a']/}"
+  printf '%s' "$text"
+}
+
 # C = Pre-Execution (command is about to run)
 __smux_preexec() {
   __smux_osc633 "C"
-  # E = Command Line (send the actual command text)
-  __smux_osc633 "E;${1}"
+  # E = Command Line (send the sanitized command text)
+  local safe_cmd
+  safe_cmd=$(__smux_sanitize "$1")
+  __smux_osc633 "E;${safe_cmd}"
 }
 
 # D = Execution Finished with exit code

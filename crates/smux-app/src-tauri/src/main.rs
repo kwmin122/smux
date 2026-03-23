@@ -470,6 +470,13 @@ fn create_pty(
         );
         let custom_zdotdir = smux_dir.join("zdotdir");
         let _ = std::fs::create_dir_all(&custom_zdotdir);
+        // Set restrictive permissions on zdotdir (owner-only)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ =
+                std::fs::set_permissions(&custom_zdotdir, std::fs::Permissions::from_mode(0o700));
+        }
         let _ = std::fs::write(custom_zdotdir.join(".zshenv"), &zshenv_content);
         // Copy real zshrc so user config still loads
         if let Some(home) = dirs::home_dir() {
@@ -555,6 +562,17 @@ fn write_pty(
     tab_id: String,
     data: String,
 ) -> Result<(), String> {
+    // Enforce deny-list: block commands that match dangerous patterns
+    let config = load_config();
+    if data.contains('\n') || data.contains('\r') {
+        // Only check command-like input (lines ending with newline = command execution)
+        for denied in &config.ai.deny_commands {
+            if data.contains(denied.as_str()) {
+                return Err(format!("blocked by deny-list: command contains '{denied}'"));
+            }
+        }
+    }
+
     let sessions = pty_mgr.sessions.lock().unwrap();
     let session = sessions.get(&tab_id).ok_or("session not found")?;
     session
@@ -646,12 +664,18 @@ fn load_session_metadata() -> Vec<serde_json::Value> {
 
 /// Socket API handler — execute a JSON-RPC style command.
 /// This enables external tools/agents to control smux programmatically.
+/// SECURITY: Only accessible from the main window (not the browser WebView).
 #[tauri::command]
 fn api_exec(
+    window: tauri::Window,
     pty_mgr: tauri::State<PtyManager>,
     method: String,
     params: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
+    // Reject calls from the browser window to prevent XSS-to-RCE
+    if window.label() != "main" {
+        return Err("api_exec is only accessible from the main window".into());
+    }
     match method.as_str() {
         "session.list" => {
             let sessions: Vec<String> = pty_mgr.sessions.lock().unwrap().keys().cloned().collect();

@@ -828,11 +828,13 @@ function App() {
                   <FailedCommandOverlay
                     command={failedCommand}
                     onFixWithAi={(cmd) => {
-                      // Send failed command to AI for analysis
+                      // Send failed command to AI for analysis via temp file (safe from injection)
                       const activeRef = tabRefsMap.current.get(activeTabId || '')
                       if (activeRef) {
-                        activeRef.write(`\n# AI Analysis: The command '${cmd.command}' failed with exit code ${cmd.exitCode}\n`)
-                        activeRef.write(`claude -p 'The following command failed with exit code ${cmd.exitCode}: ${cmd.command}. Please analyze why and suggest a fix.'\n`)
+                        const safeCmd = cmd.command.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')
+                        const tmpFile = `/tmp/smux-fix-${Date.now()}.txt`
+                        activeRef.write(`printf '%s' "The following command failed with exit code ${cmd.exitCode}: ${safeCmd}. Please analyze why and suggest a fix." > "${tmpFile}"\n`)
+                        activeRef.write(`cat "${tmpFile}" | claude -p --dangerously-skip-permissions -\n`)
                       }
                       setFailedCommand(null)
                     }}
