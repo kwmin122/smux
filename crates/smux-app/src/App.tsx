@@ -5,13 +5,13 @@ import { BrowserPanel } from './components/BrowserPanel'
 import { WelcomeView } from './components/WelcomeView'
 import { TabBar, type TabInfo, type TabColor } from './components/TabBar'
 import { SplitContainer, type SplitNode, createLeaf, splitLeaf, removeLeaf } from './components/SplitContainer'
-import { AiExecutionLevel, type ExecutionLevel } from './components/AiExecutionLevel'
+import type { ExecutionLevel } from './components/AiExecutionLevel'
 import { SettingsView } from './components/SettingsView'
 import { FailedCommandOverlay } from './components/FailedCommandOverlay'
 import { FileExplorer } from './components/FileExplorer'
 import { FileViewer } from './components/FileViewer'
-import { AgentSetup } from './components/AgentSetup'
-import { usePingPongOrchestrator } from './hooks/usePingPongOrchestrator'
+// AgentSetup removed — users run agents directly in terminals
+// usePingPongOrchestrator kept for future auto-mode
 import type { CommandRecord } from './hooks/useShellIntegration'
 
 declare global {
@@ -81,11 +81,9 @@ function App() {
   // AI session state
   const [executionLevel, setExecutionLevel] = useState<ExecutionLevel>('auto')
   const [failedCommand, setFailedCommand] = useState<CommandRecord | null>(null)
-  const pingPong = usePingPongOrchestrator()
+  // Orchestrator removed from main render — available as separate feature
   const [viewingFile, setViewingFile] = useState<string | null>(null)
-  const [showAgentSetup, setShowAgentSetup] = useState(false)
-  const [selectedPlanner, setSelectedPlanner] = useState('claude')
-  const [selectedVerifier, setSelectedVerifier] = useState('claude')
+  // Agent setup state removed — users run agents directly
   const [terminalMode, setTerminalMode] = useState<'idle' | 'terminal' | 'ai-session'>(() => {
     // Auto-resume last project if available
     try {
@@ -811,7 +809,7 @@ function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setShowAgentSetup(true)}
+                    onClick={() => setTerminalMode('ai-session')}
                     className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary/10 text-secondary border border-secondary/20 hover:bg-secondary/20 transition-colors"
                   >
                     AI PING-PONG
@@ -894,84 +892,40 @@ function App() {
             </div>
           ) : terminalMode === 'ai-session' ? (
             <>
-              {/* Planner Terminal (Claude) — user can type here too */}
+              {/* Left Terminal — type 'claude' here */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
                 <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Planner (Claude)</span>
-                    <span className={`w-1.5 h-1.5 rounded-full ${pingPong.isRunning ? 'bg-secondary animate-pulse' : 'bg-outline'}`} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <AiExecutionLevel level={executionLevel} onChange={setExecutionLevel} compact />
-                    {!pingPong.isRunning && pingPong.phase === 'idle' && (
-                      <form
-                        className="flex items-center gap-1"
-                        onSubmit={(e) => {
-                          e.preventDefault()
-                          const input = (e.currentTarget.elements.namedItem('goal') as HTMLInputElement)
-                          const goal = input?.value.trim()
-                          if (goal && plannerRef.current && verifierRef.current) {
-                            pingPong.start(goal, plannerRef.current, verifierRef.current, selectedPlanner, selectedVerifier)
-                            input.value = ''
-                          }
-                        }}
-                      >
-                        <input
-                          name="goal"
-                          placeholder="What to build?"
-                          className="w-40 h-5 bg-surface-container-lowest border border-outline-variant/30 rounded px-2 font-mono text-[9px] text-on-surface outline-none focus:border-primary"
-                          autoFocus
-                        />
-                        <button type="submit" className="font-mono text-[9px] px-2 py-0.5 rounded bg-secondary text-on-primary hover:opacity-90">GO</button>
-                      </form>
-                    )}
-                    {pingPong.isRunning && (
-                      <button
-                        onClick={pingPong.abort}
-                        className="font-mono text-[9px] px-2 py-0.5 rounded bg-error/20 text-error border border-error/30 hover:opacity-90"
-                      >
-                        STOP
-                      </button>
-                    )}
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-secondary">Terminal 1</span>
+                    <span className="font-mono text-[8px] text-outline">type: claude</span>
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedPlannerOutput} />
+                  <TerminalPanel ref={plannerRef} role="planner" ptyMode={true} cwd={projectDir || undefined} />
                 </div>
               </section>
 
-              {/* Status bar between terminals */}
-              <div className="w-8 shrink-0 flex flex-col items-center justify-center gap-1">
-                <div className="w-0.5 flex-1 bg-outline-variant/20" />
-                <span className={`font-mono text-[8px] font-bold uppercase writing-mode-vertical px-1 py-2 rounded ${
-                  pingPong.phase === 'ideation' ? 'text-primary bg-primary/10' :
-                  pingPong.phase === 'planning' ? 'text-secondary bg-secondary/10' :
-                  pingPong.phase === 'execution' ? 'text-tertiary bg-tertiary/10' :
-                  pingPong.phase === 'complete' ? 'text-green-400 bg-green-400/10' :
-                  'text-outline bg-outline/5'
-                }`} style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-                  {pingPong.phase === 'idle' ? 'READY' : `${pingPong.phase.toUpperCase()} R${pingPong.round}`}
-                </span>
-                <div className="w-0.5 flex-1 bg-outline-variant/20" />
+              {/* Divider */}
+              <div className="w-1 shrink-0 flex items-center justify-center">
+                <div className="w-0.5 h-8 rounded-full bg-outline-variant/40" />
               </div>
 
-              {/* Verifier Terminal (Codex) — user can type here too */}
+              {/* Right Terminal — type 'codex' here */}
               <section className="flex flex-col bg-surface-container-lowest border border-outline-variant/20 rounded-[var(--radius-default)] overflow-hidden" style={{ width: '50%' }}>
                 <div className="h-6 bg-surface-container-high px-3 flex items-center justify-between border-b border-outline-variant/20 shrink-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-tertiary">Verifier (Codex)</span>
-                    <span className={`w-1.5 h-1.5 rounded-full ${pingPong.isRunning && pingPong.status.includes('Verifier') ? 'bg-tertiary animate-pulse' : 'bg-outline'}`} />
-                    <span className="font-mono text-[8px] text-outline truncate max-w-[200px]">{pingPong.status}</span>
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-tertiary">Terminal 2</span>
+                    <span className="font-mono text-[8px] text-outline">type: codex</span>
                   </div>
                   <button
-                    onClick={() => { pingPong.abort(); setTerminalMode('terminal') }}
+                    onClick={() => setTerminalMode('terminal')}
                     className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
                   >
                     EXIT
                   </button>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} onPtyOutput={pingPong.feedVerifierOutput} />
+                  <TerminalPanel ref={verifierRef} role="verifier" ptyMode={true} cwd={projectDir || undefined} />
                 </div>
               </section>
             </>
@@ -992,10 +946,10 @@ function App() {
                   if (selected && typeof selected === 'string') {
                     setProjectDir(selected)
                     try { localStorage.setItem('smux-last-project', selected) } catch {}
-                    setShowAgentSetup(true)
+                    setTerminalMode('ai-session')
                   }
                 } catch {
-                  setShowAgentSetup(true)
+                  setTerminalMode('ai-session')
                 }
               }}
               daemonRunning={daemonRunning}
@@ -1163,35 +1117,7 @@ function App() {
       )}
 
       {/* AI Task Prompt Modal */}
-      {/* Agent Setup Modal */}
-      {showAgentSetup && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50" onClick={() => setShowAgentSetup(false)}>
-          <div className="bg-surface-container-high rounded-lg border border-outline-variant/20 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <AgentSetup
-              onReady={(p, v) => {
-                setSelectedPlanner(p)
-                setSelectedVerifier(v)
-                setShowAgentSetup(false)
-                setTerminalMode('ai-session')
-              }}
-              onSkip={() => {
-                setShowAgentSetup(false)
-                setTerminalMode('ai-session')
-              }}
-              onRunInTerminal={(cmd) => {
-                // Run install command in the active terminal
-                const activeRef = tabRefsMap.current.get(activeTabId || '')
-                if (activeRef) {
-                  activeRef.writeToPty(cmd + '\n')
-                } else if (plannerRef.current) {
-                  plannerRef.current.writeToPty(cmd + '\n')
-                }
-                setShowAgentSetup(false)
-              }}
-            />
-          </div>
-        </div>
-      )}
+      {/* Agent setup removed — users type claude/codex/gemini directly in terminals */}
     </div>
   )
 }

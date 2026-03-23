@@ -217,13 +217,51 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
             // Start the PTY read loop
             await invoke('start_pty', { tabId })
 
-            // Send keyboard input to PTY
+            // --- Korean / CJK IME composition guard ---
+            // In WKWebView (Tauri v2 macOS), xterm.js's internal CompositionHelper
+            // may not reliably suppress onData during IME composition, causing
+            // individual jamo (ㅈ ㅓ ㅇ) to be sent instead of composed syllables (정).
+            // We track composition state on the textarea and gate PTY writes.
+            let isComposing = false
+            let compositionEndData: string | null = null
+            const textarea = terminal.textarea
+            const onCompositionStart = () => { isComposing = true }
+            const onCompositionEnd = (e: CompositionEvent) => {
+              isComposing = false
+              // Store the composed text; the next onData call should deliver it.
+              // If onData fires with the same text, we let it through (normal path).
+              // If onData doesn't fire (WKWebView bug), we send it after a microtask.
+              compositionEndData = e.data || null
+              if (compositionEndData) {
+                Promise.resolve().then(() => {
+                  // If onData already sent this, compositionEndData was cleared.
+                  // Otherwise, WKWebView swallowed it — send directly.
+                  if (compositionEndData) {
+                    invoke('write_pty', { tabId, data: compositionEndData }).catch(() => {})
+                    compositionEndData = null
+                  }
+                })
+              }
+            }
+            textarea?.addEventListener('compositionstart', onCompositionStart)
+            textarea?.addEventListener('compositionend', onCompositionEnd)
+
+            // Send keyboard input to PTY (skip during IME composition)
             const onDataDisposable = terminal.onData((data) => {
-              invoke('write_pty', { tabId, data }).catch(() => {})
+              if (!isComposing) {
+                // Clear compositionEndData if onData delivers the composed result,
+                // preventing the microtask fallback from sending a duplicate.
+                if (compositionEndData && data === compositionEndData) {
+                  compositionEndData = null
+                }
+                invoke('write_pty', { tabId, data }).catch(() => {})
+              }
             })
 
             cleanupPty = () => {
               onDataDisposable.dispose()
+              textarea?.removeEventListener('compositionstart', onCompositionStart)
+              textarea?.removeEventListener('compositionend', onCompositionEnd)
               unlistenOutput()
               unlistenExit()
               invoke('close_pty', { tabId }).catch(() => {})
