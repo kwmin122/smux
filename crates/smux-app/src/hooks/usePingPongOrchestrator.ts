@@ -157,7 +157,7 @@ export function usePingPongOrchestrator() {
   const cleanupTempFiles = useCallback(() => {
     if (plannerRef.current && tempFilesRef.current.length > 0) {
       const files = tempFilesRef.current.join(' ')
-      plannerRef.current.write(`rm -f ${files} 2>/dev/null\n`)
+      plannerRef.current.writeToPty(`rm -f ${files} 2>/dev/null\n`)
       tempFilesRef.current = []
     }
   }, [])
@@ -184,8 +184,9 @@ export function usePingPongOrchestrator() {
     startCapture(which)
 
     // Chain: mkdir → write prompt → run agent (no race condition)
+    // CRITICAL: Use writeToPty() to send to PTY stdin, NOT write() which only updates display
     const cmd = agentCmd(agent, tmpFile)
-    terminal.write(`mkdir -p "$HOME/.smux/tmp" && chmod 700 "$HOME/.smux/tmp" && printf '%s' "${escaped}" > "${tmpFile}" && chmod 600 "${tmpFile}" && ${cmd}\n`)
+    terminal.writeToPty(`mkdir -p "$HOME/.smux/tmp" && chmod 700 "$HOME/.smux/tmp" && printf '%s' "${escaped}" > "${tmpFile}" && chmod 600 "${tmpFile}" && ${cmd}\n`)
 
     // Wait for completion (output stabilizes)
     await waitForStable(45000)

@@ -20,8 +20,11 @@ declare global {
 const isTauri = !!window.__TAURI_INTERNALS__
 
 export interface TerminalPanelHandle {
+  /** Write to xterm display (visual only, does NOT execute in shell) */
   write: (data: string) => void
   writeln: (data: string) => void
+  /** Write to PTY stdin (actually executes in the shell) */
+  writeToPty: (data: string) => void
   clear: () => void
   getCommands: () => CommandRecord[]
   getCurrentCwd: () => string
@@ -88,10 +91,19 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
     useImperativeHandle(ref, () => ({
       write(data: string) {
+        // Write to xterm display (visual only)
         terminalRef.current?.write(data)
       },
       writeln(data: string) {
         terminalRef.current?.writeln(data)
+      },
+      /** Write to PTY stdin (actually executes in the shell) */
+      writeToPty(data: string) {
+        if (ptyIdRef.current && isTauri) {
+          import('@tauri-apps/api/core').then(({ invoke }) => {
+            invoke('write_pty', { tabId: ptyIdRef.current, data }).catch(() => {})
+          })
+        }
       },
       clear() {
         terminalRef.current?.clear()

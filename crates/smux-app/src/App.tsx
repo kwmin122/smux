@@ -278,7 +278,8 @@ function App() {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
-      if (e.key === 'Tab') {
+      // Tab toggles mode — but only when NOT focused on a terminal (allow shell tab-completion)
+      if (e.key === 'Tab' && e.ctrlKey) {
         e.preventDefault()
         setMode(m => m === 'focus' ? 'control' : 'focus')
       }
@@ -321,7 +322,9 @@ function App() {
         setLayout('bottom')
         setFullscreen(null)
       }
-      if (e.key === 'f' && (e.metaKey || e.ctrlKey)) {
+      // Cmd+F → search (handled by TerminalPanel). Do NOT override here.
+      // Cmd+Shift+F → toggle fullscreen panel
+      if (e.key === 'F' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
         e.preventDefault()
         setFullscreen(prev => prev ? null : 'planner')
       }
@@ -830,8 +833,8 @@ function App() {
                       if (activeRef) {
                         const safeCmd = cmd.command.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$')
                         const tmpFile = `/tmp/smux-fix-${Date.now()}.txt`
-                        activeRef.write(`printf '%s' "The following command failed with exit code ${cmd.exitCode}: ${safeCmd}. Please analyze why and suggest a fix." > "${tmpFile}"\n`)
-                        activeRef.write(`cat "${tmpFile}" | claude -p --dangerously-skip-permissions -\n`)
+                        activeRef.writeToPty(`printf '%s' "The following command failed with exit code ${cmd.exitCode}: ${safeCmd}. Please analyze why and suggest a fix." > "${tmpFile}"\n`)
+                        activeRef.writeToPty(`cat "${tmpFile}" | claude -p -\n`)
                       }
                       setFailedCommand(null)
                     }}
