@@ -911,7 +911,7 @@ function App() {
                           const input = (e.currentTarget.elements.namedItem('goal') as HTMLInputElement)
                           const goal = input?.value.trim()
                           if (goal && plannerRef.current && verifierRef.current) {
-                            pingPong.start(goal, plannerRef.current, verifierRef.current)
+                            pingPong.start(goal, plannerRef.current, verifierRef.current, selectedPlanner, selectedVerifier)
                             input.value = ''
                           }
                         }}
