@@ -8,16 +8,16 @@ interface AgentInfo {
 
 const INSTALL_GUIDES: Record<string, { cmd: string; note: string }> = {
   claude: {
-    cmd: 'npm install -g @anthropic-ai/claude-code',
-    note: 'Claude Max/Pro 구독이면 API 키 없이 브라우저 로그인으로 사용 가능',
+    cmd: 'curl -fsSL https://claude.ai/install.sh | bash',
+    note: 'Claude Pro ($20/월) 이상이면 API 키 없이 브라우저 로그인으로 사용. 설치 후 claude 실행하면 자동 로그인.',
   },
   codex: {
     cmd: 'npm install -g @openai/codex',
-    note: 'OPENAI_API_KEY 환경변수 필요. ChatGPT Pro 구독과는 별개.',
+    note: 'ChatGPT Plus ($20/월) 이상이면 브라우저 로그인으로 사용. Pro ($200/월)면 $50 크레딧 포함.',
   },
   gemini: {
-    cmd: 'npm install -g @anthropic-ai/gemini-cli',
-    note: 'Google AI API 키 필요',
+    cmd: 'npm install -g @google/gemini-cli',
+    note: '무료! Google 계정만 있으면 됨. 브라우저 로그인으로 사용.',
   },
 }
 
