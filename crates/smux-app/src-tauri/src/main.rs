@@ -440,12 +440,40 @@ fn create_pty(
     // Use provided shell command, or config shell, or detect default
     let config = load_config();
     let shell = shell_cmd.unwrap_or_else(|| config.general.shell.clone());
+
+    // Security: validate shell is a known shell binary
+    let allowed_shells = [
+        "/bin/zsh",
+        "/bin/bash",
+        "/bin/sh",
+        "/usr/bin/zsh",
+        "/usr/bin/bash",
+        "/usr/local/bin/zsh",
+        "/usr/local/bin/bash",
+        "/usr/local/bin/fish",
+        "/opt/homebrew/bin/zsh",
+        "/opt/homebrew/bin/bash",
+        "/opt/homebrew/bin/fish",
+    ];
+    if !allowed_shells.iter().any(|s| shell == *s)
+        && !shell.ends_with("/zsh")
+        && !shell.ends_with("/bash")
+        && !shell.ends_with("/sh")
+        && !shell.ends_with("/fish")
+    {
+        return Err(format!("shell not in allowlist: {shell}"));
+    }
+
     let mut cmd = CommandBuilder::new(&shell);
     cmd.env("TERM", "xterm-256color");
     cmd.env("SMUX_SHELL_INTEGRATION", "1");
-    // Use provided cwd, or fall back to HOME
+
+    // Use provided cwd, or fall back to HOME. Validate it exists.
     let working_dir =
         cwd.unwrap_or_else(|| std::env::var("HOME").unwrap_or_else(|_| "/".to_string()));
+    if !std::path::Path::new(&working_dir).is_dir() {
+        return Err(format!("working directory does not exist: {working_dir}"));
+    }
     cmd.cwd(&working_dir);
 
     // Install shell integration script for zsh

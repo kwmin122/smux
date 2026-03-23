@@ -52,11 +52,9 @@ function buildAgentCommand(agent: string, promptFile: string, mode: 'plan' | 're
   }
 }
 
-/** Write prompt content to a temp file safely, returns file path */
-function writeTempPrompt(content: string): string {
-  // Use a timestamp-based filename in /tmp to avoid collisions
-  const filename = `/tmp/smux-prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`
-  return filename // The actual write happens via PTY: echo "content" > file
+/** Generate a temp file path for prompt content. The actual write happens via PTY. */
+function writeTempPrompt(): string {
+  return `/tmp/smux-prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`
 }
 
 /** Escape content for safe echo into a file (escape backslashes, double quotes, backticks, $) */
@@ -132,7 +130,7 @@ export function useAiPingPong() {
       : task
 
     // Write prompt to temp file via PTY, then run agent reading from it
-    const promptFile = writeTempPrompt(prompt)
+    const promptFile = writeTempPrompt()
     const escaped = escapeForEcho(prompt)
 
     // Write prompt to temp file first
@@ -172,7 +170,7 @@ export function useAiPingPong() {
     outputBufferRef.current = ''
 
     // Write planner output to temp file for verifier to read
-    const promptFile = writeTempPrompt(plannerOutput)
+    const promptFile = writeTempPrompt()
     const escaped = escapeForEcho(plannerOutput.substring(0, 4000))
 
     verifierRef.current.writeln(`\x1b[35m━━━ Round ${roundNum} / Verifier (${opts.verifier}) ━━━\x1b[0m`)

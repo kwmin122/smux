@@ -77,11 +77,21 @@ function openUrl(url: string): void {
 // ---------------------------------------------------------------------------
 
 async function openFileLink(file: string, line: number, col: number): Promise<void> {
+  // Security: reject absolute paths and path traversal
+  if (file.startsWith('/') || file.startsWith('~') || file.includes('..')) {
+    console.warn('[useTerminalLinks] blocked suspicious path:', file)
+    return
+  }
+  // Only allow relative paths with safe characters
+  if (!/^[\w./_-]+$/.test(file)) {
+    console.warn('[useTerminalLinks] blocked path with unsafe characters:', file)
+    return
+  }
+
   try {
     const { emit } = await import('@tauri-apps/api/event')
     await emit('open-file-link', { file, line, col })
   } catch {
-    // Non-Tauri environment — no-op or log for debugging
     console.debug('[useTerminalLinks] open-file-link:', { file, line, col })
   }
 }

@@ -36,6 +36,30 @@ export function redactSecrets(text: string): string {
   // AWS access key IDs: AKIA...
   result = result.replace(/\bAKIA[A-Z0-9]{16}\b/g, '[REDACTED]')
 
+  // Anthropic API keys: sk-ant-api03-...
+  result = result.replace(/\bsk-ant-api\d{2}-[A-Za-z0-9\-_]{20,}\b/g, '[REDACTED]')
+
+  // Slack tokens: xoxb-, xoxp-, xoxs-
+  result = result.replace(/\bxox[bps]-[A-Za-z0-9\-]{20,}\b/g, '[REDACTED]')
+
+  // npm tokens: npm_...
+  result = result.replace(/\bnpm_[A-Za-z0-9]{20,}\b/g, '[REDACTED]')
+
+  // PyPI tokens: pypi-...
+  result = result.replace(/\bpypi-[A-Za-z0-9]{20,}\b/g, '[REDACTED]')
+
+  // Hugging Face tokens: hf_...
+  result = result.replace(/\bhf_[A-Za-z0-9]{20,}\b/g, '[REDACTED]')
+
+  // SSH private keys
+  result = result.replace(/-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----/g, '[REDACTED SSH KEY]')
+
+  // Basic auth headers: Basic <base64>
+  result = result.replace(/Basic\s+[A-Za-z0-9+/]{16,}={0,2}/g, 'Basic [REDACTED]')
+
+  // Connection strings with credentials: postgres://user:pass@..., mongodb://...
+  result = result.replace(/((?:postgres|postgresql|mysql|mongodb|redis|amqp):\/\/[^:]+:)[^\s@]+(@)/g, '$1[REDACTED]$2')
+
   // Generic key=value patterns where key contains sensitive words
   result = result.replace(
     /\b([A-Za-z_]*(?:secret|password|passwd|token|api_key|apikey|auth_key|authkey|access_key|private_key)[A-Za-z_]*)\s*[=:]\s*["']?([^\s"',;]{4,})["']?/gi,

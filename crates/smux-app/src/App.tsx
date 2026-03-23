@@ -761,7 +761,7 @@ function App() {
                     AI PING-PONG
                   </button>
                   <button
-                    onClick={() => { setTerminalMode('idle'); setActiveSession(null); setTabs([]); setActiveTabId(null); try { localStorage.removeItem('smux-last-project') } catch {} }}
+                    onClick={() => { setTerminalMode('idle'); setActiveSession(null); setTabs([]); setActiveTabId(null); setSplitRoot(null); setActiveLeafId(null); setProjectDir(''); try { localStorage.removeItem('smux-last-project') } catch {} }}
                     className="font-mono text-[9px] text-outline hover:text-primary transition-colors"
                   >
                     HOME
@@ -961,7 +961,21 @@ function App() {
                 setProjectDir(path)
                 setTerminalMode('terminal')
               }}
-              onNewSession={() => setShowNewSession(true)}
+              onNewSession={async () => {
+                // AI Ping-Pong: first select folder, then show AI prompt
+                try {
+                  const { open } = await import('@tauri-apps/plugin-dialog')
+                  const selected = await open({ directory: true, multiple: false, title: 'Select project for AI session' })
+                  if (selected && typeof selected === 'string') {
+                    setProjectDir(selected)
+                    try { localStorage.setItem('smux-last-project', selected) } catch {}
+                    setShowAiPrompt(true)
+                  }
+                } catch {
+                  // Non-Tauri fallback
+                  setShowAiPrompt(true)
+                }
+              }}
               daemonRunning={daemonRunning}
             />
           ) : fullscreen ? (

@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
+import { WebglAddon } from '@xterm/addon-webgl'
 import { useShellIntegration, type CommandRecord } from '../hooks/useShellIntegration'
 import { useTerminalLinks } from '../hooks/useTerminalLinks'
 import { SearchOverlay } from './SearchOverlay'
 import { CommandGutter } from './CommandGutter'
 import { StickyScroll } from './StickyScroll'
+import { redactSecrets } from './GitInfo'
 import '@xterm/xterm/css/xterm.css'
 
 declare global {
@@ -117,6 +120,20 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
       const fitAddon = new FitAddon()
       terminal.loadAddon(fitAddon)
 
+      // Load Unicode11 addon for correct CJK/Korean character widths
+      const unicode11 = new Unicode11Addon()
+      terminal.loadAddon(unicode11)
+      terminal.unicode.activeVersion = '11'
+
+      // Load WebGL addon for GPU-accelerated rendering (fallback to canvas if unavailable)
+      try {
+        const webgl = new WebglAddon()
+        webgl.onContextLoss(() => webgl.dispose())
+        terminal.loadAddon(webgl)
+      } catch {
+        // WebGL not available, use default canvas renderer
+      }
+
       terminal.open(containerRef.current)
       fitAddon.fit()
 
@@ -160,7 +177,9 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
 
             // Listen for output BEFORE starting read loop (prevent race)
             const unlistenOutput = await listen<string>(`pty-output-${tabId}`, (event) => {
-              terminal.write(event.payload)
+              // Apply secret redaction to terminal output before rendering
+              const output = redactSecrets(event.payload)
+              terminal.write(output)
             })
 
             const unlistenExit = await listen(`pty-exit-${tabId}`, () => {
