@@ -168,6 +168,18 @@ impl SessionPipeline {
         Ok(())
     }
 
+    /// Get recipients for planner output in a given stage.
+    /// In most stages, planner output goes to verifiers.
+    pub fn stage_recipients_for_planner(&self, stage: &SessionStage) -> Vec<String> {
+        stage.participants.verifiers.clone()
+    }
+
+    /// Get recipients for worker output in a given stage.
+    /// Worker output goes to verifiers for review.
+    pub fn stage_recipients_for_worker(&self, stage: &SessionStage) -> Vec<String> {
+        stage.participants.verifiers.clone()
+    }
+
     /// Default preset: planner + verifier (backward compatible with v0.5).
     pub fn default_dual() -> Self {
         Self::new(vec![
