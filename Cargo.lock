@@ -3517,6 +3517,7 @@ dependencies = [
  "async-trait",
  "dirs 6.0.0",
  "futures",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",

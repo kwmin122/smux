@@ -1,6 +1,7 @@
 //! smux-core — session model, adapter traits, and orchestration logic for smux.
 
 pub mod adapter;
+pub mod audit;
 pub mod config;
 pub mod consensus;
 pub mod context;
@@ -8,7 +9,9 @@ pub mod git_worktree;
 pub mod health;
 pub mod ipc;
 pub mod orchestrator;
+pub mod ownership;
 pub mod pipeline;
+pub mod redaction;
 pub mod safety;
 pub mod session_store;
 pub mod stop;
