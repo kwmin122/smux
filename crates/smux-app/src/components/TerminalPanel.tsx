@@ -157,6 +157,17 @@ export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>
         // WebGL not available, use default canvas renderer
       }
 
+      // Fix Korean/CJK IME: prevent xterm.js from prematurely finalizing
+      // composition when WebKit fires non-229 keydown during IME input.
+      // Without this, xterm.js CompositionHelper calls _finalizeComposition(false)
+      // on every non-229 keydown, breaking syllable assembly (한 → ㅎㅏㄴ).
+      terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+        if (event.type === 'keydown' && event.isComposing) {
+          return false // Block xterm.js from processing — let IME finish composing
+        }
+        return true
+      })
+
       terminal.open(containerRef.current)
       fitAddon.fit()
 
