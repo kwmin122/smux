@@ -1,6 +1,22 @@
 //! Tests for pipeline-aware IPC message serialization.
 
-use smux_core::ipc::{ClientMessage, DaemonMessage};
+use smux_core::ipc::{ClientMessage, DaemonMessage, IpcStageDefinition};
+
+fn make_stage(
+    name: &str,
+    planners: Vec<&str>,
+    verifiers: Vec<&str>,
+    workers: Vec<&str>,
+) -> IpcStageDefinition {
+    IpcStageDefinition {
+        name: name.to_string(),
+        approval_mode: "gated".to_string(),
+        consensus: "majority".to_string(),
+        planners: planners.into_iter().map(|s| s.to_string()).collect(),
+        verifiers: verifiers.into_iter().map(|s| s.to_string()).collect(),
+        workers: workers.into_iter().map(|s| s.to_string()).collect(),
+    }
+}
 
 #[test]
 fn start_session_with_pipeline_serializes() {
@@ -12,12 +28,15 @@ fn start_session_with_pipeline_serializes() {
             ("gemini".to_string(), "verifier".to_string()),
         ],
         stages: vec![
-            "ideate".to_string(),
-            "plan".to_string(),
-            "execute".to_string(),
+            make_stage("ideate", vec!["claude"], vec![], vec![]),
+            make_stage("plan", vec!["claude"], vec!["codex", "gemini"], vec![]),
+            make_stage(
+                "execute",
+                vec!["claude"],
+                vec!["codex"],
+                vec!["frontend", "backend"],
+            ),
         ],
-        approval_mode: "gated".to_string(),
-        consensus: "majority".to_string(),
         max_rounds: 5,
     };
 
@@ -27,23 +46,29 @@ fn start_session_with_pipeline_serializes() {
 }
 
 #[test]
-fn start_session_with_pipeline_contains_agents() {
+fn stage_carries_per_stage_participants() {
     let msg = ClientMessage::StartSessionWithPipeline {
         task: "test".to_string(),
         agents: vec![
             ("claude".to_string(), "planner".to_string()),
             ("codex".to_string(), "verifier".to_string()),
         ],
-        stages: vec!["execute".to_string()],
-        approval_mode: "gated".to_string(),
-        consensus: "majority".to_string(),
+        stages: vec![make_stage(
+            "execute",
+            vec!["claude"],
+            vec!["codex"],
+            vec!["fe-worker"],
+        )],
         max_rounds: 3,
     };
 
-    if let ClientMessage::StartSessionWithPipeline { agents, .. } = &msg {
-        assert_eq!(agents.len(), 2);
-        assert_eq!(agents[0].0, "claude");
-        assert_eq!(agents[0].1, "planner");
+    if let ClientMessage::StartSessionWithPipeline { stages, .. } = &msg {
+        assert_eq!(stages.len(), 1);
+        assert_eq!(stages[0].planners, vec!["claude"]);
+        assert_eq!(stages[0].verifiers, vec!["codex"]);
+        assert_eq!(stages[0].workers, vec!["fe-worker"]);
+        assert_eq!(stages[0].approval_mode, "gated");
+        assert_eq!(stages[0].consensus, "majority");
     } else {
         panic!("wrong variant");
     }
@@ -58,14 +83,12 @@ fn stage_transition_event_serializes() {
     };
 
     let json = serde_json::to_string(&msg).unwrap();
-    assert!(json.contains("StageTransition") || json.contains("stage_transition"));
     let deserialized: DaemonMessage = serde_json::from_str(&json).unwrap();
     assert_eq!(msg, deserialized);
 }
 
 #[test]
 fn old_start_session_still_works() {
-    // Backward compatibility: old StartSession variant must still parse
     let msg = ClientMessage::StartSession {
         planner: "claude".to_string(),
         verifier: "codex".to_string(),

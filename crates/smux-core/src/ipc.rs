@@ -43,18 +43,26 @@ pub enum ClientMessage {
     /// Gracefully shut down the daemon.
     Shutdown,
     /// Start a session using a pipeline definition (v0.6+).
+    /// Each stage carries its own participants, approval mode, and consensus.
     StartSessionWithPipeline {
         task: String,
-        /// Vec of (agent_id, role) pairs.
+        /// All agents in the session: (agent_id, role).
         agents: Vec<(String, String)>,
-        /// Stage names in order.
-        stages: Vec<String>,
-        /// "gated" or "full_auto".
-        approval_mode: String,
-        /// Consensus strategy.
-        consensus: String,
+        /// Per-stage definitions with participants and policies.
+        stages: Vec<IpcStageDefinition>,
         max_rounds: u32,
     },
+}
+
+/// Wire representation of a pipeline stage for IPC.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct IpcStageDefinition {
+    pub name: String,
+    pub approval_mode: String,
+    pub consensus: String,
+    pub planners: Vec<String>,
+    pub verifiers: Vec<String>,
+    pub workers: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------

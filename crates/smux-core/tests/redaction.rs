@@ -54,3 +54,29 @@ fn custom_redaction_rule() {
     assert!(result.contains("[REDACTED]"));
     assert!(result.contains("normal text"));
 }
+
+#[test]
+fn rules_work_after_deserialize() {
+    // This is the critical test: rules serialized to JSON and back must still redact
+    let rules = RedactionRule::default_rules();
+    let json = serde_json::to_string(&rules).unwrap();
+    let deserialized: Vec<RedactionRule> = serde_json::from_str(&json).unwrap();
+    let text = "sk-abc123def456ghi789jkl012mno345";
+    let result = redact_transcript(text, &deserialized);
+    assert!(
+        result.contains("[REDACTED]"),
+        "redaction must work after deserialize, got: {result}"
+    );
+}
+
+#[test]
+fn compiled_rules_work() {
+    use smux_core::redaction::compile_rules;
+    use smux_core::redaction::redact_with_compiled;
+    let rules = RedactionRule::default_rules();
+    let compiled = compile_rules(&rules);
+    assert!(!compiled.is_empty());
+    let text = "Bearer eyJhbGciOiJIUzI1NiJ9.test.sig";
+    let result = redact_with_compiled(text, &compiled);
+    assert!(result.contains("[REDACTED]"));
+}

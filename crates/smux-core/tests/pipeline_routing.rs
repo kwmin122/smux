@@ -22,11 +22,12 @@ fn planner_plus_two_verifier_routing() {
 
     assert!(pipeline.validate().is_ok());
 
-    // Verify routing: planner output should go to BOTH verifiers
+    // Verify routing: no workers → planner output should go to BOTH verifiers
     let stage = &pipeline.stages[0];
-    assert_eq!(stage.participants.verifiers.len(), 2);
-    assert!(stage.participants.verifiers.contains(&"codex".to_string()));
-    assert!(stage.participants.verifiers.contains(&"gemini".to_string()));
+    let recipients = pipeline.stage_recipients_for_planner(stage);
+    assert_eq!(recipients.len(), 2);
+    assert!(recipients.contains(&"codex".to_string()));
+    assert!(recipients.contains(&"gemini".to_string()));
 }
 
 #[test]
@@ -45,6 +46,16 @@ fn planner_to_worker_dispatch() {
     assert!(pipeline.validate().is_ok());
     let stage = &pipeline.stages[0];
     assert_eq!(stage.participants.workers.len(), 2);
+
+    // Actually test routing: planner dispatches to WORKERS, not verifiers
+    let recipients = pipeline.stage_recipients_for_planner(stage);
+    assert_eq!(recipients.len(), 2);
+    assert!(recipients.contains(&"frontend".to_string()));
+    assert!(recipients.contains(&"backend".to_string()));
+    // Workers don't appear — verifiers receive worker output instead
+    let worker_recipients = pipeline.stage_recipients_for_worker(stage);
+    assert_eq!(worker_recipients.len(), 1);
+    assert_eq!(worker_recipients[0], "codex");
 }
 
 #[test]

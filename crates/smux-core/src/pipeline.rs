@@ -169,9 +169,14 @@ impl SessionPipeline {
     }
 
     /// Get recipients for planner output in a given stage.
-    /// In most stages, planner output goes to verifiers.
+    /// - If stage has workers → planner dispatches to workers
+    /// - If no workers → planner output goes to verifiers
     pub fn stage_recipients_for_planner(&self, stage: &SessionStage) -> Vec<String> {
-        stage.participants.verifiers.clone()
+        if !stage.participants.workers.is_empty() {
+            stage.participants.workers.clone()
+        } else {
+            stage.participants.verifiers.clone()
+        }
     }
 
     /// Get recipients for worker output in a given stage.

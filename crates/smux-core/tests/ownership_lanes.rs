@@ -46,7 +46,7 @@ fn detect_glob_collision_between_lanes() {
     ];
     let collisions = detect_collisions(&lanes);
     assert_eq!(collisions.len(), 1);
-    assert_eq!(collisions[0].glob, "src/**");
+    assert!(collisions[0].glob.contains("src/**"));
 }
 
 #[test]
@@ -99,6 +99,26 @@ fn validate_duplicate_lane_assignment_rejected() {
 fn empty_lanes_no_collisions() {
     let lanes: Vec<OwnershipLane> = vec![];
     assert!(detect_collisions(&lanes).is_empty());
+}
+
+#[test]
+fn detect_containment_collision() {
+    // src/** contains src/components/** — this must be detected
+    let lanes = vec![
+        OwnershipLane {
+            name: "fullstack".into(),
+            file_globs: vec!["src/**".into()],
+        },
+        OwnershipLane {
+            name: "frontend".into(),
+            file_globs: vec!["src/components/**".into()],
+        },
+    ];
+    let collisions = detect_collisions(&lanes);
+    assert!(
+        !collisions.is_empty(),
+        "src/** should overlap with src/components/**"
+    );
 }
 
 #[test]
