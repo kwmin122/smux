@@ -2,18 +2,18 @@
 
 ## Status
 
-Proposed and approved for planning on 2026-03-24.
+Proposed and revised on 2026-03-24 after architecture review.
 
 ## Goal
 
-Build a macOS-first terminal product that feels as fast and correct as cmux/tmux, fixes Korean IME/input quality at the root, and turns multi-agent coding into a real operator workflow instead of a brittle demo.
+Build a macOS-first terminal product that feels as fast and correct as cmux/tmux, fixes Korean IME and terminal input quality at the root, and turns multi-agent coding into a real operator workflow instead of a brittle demo.
 
 ## Product Position
 
 smux should stop thinking of itself as "two agents ping-ponging" and instead become a:
 
 - native terminal workspace for real AI CLIs
-- role-based multi-agent relay engine
+- role-based multi-agent relay pipeline
 - gated execution and verification system
 - policy-aware operator console for teams
 
@@ -111,6 +111,7 @@ Verdict: choose this.
 4. Ownership before concurrency. Parallel workers only run with explicit work ownership.
 5. Restore is mandatory. Sessions must survive app close, daemon restarts, and operator context switching.
 6. Policy is a product feature. Team controls are part of the core design, not a late enterprise add-on.
+7. Highest-risk integration first. libghostty IME viability is a day-one gate, not a late milestone.
 
 ## User Experience Model
 
@@ -149,9 +150,10 @@ The default workspace contains:
 
 The user can always type directly into any agent terminal. Buttons and shortcuts are accelerators, not replacements.
 
-## Multi-Agent Session Graph
+## Multi-Agent Session Pipeline
 
-smux should model sessions as a directed graph of agents and lanes rather than a fixed planner/verifier pair.
+smux should model sessions as a stage pipeline with participant slots rather than a fixed planner/verifier pair.
+An explicit general-purpose graph engine is not required for the first product version. Routing can be derived from stage definitions.
 
 ### Roles
 
@@ -169,16 +171,43 @@ smux should model sessions as a directed graph of agents and lanes rather than a
 - planner + frontend worker + backend worker + verifier
 - planner + multiple workers + integrator + multiple verifiers
 
+### Pipeline model
+
+The pipeline is:
+
+- `Ideate`
+- `Plan`
+- `Execute(workers[])`
+- `Verify`
+- `Harden`
+
+Each stage has:
+
+- participant slots
+- entry criteria
+- exit criteria
+- approval mode
+- verifier consensus rules where applicable
+
+This is expressive enough for:
+
+- one planner plus two verifiers
+- frontend and backend worker splits
+- one continuous verifier during execution
+- later integrator and auditor roles
+
+without exposing an arbitrary graph engine to users or the first implementation.
+
 ### Constraints
 
-Free-form all-to-all messaging should not be allowed by default. Each stage should use routing policies so the system stays legible, efficient, and auditable.
+Free-form all-to-all messaging should not be allowed by default. Each stage should use derived routing rules so the system stays legible, efficient, and auditable.
 
 Examples:
 
-- ideation: `planner -> verifiers`
-- planning: `planner -> verifiers -> planner`
-- execution: `planner -> workers`
-- worker completion: `worker -> verifiers -> planner`
+- ideation: `planner -> ideation reviewers`
+- planning: `planner -> verifier(s) -> planner`
+- execution dispatch: `planner -> workers`
+- execution review: `worker -> verifier(s) -> planner`
 - integration: `integrator <- approved workers`
 
 ## Consensus and Routing
@@ -250,6 +279,30 @@ Exit criteria:
 - quality bar met
 - session ready for handoff, merge, or release
 
+## Toolchain Gate
+
+The native shell effort has an explicit toolchain and viability gate before broader implementation.
+
+### Day-one gate
+
+The first executable milestone is:
+
+- libghostty integrated into a tiny native shell
+- Korean IME confirmed in a terminal view
+- PTY attach confirmed
+
+If this fails, the product should stop and reassess before daemon, policy, or pipeline work expands further.
+
+### Toolchain direction
+
+The first proof of concept may use a pinned prebuilt `xcframework` if it shortens feedback time.
+The product path should still assume full Xcode availability for native app build, debugging, signing, packaging, and release.
+
+### Dependency pinning
+
+`ghostty-org/ghostty` must be pinned to a specific commit or release artifact.
+Upgrades should be deliberate and tested, not floating.
+
 ## Native Shell Architecture
 
 ### Layer split
@@ -276,7 +329,7 @@ Responsibilities:
 
 #### Layer 2: Native shell
 
-Create a new native crate and macOS app shell.
+Create a native macOS project under `macos/smux`, not as a Cargo workspace crate.
 
 Responsibilities:
 
@@ -346,7 +399,7 @@ Windows remains a valid future target, but not through the same UI codebase.
 
 Plan for this now by keeping:
 
-- session graph logic in Rust
+- session pipeline logic in Rust
 - IPC protocol UI-agnostic
 - policy engine UI-agnostic
 - shell-specific rendering behind an app shell interface
@@ -362,6 +415,8 @@ without redoing the orchestration core.
 
 ### Milestone 1: Native terminal foundation
 
+- toolchain ready
+- libghostty viability proven
 - native app shell created
 - libghostty panes rendering
 - PTY bridge working
@@ -369,7 +424,7 @@ without redoing the orchestration core.
 
 ### Milestone 2: Relay engine upgrade
 
-- session graph replaces fixed planner/verifier pair
+- session pipeline replaces fixed planner/verifier pair
 - multiple verifiers and worker lanes supported
 - routing and consensus configurable
 
@@ -398,8 +453,8 @@ Mitigation:
 ### Risk 2: Multi-agent complexity explosion
 
 Mitigation:
-- constrain topology with role presets
-- allow advanced custom graphs only behind explicit configuration
+- constrain topology with stage presets
+- allow advanced custom configurations only through explicit participant slots and ownership rules
 
 ### Risk 3: Parallel worker merge pain
 
@@ -413,6 +468,12 @@ Mitigation:
 - default to summaries and stage state
 - keep raw transcripts collapsible
 
+### Risk 5: libghostty API churn
+
+Mitigation:
+- pin Ghostty to a specific commit or artifact
+- upgrade deliberately behind a compatibility check
+
 ## Decision
 
 smux should move from:
@@ -423,7 +484,7 @@ smux should move from:
 to:
 
 - macOS-native Swift plus libghostty shell
-- role-based multi-agent relay engine over real PTYs
+- stage-based multi-agent relay pipeline over real PTYs
 
 This is the architecture most likely to produce the terminal quality, Korean input fidelity, and operator-grade workflow the product is aiming for.
 
@@ -433,6 +494,8 @@ This is the architecture most likely to produce the terminal quality, Korean inp
 - Ghostty features: https://ghostty.org/docs/features
 - Ghostty AppleScript: https://ghostty.org/docs/features/applescript
 - Ghostty keybinding reference: https://ghostty.org/docs/config/keybind/reference
+- Ghostty build docs: https://ghostty.org/docs/install/build
+- Ghostty about: https://ghostty.org/docs/about
 - tmux wiki: https://github.com/tmux/tmux/wiki
 - tmux advanced use: https://github.com/tmux/tmux/wiki/Advanced-Use
 - Tauri webview versions: https://v2.tauri.app/reference/webview-versions/
