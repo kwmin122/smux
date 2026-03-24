@@ -6,7 +6,7 @@ Proposed and revised on 2026-03-24 after architecture review.
 
 ## Goal
 
-Build a macOS-first terminal product that feels as fast and correct as cmux/tmux, fixes Korean IME and terminal input quality at the root, and turns multi-agent coding into a real operator workflow instead of a brittle demo.
+Build a macOS-first native terminal product that feels as fast and durable as cmux/tmux, has first-class macOS app ergonomics from day one, and turns multi-agent coding into a real operator workflow instead of a brittle demo.
 
 ## Product Position
 
@@ -23,7 +23,8 @@ The user experience stays terminal-native. Users still run `claude`, `codex`, `g
 
 ### Primary requirement
 
-Korean IME and terminal quality are not optional. The current Tauri plus xterm.js stack can be patched around, but not trusted as the long-term base for a product whose first serious users will type Korean inside terminal panes all day.
+The product thesis is not "Korean support." The thesis is a cmux/tmux-class native terminal shell with durable session orchestration.
+Korean IME is still a hard acceptance gate because it quickly exposes whether the chosen terminal stack is fundamentally trustworthy on macOS.
 
 ### Architecture conclusion
 
@@ -35,6 +36,7 @@ The best fit is:
 - PTY, session persistence, routing, policy, consensus: existing Rust layer extended
 
 This preserves the current Rust investment while replacing only the weakest layer: the webview terminal shell.
+It also aligns the project with how serious macOS terminal products are actually built, debugged, profiled, and shipped.
 
 ## Alternatives Compared
 
@@ -111,7 +113,8 @@ Verdict: choose this.
 4. Ownership before concurrency. Parallel workers only run with explicit work ownership.
 5. Restore is mandatory. Sessions must survive app close, daemon restarts, and operator context switching.
 6. Policy is a product feature. Team controls are part of the core design, not a late enterprise add-on.
-7. Highest-risk integration first. libghostty IME viability is a day-one gate, not a late milestone.
+7. Highest-risk integration first. libghostty viability is a day-one gate, not a late milestone.
+8. Xcode-first development. The native shell should be designed and debugged in its real product toolchain from the start.
 
 ## User Experience Model
 
@@ -295,8 +298,20 @@ If this fails, the product should stop and reassess before daemon, policy, or pi
 
 ### Toolchain direction
 
-The first proof of concept may use a pinned prebuilt `xcframework` if it shortens feedback time.
-The product path should still assume full Xcode availability for native app build, debugging, signing, packaging, and release.
+The product path assumes full Xcode availability from day zero for native app build, debugging, signing, packaging, profiling, and release.
+
+Prebuilt `xcframework` usage is allowed only as a dependency bootstrap shortcut. It does not replace the Xcode-first development model. The intended framing is:
+
+- Xcode-first app project
+- prebuilt libghostty artifact optional
+- source build later if needed
+
+The wrong framing is:
+
+- prebuilt first
+- maybe Xcode later
+
+That optimizes for setup convenience instead of optimizing for the real product environment.
 
 ### Dependency pinning
 

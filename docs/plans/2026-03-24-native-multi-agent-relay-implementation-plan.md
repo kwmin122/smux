@@ -2,15 +2,15 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Replace the current Tauri-first shell direction with a macOS-native libghostty shell while upgrading smux from a fixed planner/verifier loop into a stage-based multi-agent relay pipeline over real PTYs.
+**Goal:** Replace the current Tauri-first shell direction with a cmux/tmux-class macOS-native libghostty shell while upgrading smux from a fixed planner/verifier loop into a stage-based multi-agent relay pipeline over real PTYs.
 
-**Architecture:** Keep the Rust orchestration core as the durable source of truth. Add a native macOS project outside the Cargo workspace, extend the daemon and core to support stage pipelines, ownership lanes, and consensus, and keep the old Tauri app available until the native shell reaches parity.
+**Architecture:** Keep the Rust orchestration core as the durable source of truth. Add a native macOS project outside the Cargo workspace, develop it in Xcode from day zero, extend the daemon and core to support stage pipelines, ownership lanes, and consensus, and keep the old Tauri app available until the native shell reaches parity.
 
 **Tech Stack:** Rust workspace crates, Swift/AppKit or SwiftUI macOS shell, libghostty, PTY integration, Unix socket IPC, TOML config, xcodebuild, swift build, cargo test, cargo fmt, cargo clippy.
 
 ---
 
-### Task 0: Prepare disk space and choose the initial toolchain path
+### Task 0: Prepare disk space and establish the Xcode-first toolchain
 
 **Files:**
 - Modify: `docs/plans/2026-03-24-native-multi-agent-relay-design.md`
@@ -21,8 +21,8 @@
 
 Write down:
 - minimum free disk target: 20 GB or more
-- preferred product toolchain: full Xcode installed
-- allowed PoC shortcut: pinned prebuilt `xcframework` if disk is constrained
+- required product toolchain: full Xcode installed
+- optional dependency shortcut: pinned prebuilt `xcframework` if it helps bootstrap libghostty
 
 **Step 2: Verify the machine state**
 
@@ -38,13 +38,14 @@ Expected:
 - enough free disk for the chosen path
 - clear visibility into whether Xcode, Swift, and Zig are installed
 
-**Step 3: Decide the day-one toolchain**
+**Step 3: Fix the day-one toolchain policy**
 
-Choose one:
-- prebuilt `xcframework` PoC for fastest viability test
-- full Xcode path for immediate product-grade setup
+Set:
+- Xcode as mandatory from day zero
+- prebuilt `xcframework` as optional dependency bootstrap only
+- Ghostty artifact pinned to an exact source and version or commit
 
-Pin the decision in the ADR with the exact Ghostty artifact source and version or commit.
+Record that policy in the ADR.
 
 **Step 4: Re-run the checklist**
 
@@ -54,7 +55,7 @@ df -h .
 xcode-select -p
 ```
 
-Expected: the selected path is feasible before implementation starts.
+Expected: the Xcode-first path is feasible before implementation starts.
 
 **Step 5: Commit**
 
@@ -64,7 +65,7 @@ git add docs/plans/2026-03-24-native-multi-agent-relay-design.md docs/plans/2026
 git commit -m "docs: add native toolchain gate"
 ```
 
-### Task 1: Build a libghostty proof of concept and validate Korean IME
+### Task 1: Build a libghostty proof of concept inside the Xcode-first shell and validate acceptance gates
 
 **Files:**
 - Create: `macos/smux/Package.swift`
@@ -75,7 +76,7 @@ git commit -m "docs: add native toolchain gate"
 
 **Step 1: Write the failing integration target**
 
-Create a tiny native shell target that links a pinned libghostty artifact and attempts to render one terminal surface.
+Create a tiny native shell target that links a pinned libghostty artifact and attempts to render one terminal surface inside the real macOS app shell.
 
 **Step 2: Run the build to verify it fails before integration**
 
@@ -93,7 +94,7 @@ Build a tiny macOS app that proves:
 - a shell can attach to a PTY
 - Korean IME composition works inside the terminal surface
 
-Pin the Ghostty dependency to an exact commit or exact binary artifact version.
+Pin the Ghostty dependency to an exact commit or exact binary artifact version. If a prebuilt artifact is used here, treat it strictly as dependency bootstrap, not as a replacement for the Xcode-first setup.
 
 **Step 4: Run the kill-or-go verification**
 
@@ -108,7 +109,7 @@ Then manually verify:
 - Korean IME composition works
 - pasted Korean text renders correctly
 
-Expected: PASS on all four checks. If Korean IME fails, stop the native-shell rollout and reassess before continuing.
+Expected: PASS on all four checks. If Korean IME fails, stop the native-shell rollout and reassess before continuing. This is an acceptance gate, not the product thesis.
 
 **Step 5: Commit**
 
@@ -118,7 +119,7 @@ git add macos/smux docs/plans/2026-03-24-libghostty-poc-report.md
 git commit -m "feat: prove libghostty native shell viability"
 ```
 
-### Task 2: Add native-shell project scaffolding
+### Task 2: Expand the native Xcode shell project scaffolding
 
 **Files:**
 - Create: `macos/smux/SmuxApp.xcodeproj/project.pbxproj`
