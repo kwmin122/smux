@@ -42,6 +42,19 @@ pub enum ClientMessage {
     },
     /// Gracefully shut down the daemon.
     Shutdown,
+    /// Start a session using a pipeline definition (v0.6+).
+    StartSessionWithPipeline {
+        task: String,
+        /// Vec of (agent_id, role) pairs.
+        agents: Vec<(String, String)>,
+        /// Stage names in order.
+        stages: Vec<String>,
+        /// "gated" or "full_auto".
+        approval_mode: String,
+        /// Consensus strategy.
+        consensus: String,
+        max_rounds: u32,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +86,12 @@ pub enum DaemonMessage {
     Error { message: String },
     /// Generic acknowledgement.
     Ok,
+    /// A pipeline stage transition occurred (v0.6+).
+    StageTransition {
+        from: String,
+        to: String,
+        approval: String,
+    },
 }
 
 /// Individual verifier verdict info for IPC (simplified for wire format).

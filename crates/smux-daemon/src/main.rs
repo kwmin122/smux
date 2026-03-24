@@ -429,6 +429,24 @@ async fn handle_client(
                 send_message(&mut stream, &DaemonMessage::Ok).await?;
                 return Ok(());
             }
+
+            ClientMessage::StartSessionWithPipeline { task, agents, .. } => {
+                tracing::info!(task = %task, agents = ?agents, "pipeline session requested (v0.6+)");
+                // For now, extract first planner/verifier and delegate to existing session logic
+                let planner = agents
+                    .iter()
+                    .find(|(_, r)| r == "planner")
+                    .map(|(id, _)| id.clone())
+                    .unwrap_or_else(|| "claude".to_string());
+                let verifier = agents
+                    .iter()
+                    .find(|(_, r)| r == "verifier")
+                    .map(|(id, _)| id.clone())
+                    .unwrap_or_else(|| "codex".to_string());
+                send_message(&mut stream, &DaemonMessage::Error {
+                    message: format!("pipeline sessions not yet fully implemented — use planner={planner} verifier={verifier} for now"),
+                }).await?;
+            }
         }
     }
 }
