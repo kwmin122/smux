@@ -116,6 +116,13 @@ class GhosttyTerminalView: NSView {
             for text in texts {
                 sendKey(action, event: event, text: text, composing: false)
             }
+            // If we had marked text (IME was composing) and the key that ended it
+            // was Enter/Return, send the Enter as a separate key event too.
+            // Without this, Enter during Korean composition only commits the text
+            // but doesn't execute the command — user has to press Enter twice.
+            if hadMarkedText && (event.keyCode == 36 || event.keyCode == 76) {
+                sendKey(action, event: event, text: nil, composing: false)
+            }
         } else {
             let composing = markedText.length > 0 || hadMarkedText
             let text = event.ghosttyCharacters
