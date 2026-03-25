@@ -99,18 +99,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeFirstResponder(termView)
         window.makeKeyAndOrderFront(nil)
 
-        // Tick timer
-        Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+        // Tick timer — only when needed, invalidated on quit
+        tickTimer = Timer.scheduledTimer(withTimeInterval: 1.0/120.0, repeats: true) { [weak self] _ in
             guard let a = self?.ghosttyApp else { return }
             ghostty_app_tick(a)
         }
     }
 
+    var tickTimer: Timer?
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ notification: Notification) {
+        tickTimer?.invalidate()
+        tickTimer = nil
         terminalView = nil
-        if let a = ghosttyApp { ghostty_app_free(a) }
+        if let a = ghosttyApp {
+            ghostty_app_free(a)
+            ghosttyApp = nil
+        }
     }
 }
 
