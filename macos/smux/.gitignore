@@ -1,1 +1,3 @@
 Frameworks/GhosttyKit.xcframework
+.build/
+DerivedData/
