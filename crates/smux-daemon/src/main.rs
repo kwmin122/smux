@@ -305,6 +305,7 @@ async fn handle_client(
                     task,
                     capped_max_rounds,
                     safety_config,
+                    None, // legacy mode: no pipeline
                 );
 
                 send_message(
@@ -508,6 +509,29 @@ async fn handle_client(
                     .sessions
                     .insert(session_id.clone(), handle.clone());
 
+                // Convert IPC stages to pipeline
+                use smux_core::pipeline::{
+                    ApprovalMode, SessionPipeline, SessionStage, StageParticipants,
+                };
+                let pipeline_stages: Vec<SessionStage> = stages
+                    .iter()
+                    .map(|s| SessionStage {
+                        name: s.name.clone(),
+                        participants: StageParticipants {
+                            planners: s.planners.clone(),
+                            verifiers: s.verifiers.clone(),
+                            workers: s.workers.clone(),
+                        },
+                        approval_mode: if s.approval_mode == "full_auto" {
+                            ApprovalMode::FullAuto
+                        } else {
+                            ApprovalMode::Gated
+                        },
+                        consensus: s.consensus.clone(),
+                    })
+                    .collect();
+                let session_pipeline = SessionPipeline::new(pipeline_stages);
+
                 let safety_config = state.lock().await.config.safety.clone();
                 let config_max_rounds = state.lock().await.config.defaults.max_rounds;
                 let capped_max_rounds = max_rounds.min(config_max_rounds.max(1));
@@ -519,6 +543,7 @@ async fn handle_client(
                     task,
                     capped_max_rounds,
                     safety_config,
+                    Some(session_pipeline), // pipeline mode
                 );
 
                 send_message(
@@ -569,6 +594,7 @@ async fn stream_events_to_client(
 // Spawn orchestrator session task
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 fn spawn_session(
     handle: Arc<SessionHandle>,
     planner: String,
@@ -577,6 +603,7 @@ fn spawn_session(
     task: String,
     max_rounds: u32,
     safety_config: smux_core::config::SafetyConfig,
+    pipeline: Option<smux_core::pipeline::SessionPipeline>,
 ) {
     tokio::spawn(async move {
         let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/tmp"));
@@ -761,7 +788,14 @@ fn spawn_session(
 
         let mut orchestrator = Orchestrator::new_multi(planner_adapter, verifier_adapters, config)
             .with_event_sink(event_tx);
-        let outcome = orchestrator.run().await;
+
+        // Use pipeline execution if provided, otherwise legacy ping-pong
+        let outcome = if let Some(ref pl) = pipeline {
+            tracing::info!(stages = pl.stages.len(), "running pipeline session");
+            orchestrator.run_pipeline(pl).await
+        } else {
+            orchestrator.run().await
+        };
 
         let summary = match &outcome {
             OrchestratorOutcome::Approved { round, reason } => {
