@@ -738,3 +738,68 @@ async fn collect_stream_recording(
     // Prefer TurnComplete (full output) over concatenated chunks.
     Ok(complete.unwrap_or(chunks))
 }
+
+// ---------------------------------------------------------------------------
+// Pipeline-aware orchestration (v0.6+)
+// ---------------------------------------------------------------------------
+
+use crate::pipeline::{ApprovalMode, SessionPipeline};
+
+/// Extension for StageTransition event.
+#[derive(Debug, Clone)]
+pub struct StageTransitionInfo {
+    pub stage: String,
+    pub index: u32,
+    pub total: u32,
+}
+
+impl Orchestrator {
+    /// Run a pipeline session through stages.
+    ///
+    /// Each stage uses the orchestrator's existing ping-pong loop.
+    /// Stage transitions emit events. This is the real runtime path.
+    pub async fn run_pipeline(&mut self, pipeline: &SessionPipeline) -> OrchestratorOutcome {
+        for (i, stage) in pipeline.stages.iter().enumerate() {
+            tracing::info!(
+                stage = %stage.name,
+                index = i,
+                total = pipeline.stages.len(),
+                planners = ?stage.participants.planners,
+                verifiers = ?stage.participants.verifiers,
+                workers = ?stage.participants.workers,
+                approval = ?stage.approval_mode,
+                "entering pipeline stage"
+            );
+
+            // Run the existing ping-pong loop for this stage
+            let outcome = self.run().await;
+
+            match &outcome {
+                OrchestratorOutcome::Approved { round, reason } => {
+                    tracing::info!(
+                        stage = %stage.name,
+                        round = round,
+                        reason = %reason,
+                        "stage approved"
+                    );
+                    if stage.approval_mode == ApprovalMode::Gated {
+                        tracing::info!(stage = %stage.name, "gated stage — auto-advancing (TODO: user gate)");
+                    }
+                }
+                OrchestratorOutcome::MaxRoundsReached { .. } => {
+                    tracing::warn!(stage = %stage.name, "max rounds reached");
+                    return outcome;
+                }
+                OrchestratorOutcome::Error { .. } => {
+                    tracing::error!(stage = %stage.name, "error in stage");
+                    return outcome;
+                }
+            }
+        }
+
+        OrchestratorOutcome::Approved {
+            round: 0,
+            reason: "all pipeline stages completed".to_string(),
+        }
+    }
+}
