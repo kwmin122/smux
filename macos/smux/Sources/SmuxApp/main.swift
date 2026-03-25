@@ -2,15 +2,12 @@ import AppKit
 import libghostty
 
 // ===================================================================
-// smux native terminal — libghostty + AppKit + Korean IME
+// smux native terminal — libghostty + AppKit
 // ===================================================================
 
-// MARK: - Initialize libghostty (MUST be first)
-
+// Initialize libghostty
 let initResult = ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv)
-guard initResult == GHOSTTY_SUCCESS else {
-    fatalError("ghostty_init failed: \(initResult)")
-}
+guard initResult == GHOSTTY_SUCCESS else { fatalError("ghostty_init: \(initResult)") }
 
 // MARK: - Runtime Callbacks
 
@@ -21,7 +18,6 @@ private let wakeupCb: @convention(c) (UnsafeMutableRawPointer?) -> Void = { _ in
         }
     }
 }
-
 private let actionCb: @convention(c) (ghostty_app_t?, ghostty_target_s, ghostty_action_s) -> Bool = { _, _, _ in false }
 private let readCb: @convention(c) (UnsafeMutableRawPointer?, ghostty_clipboard_e, UnsafeMutableRawPointer?) -> Bool = { _, _, _ in false }
 private let confirmCb: @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafeMutableRawPointer?, ghostty_clipboard_request_e) -> Void = { _, _, _, _ in }
@@ -33,22 +29,13 @@ private let closeCb: @convention(c) (UnsafeMutableRawPointer?, Bool) -> Void = {
 // MARK: - App Delegate
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var window: NSWindow!
     var ghosttyApp: ghostty_app_t?
-    var terminalView: GhosttyTerminalView?
+    var workspaceController: WorkspaceWindowController?
+    var tickTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        window = NSWindow(
-            contentRect: NSRect(x: 100, y: 100, width: 900, height: 600),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "smux"
-        window.backgroundColor = .black
-
         // Config
-        guard let config = ghostty_config_new() else { fatalError("config failed") }
+        guard let config = ghostty_config_new() else { fatalError("config") }
         ghostty_config_load_default_files(config)
         ghostty_config_finalize(config)
 
@@ -63,61 +50,82 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         rt.write_clipboard_cb = writeCb
         rt.close_surface_cb = closeCb
 
-        // App
         guard let gApp = ghostty_app_new(&rt, config) else {
             ghostty_config_free(config)
-            fatalError("ghostty_app_new failed")
+            fatalError("ghostty_app_new")
         }
         ghostty_config_free(config)
         self.ghosttyApp = gApp
 
-        let info = ghostty_info()
-        let ver = info.version != nil ? String(cString: info.version) : "?"
-        print("✅ smux — ghostty \(ver)")
-
-        // Check daemon connection
-        let ipc = SmuxIpcClient()
-        if ipc.isDaemonRunning {
-            print("✅ daemon connected")
-            window.title = "smux — daemon ●"
-        } else {
-            print("⚠️ daemon not running (smux daemon start)")
-            window.title = "smux — daemon ○"
-        }
-
-        // Terminal view
-        let termView = GhosttyTerminalView(frame: window.contentView!.bounds, app: gApp)
-        termView.autoresizingMask = [.width, .height]
-        window.contentView?.addSubview(termView)
-        self.terminalView = termView
-
-        // CRITICAL: activate the app so it can receive keyboard events.
-        // Without this, CLI-launched apps stay in background and keyDown never fires.
+        // Activate app (CRITICAL for keyboard input from CLI launch)
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
-        window.makeFirstResponder(termView)
-        window.makeKeyAndOrderFront(nil)
+        // Create workspace
+        workspaceController = WorkspaceWindowController(app: gApp)
+        workspaceController?.showWindow(nil)
 
-        // Tick timer — only when needed, invalidated on quit
+        // Daemon status
+        let ipc = SmuxIpcClient()
+        if ipc.isDaemonRunning {
+            workspaceController?.window?.title = "smux — daemon ●"
+        }
+
+        // Setup menu bar
+        setupMenuBar()
+
+        // Tick timer
         tickTimer = Timer.scheduledTimer(withTimeInterval: 1.0/120.0, repeats: true) { [weak self] _ in
             guard let a = self?.ghosttyApp else { return }
             ghostty_app_tick(a)
         }
     }
 
-    var tickTimer: Timer?
+    func setupMenuBar() {
+        let mainMenu = NSMenu()
+
+        // App menu
+        let appMenu = NSMenu()
+        appMenu.addItem(NSMenuItem(title: "Quit smux", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let appItem = NSMenuItem()
+        appItem.submenu = appMenu
+        mainMenu.addItem(appItem)
+
+        // File menu
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(NSMenuItem(title: "New Tab", action: #selector(newTab), keyEquivalent: "t"))
+        fileMenu.addItem(NSMenuItem(title: "Close", action: #selector(closeTab), keyEquivalent: "w"))
+        let fileItem = NSMenuItem()
+        fileItem.submenu = fileMenu
+        mainMenu.addItem(fileItem)
+
+        // View menu
+        let viewMenu = NSMenu(title: "View")
+        viewMenu.addItem(NSMenuItem(title: "Split Vertical", action: #selector(splitV), keyEquivalent: "d"))
+
+        let splitHItem = NSMenuItem(title: "Split Horizontal", action: #selector(splitH), keyEquivalent: "d")
+        splitHItem.keyEquivalentModifierMask = [.command, .shift]
+        viewMenu.addItem(splitHItem)
+
+        let viewItem = NSMenuItem()
+        viewItem.submenu = viewMenu
+        mainMenu.addItem(viewItem)
+
+        NSApp.mainMenu = mainMenu
+    }
+
+    @objc func newTab() { workspaceController?.newTab() }
+    @objc func closeTab() { workspaceController?.window?.close() }
+    @objc func splitV() { workspaceController?.splitVertical() }
+    @objc func splitH() { workspaceController?.splitHorizontal() }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ notification: Notification) {
         tickTimer?.invalidate()
         tickTimer = nil
-        terminalView = nil
-        if let a = ghosttyApp {
-            ghostty_app_free(a)
-            ghosttyApp = nil
-        }
+        workspaceController = nil
+        if let a = ghosttyApp { ghostty_app_free(a); ghosttyApp = nil }
     }
 }
 

@@ -9,6 +9,27 @@
     "swift-dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.swiftdeps",
     "diagnostics": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.dia"
   },
+  "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/IpcClient.swift": {
+    "dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient.d",
+    "object": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient.swift.o",
+    "swiftmodule": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient~partial.swiftmodule",
+    "swift-dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient.swiftdeps",
+    "diagnostics": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient.dia"
+  },
+  "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/SessionModel.swift": {
+    "dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel.d",
+    "object": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel.swift.o",
+    "swiftmodule": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel~partial.swiftmodule",
+    "swift-dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel.swiftdeps",
+    "diagnostics": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel.dia"
+  },
+  "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/WorkspaceWindowController.swift": {
+    "dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController.d",
+    "object": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController.swift.o",
+    "swiftmodule": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController~partial.swiftmodule",
+    "swift-dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController.swiftdeps",
+    "diagnostics": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController.dia"
+  },
   "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/main.swift": {
     "dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.d",
     "object": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.swift.o",

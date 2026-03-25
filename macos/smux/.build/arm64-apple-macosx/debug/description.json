@@ -41,6 +41,18 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/IpcClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/SessionModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/WorkspaceWindowController.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/main.swift"
         },
         {
@@ -61,6 +73,9 @@
       "moduleOutputPath" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/Modules/SmuxApp.swiftmodule",
       "objects" : [
         "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.swift.o",
+        "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient.swift.o",
+        "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel.swift.o",
+        "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController.swift.o",
         "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.swift.o"
       ],
       "otherArguments" : [
@@ -134,6 +149,18 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.swift.o"
         },
         {
@@ -144,6 +171,9 @@
       "prepareForIndexing" : false,
       "sources" : [
         "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/GhosttyTerminalView.swift",
+        "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/IpcClient.swift",
+        "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/SessionModel.swift",
+        "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/WorkspaceWindowController.swift",
         "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/main.swift"
       ],
       "tempsPath" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build",
@@ -162,6 +192,9 @@
       "smux",
       "-c",
       "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/GhosttyTerminalView.swift",
+      "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/IpcClient.swift",
+      "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/SessionModel.swift",
+      "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/WorkspaceWindowController.swift",
       "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/main.swift",
       "-I",
       "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/Modules",
@@ -274,6 +307,18 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/IpcClient.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/SessionModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/WorkspaceWindowController.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/main.swift"
         }
       ],
@@ -289,6 +334,18 @@
         {
           "kind" : "file",
           "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/IpcClient.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/SessionModel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/WorkspaceWindowController.swift.o"
         },
         {
           "kind" : "file",
