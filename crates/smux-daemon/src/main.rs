@@ -430,22 +430,106 @@ async fn handle_client(
                 return Ok(());
             }
 
-            ClientMessage::StartSessionWithPipeline { task, agents, .. } => {
-                tracing::info!(task = %task, agents = ?agents, "pipeline session requested (v0.6+)");
-                // For now, extract first planner/verifier and delegate to existing session logic
+            ClientMessage::StartSessionWithPipeline {
+                task,
+                agents,
+                stages,
+                max_rounds,
+            } => {
+                tracing::info!(
+                    task = %task,
+                    agents = ?agents,
+                    stages = stages.len(),
+                    "pipeline session requested"
+                );
+
+                // Extract planner and verifiers from agents list
                 let planner = agents
                     .iter()
                     .find(|(_, r)| r == "planner")
                     .map(|(id, _)| id.clone())
                     .unwrap_or_else(|| "claude".to_string());
-                let verifier = agents
+                let effective_verifiers: Vec<String> = agents
                     .iter()
-                    .find(|(_, r)| r == "verifier")
+                    .filter(|(_, r)| r == "verifier")
                     .map(|(id, _)| id.clone())
-                    .unwrap_or_else(|| "codex".to_string());
-                send_message(&mut stream, &DaemonMessage::Error {
-                    message: format!("pipeline sessions not yet fully implemented — use planner={planner} verifier={verifier} for now"),
-                }).await?;
+                    .collect();
+                let consensus = if !stages.is_empty() {
+                    stages[0].consensus.clone()
+                } else {
+                    "majority".to_string()
+                };
+
+                // Create event channel for this session
+                let (event_tx, _) = broadcast::channel(256);
+
+                // Log pipeline stage info
+                for stage in &stages {
+                    tracing::info!(
+                        stage = %stage.name,
+                        planners = ?stage.planners,
+                        verifiers = ?stage.verifiers,
+                        workers = ?stage.workers,
+                        approval = %stage.approval_mode,
+                        "pipeline stage"
+                    );
+                }
+
+                // Emit stage transition event
+                let _ = event_tx.send(DaemonMessage::StageTransition {
+                    from: "none".to_string(),
+                    to: stages
+                        .first()
+                        .map(|s| s.name.clone())
+                        .unwrap_or_else(|| "execute".to_string()),
+                    approval: stages
+                        .first()
+                        .map(|s| s.approval_mode.clone())
+                        .unwrap_or_else(|| "gated".to_string()),
+                });
+
+                // Create session — delegate to existing orchestrator
+                // (pipeline routing inside orchestrator is future work)
+                let session_id = uuid::Uuid::new_v4().to_string();
+                let handle = Arc::new(SessionHandle {
+                    id: session_id.clone(),
+                    task: task.clone(),
+                    planner: planner.clone(),
+                    verifier: effective_verifiers.first().cloned().unwrap_or_default(),
+                    verifiers: effective_verifiers.clone(),
+                    current_round: Arc::new(Mutex::new(0)),
+                    status: Arc::new(Mutex::new(SessionStatus::Running)),
+                    event_tx: event_tx.clone(),
+                });
+
+                state
+                    .lock()
+                    .await
+                    .sessions
+                    .insert(session_id.clone(), handle.clone());
+
+                let safety_config = state.lock().await.config.safety.clone();
+                let config_max_rounds = state.lock().await.config.defaults.max_rounds;
+                let capped_max_rounds = max_rounds.min(config_max_rounds.max(1));
+                spawn_session(
+                    handle.clone(),
+                    planner,
+                    effective_verifiers,
+                    consensus,
+                    task,
+                    capped_max_rounds,
+                    safety_config,
+                );
+
+                send_message(
+                    &mut stream,
+                    &DaemonMessage::SessionCreated {
+                        session_id: session_id.clone(),
+                    },
+                )
+                .await?;
+
+                stream_events_to_client(&mut stream, &handle).await?;
             }
         }
     }

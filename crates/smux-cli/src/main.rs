@@ -44,6 +44,14 @@ enum Commands {
         /// Maximum planner-verifier rounds
         #[arg(long)]
         max_rounds: Option<u32>,
+
+        /// Use pipeline mode (multi-stage: ideate→plan→execute→harden)
+        #[arg(long)]
+        pipeline: bool,
+
+        /// Workers for parallel execution (comma-separated, e.g. frontend,backend)
+        #[arg(long, value_delimiter = ',')]
+        workers: Option<Vec<String>>,
     },
 
     /// Initialize config file at ~/.smux/config.toml
@@ -135,6 +143,8 @@ async fn main() {
             consensus,
             task,
             max_rounds,
+            pipeline,
+            workers,
         } => {
             // Load config; CLI flags override config values.
             let config = match SmuxConfig::load() {
@@ -165,13 +175,84 @@ async fn main() {
                 }
             };
 
-            let msg = ClientMessage::StartSession {
-                planner: planner.clone(),
-                verifier: verifier.clone(),
-                task: task.clone(),
-                max_rounds,
-                verifiers: verifiers_list,
-                consensus: consensus_str,
+            let msg = if pipeline {
+                // Pipeline mode: build per-stage definitions
+                use smux_core::ipc::IpcStageDefinition;
+                let worker_list = workers.unwrap_or_default();
+                let all_verifiers: Vec<String> = if verifiers_list.is_empty() {
+                    vec![verifier.clone()]
+                } else {
+                    let mut v = vec![verifier.clone()];
+                    v.extend(verifiers_list.iter().cloned());
+                    v.dedup();
+                    v
+                };
+
+                let mut agents: Vec<(String, String)> =
+                    vec![(planner.clone(), "planner".to_string())];
+                for v in &all_verifiers {
+                    agents.push((v.clone(), "verifier".to_string()));
+                }
+                for w in &worker_list {
+                    agents.push((w.clone(), "worker".to_string()));
+                }
+
+                let stages = vec![
+                    IpcStageDefinition {
+                        name: "ideate".to_string(),
+                        approval_mode: "full_auto".to_string(),
+                        consensus: "none".to_string(),
+                        planners: vec![planner.clone()],
+                        verifiers: vec![],
+                        workers: vec![],
+                    },
+                    IpcStageDefinition {
+                        name: "plan".to_string(),
+                        approval_mode: "gated".to_string(),
+                        consensus: consensus_str.clone(),
+                        planners: vec![planner.clone()],
+                        verifiers: all_verifiers.clone(),
+                        workers: vec![],
+                    },
+                    IpcStageDefinition {
+                        name: "execute".to_string(),
+                        approval_mode: "gated".to_string(),
+                        consensus: consensus_str.clone(),
+                        planners: vec![planner.clone()],
+                        verifiers: all_verifiers.clone(),
+                        workers: worker_list.clone(),
+                    },
+                    IpcStageDefinition {
+                        name: "harden".to_string(),
+                        approval_mode: "gated".to_string(),
+                        consensus: consensus_str.clone(),
+                        planners: vec![planner.clone()],
+                        verifiers: all_verifiers,
+                        workers: vec![],
+                    },
+                ];
+
+                println!(
+                    "smux: starting pipeline session ({} stages, {} agents)",
+                    stages.len(),
+                    agents.len()
+                );
+                ClientMessage::StartSessionWithPipeline {
+                    task: task.clone(),
+                    agents,
+                    stages,
+                    max_rounds,
+                }
+            } else {
+                // Legacy mode: single planner + verifier
+                ClientMessage::StartSession {
+                    planner: planner.clone(),
+                    verifier: verifier.clone(),
+                    task: task.clone(),
+                    max_rounds,
+                    verifiers: verifiers_list,
+                    consensus: consensus_str,
+                }
             };
 
             if let Err(e) = send_message(&mut stream, &msg).await {
