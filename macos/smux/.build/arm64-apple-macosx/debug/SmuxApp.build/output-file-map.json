@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/master.swiftdeps"
+  },
+  "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/GhosttyTerminalView.swift": {
+    "dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.d",
+    "object": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.swift.o",
+    "swiftmodule": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView~partial.swiftmodule",
+    "swift-dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.swiftdeps",
+    "diagnostics": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/GhosttyTerminalView.dia"
+  },
+  "/Users/min-kyungwook/Desktop/mmux/macos/smux/Sources/SmuxApp/main.swift": {
+    "dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.d",
+    "object": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.swift.o",
+    "swiftmodule": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.swiftdeps",
+    "diagnostics": "/Users/min-kyungwook/Desktop/mmux/macos/smux/.build/arm64-apple-macosx/debug/SmuxApp.build/main.dia"
+  }
+}

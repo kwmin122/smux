@@ -1,0 +1,31 @@
+{
+  "object" : {
+    "artifacts" : [
+      {
+        "kind" : {
+          "xcframework" : {
+
+          }
+        },
+        "packageRef" : {
+          "identity" : "smux",
+          "kind" : "root",
+          "location" : "/Users/min-kyungwook/Desktop/mmux/macos/smux",
+          "name" : "smux"
+        },
+        "path" : "/Users/min-kyungwook/Desktop/mmux/macos/smux/Frameworks/GhosttyKit.xcframework",
+        "source" : {
+          "type" : "local"
+        },
+        "targetName" : "GhosttyKit"
+      }
+    ],
+    "dependencies" : [
+
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}
