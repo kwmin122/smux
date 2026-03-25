@@ -91,6 +91,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentView?.addSubview(termView)
         self.terminalView = termView
 
+        // CRITICAL: activate the app so it can receive keyboard events.
+        // Without this, CLI-launched apps stay in background and keyDown never fires.
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
         window.makeFirstResponder(termView)
         window.makeKeyAndOrderFront(nil)
 
