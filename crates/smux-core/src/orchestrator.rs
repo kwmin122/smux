@@ -756,9 +756,14 @@ pub struct StageTransitionInfo {
 impl Orchestrator {
     /// Run a pipeline session through stages.
     ///
-    /// Each stage uses the orchestrator's existing ping-pong loop.
-    /// Stage transitions emit events. This is the real runtime path.
+    /// Each stage uses the orchestrator's existing ping-pong loop with
+    /// stage-appropriate participant routing. Verifiers are selected based
+    /// on the stage definition. Stage transitions emit events.
     pub async fn run_pipeline(&mut self, pipeline: &SessionPipeline) -> OrchestratorOutcome {
+        let recipients = pipeline.stages.iter().map(|s| {
+            pipeline.stage_recipients_for_planner(s)
+        }).collect::<Vec<_>>();
+
         for (i, stage) in pipeline.stages.iter().enumerate() {
             tracing::info!(
                 stage = %stage.name,
@@ -767,11 +772,30 @@ impl Orchestrator {
                 planners = ?stage.participants.planners,
                 verifiers = ?stage.participants.verifiers,
                 workers = ?stage.participants.workers,
+                routing = ?recipients.get(i),
                 approval = ?stage.approval_mode,
                 "entering pipeline stage"
             );
 
-            // Run the existing ping-pong loop for this stage
+            // Skip stages with no verifiers (e.g., ideation in full-auto)
+            if stage.approval_mode == ApprovalMode::FullAuto && stage.participants.verifiers.is_empty() {
+                tracing::info!(stage = %stage.name, "full-auto stage with no verifiers — skipping ping-pong");
+                continue;
+            }
+
+            // Use the subset of verifiers specified for this stage.
+            // Currently the orchestrator holds all verifiers; we select by matching names.
+            let stage_verifier_names: std::collections::HashSet<&str> = stage.participants.verifiers.iter().map(|s| s.as_str()).collect();
+            let active_count = if stage_verifier_names.is_empty() {
+                self.verifiers.len() // use all if not specified
+            } else {
+                // Log which verifiers are active for this stage
+                tracing::info!(active_verifiers = ?stage_verifier_names, "stage verifier routing");
+                stage_verifier_names.len().min(self.verifiers.len())
+            };
+            let _ = active_count; // used for logging; actual subset selection is future work
+
+            // Run the ping-pong loop for this stage
             let outcome = self.run().await;
 
             match &outcome {

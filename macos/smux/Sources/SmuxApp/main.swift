@@ -63,6 +63,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create workspace
         workspaceController = WorkspaceWindowController(app: gApp)
+        workspaceController?.restoreState()
         workspaceController?.showWindow(nil)
 
         // Daemon status
@@ -103,9 +104,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let viewMenu = NSMenu(title: "View")
         viewMenu.addItem(NSMenuItem(title: "Split Vertical", action: #selector(splitV), keyEquivalent: "d"))
 
+        fileMenu.addItem(NSMenuItem(title: "Find", action: #selector(findInTerminal), keyEquivalent: "f"))
+
         let splitHItem = NSMenuItem(title: "Split Horizontal", action: #selector(splitH), keyEquivalent: "d")
         splitHItem.keyEquivalentModifierMask = [.command, .shift]
         viewMenu.addItem(splitHItem)
+
+        viewMenu.addItem(NSMenuItem(title: "Toggle Inspector", action: #selector(toggleInspector), keyEquivalent: "i"))
+        viewMenu.addItem(NSMenuItem(title: "Command Palette", action: #selector(showPalette), keyEquivalent: "p"))
 
         let viewItem = NSMenuItem()
         viewItem.submenu = viewMenu
@@ -114,14 +120,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = mainMenu
     }
 
+    @objc func findInTerminal() { workspaceController?.toggleSearch() }
     @objc func newTab() { workspaceController?.newTab() }
     @objc func closeTab() { workspaceController?.window?.close() }
     @objc func splitV() { workspaceController?.splitVertical() }
     @objc func splitH() { workspaceController?.splitHorizontal() }
+    @objc func toggleInspector() { workspaceController?.toggleInspector() }
+    @objc func showPalette() { workspaceController?.showCommandPalette() }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ notification: Notification) {
+        workspaceController?.saveState()
         tickTimer?.invalidate()
         tickTimer = nil
         workspaceController = nil
