@@ -75,6 +75,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let ver = info.version != nil ? String(cString: info.version) : "?"
         print("✅ smux — ghostty \(ver)")
 
+        // Check daemon connection
+        let ipc = SmuxIpcClient()
+        if ipc.isDaemonRunning {
+            print("✅ daemon connected")
+            window.title = "smux — daemon ●"
+        } else {
+            print("⚠️ daemon not running (smux daemon start)")
+            window.title = "smux — daemon ○"
+        }
+
         // Terminal view
         let termView = GhosttyTerminalView(frame: window.contentView!.bounds, app: gApp)
         termView.autoresizingMask = [.width, .height]
