@@ -629,12 +629,16 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     func saveState() {
         guard let window = window else { return }
         let f = window.frame
+
+        // Serialize split directions by walking NSSplitView hierarchy
+        let splits = collectSplitDirections(from: terminalContainer)
+
         let state = SessionRestore.WorkspaceState(
             windows: [SessionRestore.WindowState(
                 tabs: [SessionRestore.TabState(
                     title: window.title,
                     workingDirectory: FileManager.default.currentDirectoryPath,
-                    splits: []
+                    splits: splits
                 )],
                 activeTabIndex: 0,
                 frame: SessionRestore.FrameRect(x: Double(f.origin.x), y: Double(f.origin.y), width: Double(f.width), height: Double(f.height))
@@ -648,6 +652,38 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         guard let state = sessionRestore.load(), let ws = state.windows.first, let window = window else { return }
         let f = ws.frame
         window.setFrame(NSRect(x: f.x, y: f.y, width: f.width, height: f.height), display: true)
+
+        // Restore split layout by replaying split directions
+        guard let tab = ws.tabs.first else { return }
+        for split in tab.splits {
+            let vertical = split.direction == "vertical"
+            doSplit(vertical: vertical)
+        }
+    }
+
+    /// Walk view hierarchy to collect split directions (depth-first).
+    private func collectSplitDirections(from view: NSView) -> [SessionRestore.SplitState] {
+        var result: [SessionRestore.SplitState] = []
+        for subview in view.subviews {
+            if let split = subview as? NSSplitView {
+                let ratio: Double
+                if split.subviews.count >= 2 {
+                    let total = split.isVertical ? split.bounds.width : split.bounds.height
+                    let first = split.isVertical ? split.subviews[0].frame.width : split.subviews[0].frame.height
+                    ratio = total > 0 ? Double(first / total) : 0.5
+                } else {
+                    ratio = 0.5
+                }
+                result.append(SessionRestore.SplitState(
+                    direction: split.isVertical ? "vertical" : "horizontal",
+                    ratio: ratio,
+                    children: []
+                ))
+                // Recurse into nested splits
+                result.append(contentsOf: collectSplitDirections(from: split))
+            }
+        }
+        return result
     }
 
     // MARK: - Window Delegate
