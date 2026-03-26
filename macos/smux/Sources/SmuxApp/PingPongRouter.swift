@@ -54,6 +54,11 @@ class PingPongRouter {
     /// Flag to ignore output briefly after injection (prevent echo noise)
     private var ignoreOutputUntil: Date = .distantPast
 
+    /// Wait for a burst of output (agent responding) before starting silence timer.
+    /// User typing produces 1 char at a time. Agent response produces bursts of many chars.
+    /// We require at least this many meaningful chars before arming the silence timer.
+    private let burstThreshold: Int = 50
+
     /// Debug counter for bytes this turn
     private var bytesThisTurn: Int = 0
 
@@ -157,10 +162,15 @@ class PingPongRouter {
         outputBuffer.append(data)
         bytesThisTurn += meaningful.count
 
-        // Reset silence timer — real content is still flowing
-        resetSilenceTimer()
+        // Only arm silence timer after burst threshold — distinguishes agent response
+        // (many chars in rapid succession) from user typing (1 char at a time).
+        if bytesThisTurn >= burstThreshold {
+            resetSilenceTimer()
+        }
 
-        NSLog("[pingpong] activity: +%d chars (total %d)", meaningful.count, bytesThisTurn)
+        NSLog("[pingpong] activity: +%d chars (total %d, armed=%@)",
+              meaningful.count, bytesThisTurn,
+              bytesThisTurn >= burstThreshold ? "YES" : "no")
     }
 
     // MARK: - Turn-Complete Detection
