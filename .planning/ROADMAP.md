@@ -27,10 +27,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. User presses ⌘W and the window closes immediately with no visible Metal layer artifact left on screen
   2. User can open a new window after closing the previous one without any crash or error
   3. App can be quit and relaunched repeatedly without accumulating zombie surfaces or memory errors in the console
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 01-01: Fix ghostty surface teardown order (window.contentView=nil → Task.detached surface_free → app_free)
+- [ ] 01-01-PLAN.md — Fix ghostty surface teardown order (contentView=nil FIRST, Task.detached surface_free, windowWillClose delegate)
 
 ### Phase 2: PTY Output Capture
 **Goal**: smux can read and clean terminal output from agents running in ghostty EXEC mode in real-time
