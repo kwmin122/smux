@@ -19,6 +19,7 @@ let package = Package(
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
                 .linkedFramework("QuartzCore"),
+                .linkedFramework("WebKit"),
                 .linkedLibrary("c++"),
             ]
         ),

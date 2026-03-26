@@ -760,9 +760,11 @@ impl Orchestrator {
     /// stage-appropriate participant routing. Verifiers are selected based
     /// on the stage definition. Stage transitions emit events.
     pub async fn run_pipeline(&mut self, pipeline: &SessionPipeline) -> OrchestratorOutcome {
-        let recipients = pipeline.stages.iter().map(|s| {
-            pipeline.stage_recipients_for_planner(s)
-        }).collect::<Vec<_>>();
+        let recipients = pipeline
+            .stages
+            .iter()
+            .map(|s| pipeline.stage_recipients_for_planner(s))
+            .collect::<Vec<_>>();
 
         for (i, stage) in pipeline.stages.iter().enumerate() {
             tracing::info!(
@@ -778,14 +780,21 @@ impl Orchestrator {
             );
 
             // Skip stages with no verifiers (e.g., ideation in full-auto)
-            if stage.approval_mode == ApprovalMode::FullAuto && stage.participants.verifiers.is_empty() {
+            if stage.approval_mode == ApprovalMode::FullAuto
+                && stage.participants.verifiers.is_empty()
+            {
                 tracing::info!(stage = %stage.name, "full-auto stage with no verifiers — skipping ping-pong");
                 continue;
             }
 
             // Use the subset of verifiers specified for this stage.
             // Currently the orchestrator holds all verifiers; we select by matching names.
-            let stage_verifier_names: std::collections::HashSet<&str> = stage.participants.verifiers.iter().map(|s| s.as_str()).collect();
+            let stage_verifier_names: std::collections::HashSet<&str> = stage
+                .participants
+                .verifiers
+                .iter()
+                .map(|s| s.as_str())
+                .collect();
             let active_count = if stage_verifier_names.is_empty() {
                 self.verifiers.len() // use all if not specified
             } else {

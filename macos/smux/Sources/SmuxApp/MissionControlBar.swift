@@ -2,12 +2,14 @@ import AppKit
 
 /// Bottom control bar with Approve/Pause/Retry/Resume buttons + status.
 class MissionControlBar: NSView {
+    private let pingPongButton = NSButton(title: "🔄 Ping-pong", target: nil, action: nil)
     private let approveButton = NSButton(title: "Approve", target: nil, action: nil)
     private let pauseButton = NSButton(title: "Pause", target: nil, action: nil)
     private let retryButton = NSButton(title: "Retry", target: nil, action: nil)
     private let statusLabel = NSTextField(labelWithString: "Ready")
     private let roundLabel = NSTextField(labelWithString: "")
 
+    var onPingPong: (() -> Void)?
     var onApprove: (() -> Void)?
     var onPause: (() -> Void)?
     var onRetry: (() -> Void)?
@@ -21,6 +23,12 @@ class MissionControlBar: NSView {
     private func setupUI() {
         wantsLayer = true
         layer?.backgroundColor = NSColor(white: 0.1, alpha: 1).cgColor
+
+        pingPongButton.bezelStyle = .inline
+        pingPongButton.contentTintColor = .systemCyan
+        pingPongButton.font = .monospacedSystemFont(ofSize: 10, weight: .bold)
+        pingPongButton.target = self
+        pingPongButton.action = #selector(pingPongTapped)
 
         approveButton.bezelStyle = .inline
         approveButton.contentTintColor = .systemGreen
@@ -46,7 +54,7 @@ class MissionControlBar: NSView {
         roundLabel.font = .monospacedSystemFont(ofSize: 9, weight: .regular)
         roundLabel.textColor = .tertiaryLabelColor
 
-        let leftStack = NSStackView(views: [approveButton, pauseButton, retryButton])
+        let leftStack = NSStackView(views: [pingPongButton, approveButton, pauseButton, retryButton])
         leftStack.spacing = 4
 
         let rightStack = NSStackView(views: [statusLabel, roundLabel])
@@ -69,10 +77,21 @@ class MissionControlBar: NSView {
 
     func update(status: String, round: Int, maxRounds: Int, isPaused: Bool) {
         statusLabel.stringValue = status
-        roundLabel.stringValue = "R\(round)/\(maxRounds)"
+        roundLabel.stringValue = maxRounds > 0 ? "R\(round)/\(maxRounds)" : ""
         pauseButton.title = isPaused ? "Resume" : "Pause"
     }
 
+    func setPingPongActive(_ active: Bool) {
+        if active {
+            pingPongButton.title = "🔴 Stop"
+            pingPongButton.contentTintColor = .systemRed
+        } else {
+            pingPongButton.title = "🔄 Ping-pong"
+            pingPongButton.contentTintColor = .systemCyan
+        }
+    }
+
+    @objc private func pingPongTapped() { onPingPong?() }
     @objc private func approveTapped() { onApprove?() }
     @objc private func pauseTapped() { onPause?() }
     @objc private func retryTapped() { onRetry?() }

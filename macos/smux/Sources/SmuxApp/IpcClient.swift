@@ -8,15 +8,20 @@ class SmuxIpcClient {
 
     init() {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        self.socketPath = "\(home)/.smux/daemon.sock"
+        self.socketPath = "\(home)/.smux/smux.sock"
     }
 
-    /// Connect to the daemon socket.
+    /// Connect to the daemon socket with 2-second timeout.
     func connect() throws {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else {
             throw IpcError.socketCreationFailed
         }
+
+        // Set 2-second send/receive timeout to prevent blocking
+        var tv = timeval(tv_sec: 2, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
@@ -35,12 +40,19 @@ class SmuxIpcClient {
         }
 
         guard connectResult == 0 else {
-            close(fd)
+            Darwin.close(fd)
             throw IpcError.connectionFailed(errno: Int(Darwin.errno))
         }
 
         self.connection = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
-        print("[IPC] connected to daemon at \(socketPath)")
+    }
+
+    /// Async wrapper — never blocks main thread.
+    func checkDaemonAsync(completion: @escaping (Bool) -> Void) {
+        DispatchQueue.global(qos: .utility).async { [self] in
+            let running = isDaemonRunning
+            DispatchQueue.main.async { completion(running) }
+        }
     }
 
     /// Send a JSON message with length prefix.
