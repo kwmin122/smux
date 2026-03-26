@@ -26,10 +26,10 @@
 
 ### E2E Verification
 
-- [ ] **E2E-01**: Browser panel (⌘⇧B) opens alongside terminal pane and renders a localhost URL
-- [ ] **E2E-02**: Browser automation DOM snapshot returns actual page content (not empty)
-- [ ] **E2E-03**: Session detach saves state; reattach restores the session with same pane layout
-- [ ] **E2E-04**: AppleScript hook executes a test script that targets smux and confirms response
+- [x] **E2E-01**: Browser panel (⌘⇧B) opens alongside terminal pane and renders a localhost URL
+- [x] **E2E-02**: Browser automation DOM snapshot returns actual page content (not empty)
+- [x] **E2E-03**: Session detach saves state; reattach restores the session with same pane layout
+- [x] **E2E-04**: AppleScript hook executes a test script that targets smux and confirms response
 
 ## v2 Requirements (Deferred)
 
@@ -74,10 +74,10 @@
 | PING-02 | Phase 3 | Complete |
 | PING-03 | Phase 3 | Complete |
 | PING-04 | Phase 3 | Complete |
-| E2E-01 | Phase 4 | Pending |
-| E2E-02 | Phase 4 | Pending |
-| E2E-03 | Phase 4 | Pending |
-| E2E-04 | Phase 4 | Pending |
+| E2E-01 | Phase 4 | Complete |
+| E2E-02 | Phase 4 | Complete |
+| E2E-03 | Phase 4 | Complete |
+| E2E-04 | Phase 4 | Complete |
 
 **Coverage:**
 - v0.8 requirements: 13 total

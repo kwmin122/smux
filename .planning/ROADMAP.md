@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Surface Lifecycle Fix** - Fix ⌘W Metal zombie and ghostty surface teardown order
 - [x] **Phase 2: PTY Output Capture** - Capture terminal output from ghostty EXEC mode; detect turn boundaries; strip ANSI (completed 2026-03-26)
 - [x] **Phase 3: Ping-Pong Relay** - Wire captured output into live relay loop with mission control status
-- [ ] **Phase 4: E2E Feature Verification** - Verify browser panel, browser automation, detach/reattach, and AppleScript hooks end-to-end
+- [x] **Phase 4: E2E Feature Verification** - Verify browser panel, browser automation, detach/reattach, and AppleScript hooks end-to-end
 
 ## Phase Details
 
@@ -70,13 +70,10 @@ Plans:
   2. Browser automation DOM snapshot call returns actual page content (non-empty, structurally valid HTML/text)
   3. User detaches a session, relaunches the app, reattaches, and sees the same pane layout restored
   4. An external AppleScript targeting smux executes successfully and receives a confirmed response
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 Plans:
-- [ ] 04-01: Verify BrowserPanelView (⌘⇧B) opens and renders localhost URLs
-- [ ] 04-02: Verify BrowserAutomation DOM snapshot returns real content
-- [ ] 04-03: Verify SessionDetachReattach preserves and restores pane layout
-- [ ] 04-04: Verify AppleScriptSupport hook responds to external script execution
+- [x] 04-01-PLAN.md — Split layout persistence + E2E verification (consolidated — browser/automation/AppleScript already functional)
 **UI hint**: yes
 
 ## Progress
@@ -89,4 +86,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Surface Lifecycle Fix | 1/1 | Complete | 2026-03-26 |
 | 2. PTY Output Capture | 2/2 | Complete   | 2026-03-26 |
 | 3. Ping-Pong Relay | 1/1 | Complete | 2026-03-26 |
-| 4. E2E Feature Verification | 0/4 | Not started | - |
+| 4. E2E Feature Verification | 1/1 | Complete | 2026-03-26 |
