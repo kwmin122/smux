@@ -228,6 +228,40 @@ class GhosttyTerminalView: NSView {
         }
     }
 
+    // MARK: - Text Capture (EXEC mode polling)
+
+    /// Read the full visible viewport text from the ghostty surface.
+    /// MUST be called on the main thread (Metal thread safety).
+    /// Returns nil if surface is not available or read fails.
+    func captureViewportText() -> String? {
+        guard let s = surface else { return nil }
+
+        var sel = ghostty_selection_s()
+        sel.rectangle = false
+        sel.top_left = ghostty_point_s(
+            tag: GHOSTTY_POINT_VIEWPORT,
+            coord: GHOSTTY_POINT_COORD_TOP_LEFT,
+            x: 0, y: 0
+        )
+        sel.bottom_right = ghostty_point_s(
+            tag: GHOSTTY_POINT_VIEWPORT,
+            coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
+            x: 9999, y: 9999
+        )
+
+        var txt = ghostty_text_s()
+        guard ghostty_surface_read_text(s, sel, &txt) else { return nil }
+        defer { ghostty_surface_free_text(s, &txt) }
+
+        guard let ptr = txt.text, txt.text_len > 0 else { return nil }
+        return ptr.withMemoryRebound(to: UInt8.self, capacity: Int(txt.text_len)) { uint8Ptr in
+            String(
+                bytes: UnsafeBufferPointer(start: uint8Ptr, count: Int(txt.text_len)),
+                encoding: .utf8
+            )
+        }
+    }
+
     // MARK: - Mouse
 
     override func mouseDown(with event: NSEvent) {

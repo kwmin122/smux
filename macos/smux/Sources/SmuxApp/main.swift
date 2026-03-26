@@ -21,6 +21,35 @@ private let wakeupCb: @convention(c) (UnsafeMutableRawPointer?) -> Void = { _ in
 }
 private let actionCb: @convention(c) (ghostty_app_t?, ghostty_target_s, ghostty_action_s) -> Bool = { _, target, action in
     NSLog("[ghostty-action] tag=%d", action.tag.rawValue)
+
+    if action.tag == GHOSTTY_ACTION_COMMAND_FINISHED {
+        let payload = action.action.command_finished
+        // Extract surface pointer as opaque identifier (UInt, NOT dereferenceable in async context)
+        let surfaceKey: UInt
+        if target.tag == GHOSTTY_TARGET_SURFACE {
+            surfaceKey = UInt(bitPattern: target.target.surface)
+        } else {
+            surfaceKey = 0
+        }
+        let exitCode = Int(payload.exit_code)
+        let duration = payload.duration
+
+        NSLog("[ghostty-action] COMMAND_FINISHED exit=%d duration=%llu surface=0x%lx",
+              exitCode, duration, surfaceKey)
+
+        // Post to NotificationCenter — cannot capture Swift refs in @convention(c)
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .ghosttyCommandFinished,
+                object: nil,
+                userInfo: [
+                    "exit_code": exitCode,
+                    "surface_ptr": surfaceKey
+                ]
+            )
+        }
+    }
+
     return false
 }
 private let readCb: @convention(c) (UnsafeMutableRawPointer?, ghostty_clipboard_e, UnsafeMutableRawPointer?) -> Bool = { _, _, _ in false }
@@ -223,6 +252,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         workspaceController = nil
         if let a = ghosttyApp { ghostty_app_free(a); ghosttyApp = nil }
     }
+}
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    /// Fired when ghostty's action_cb receives GHOSTTY_ACTION_COMMAND_FINISHED (OSC 133 D).
+    /// userInfo keys: "exit_code" (Int), "surface_ptr" (UInt — opaque pointer as key, do NOT dereference)
+    static let ghosttyCommandFinished = Notification.Name("smux.ghosttyCommandFinished")
 }
 
 // MARK: - Main
