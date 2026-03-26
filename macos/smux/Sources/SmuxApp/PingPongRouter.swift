@@ -193,7 +193,7 @@ class PingPongRouter {
             let targetPane = (speaker == "A") ? paneB : paneA
             // Brief ignore window to skip echo of our injection
             ignoreOutputUntil = Date().addingTimeInterval(1.0)
-            targetPane?.sendText(delta + "\n")
+            targetPane?.sendText(delta + "\r")
 
             NSLog("[pingpong] turn complete — speaker=%@ output=%d chars → %@",
                   label, cleanText.count, speaker == "A" ? paneBLabel : paneALabel)
