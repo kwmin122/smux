@@ -653,11 +653,15 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         let f = ws.frame
         window.setFrame(NSRect(x: f.x, y: f.y, width: f.width, height: f.height), display: true)
 
-        // Restore split layout by replaying split directions
-        guard let tab = ws.tabs.first else { return }
+        // Restore split layout by replaying split directions with saved ratios
+        guard let tab = ws.tabs.first, !tab.splits.isEmpty else { return }
         for split in tab.splits {
             let vertical = split.direction == "vertical"
             doSplit(vertical: vertical)
+        }
+        // Apply saved divider ratios after layout resolves
+        DispatchQueue.main.async { [weak self] in
+            self?.applySavedRatios(tab.splits)
         }
     }
 
@@ -684,6 +688,26 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             }
         }
         return result
+    }
+
+    /// Apply saved divider ratios to NSSplitViews in order.
+    private func applySavedRatios(_ splits: [SessionRestore.SplitState]) {
+        var splitViews: [NSSplitView] = []
+        collectNSSplitViews(from: terminalContainer, into: &splitViews)
+        for (i, sv) in splitViews.enumerated() where i < splits.count {
+            let total = sv.isVertical ? sv.bounds.width : sv.bounds.height
+            let pos = total * CGFloat(splits[i].ratio)
+            if pos > 0 { sv.setPosition(pos, ofDividerAt: 0) }
+        }
+    }
+
+    private func collectNSSplitViews(from view: NSView, into result: inout [NSSplitView]) {
+        for subview in view.subviews {
+            if let sv = subview as? NSSplitView {
+                result.append(sv)
+                collectNSSplitViews(from: sv, into: &result)
+            }
+        }
     }
 
     // MARK: - Window Delegate
