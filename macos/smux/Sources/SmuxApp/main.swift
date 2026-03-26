@@ -20,8 +20,6 @@ private let wakeupCb: @convention(c) (UnsafeMutableRawPointer?) -> Void = { _ in
     }
 }
 private let actionCb: @convention(c) (ghostty_app_t?, ghostty_target_s, ghostty_action_s) -> Bool = { _, target, action in
-    NSLog("[ghostty-action] tag=%d", action.tag.rawValue)
-
     if action.tag == GHOSTTY_ACTION_COMMAND_FINISHED {
         let payload = action.action.command_finished
         // Extract surface pointer as opaque identifier (UInt, NOT dereferenceable in async context)
@@ -237,7 +235,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func splitH() { workspaceController?.splitHorizontal() }
     @objc func toggleInspector() { workspaceController?.toggleInspector() }
     @objc func toggleBrowser() { workspaceController?.toggleBrowser() }
-    @objc func togglePingPong() { workspaceController?.togglePingPong() }
+    @objc func togglePingPong() {
+        workspaceController?.togglePingPong()
+    }
     @objc func showPalette() { workspaceController?.showCommandPalette() }
     @objc func showGuide() { GuidePanel.toggle(relativeTo: workspaceController?.window) }
 

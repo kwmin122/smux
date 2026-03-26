@@ -102,13 +102,7 @@ class GhosttyTerminalView: NSView {
     // MARK: - Keyboard (Ghostty-grade: keyDown → interpretKeyEvents → accumulate → ghostty_surface_key)
 
     override func keyDown(with event: NSEvent) {
-        NSLog("[smux] keyDown: keyCode=%d chars='%@' surface=%@",
-              event.keyCode,
-              event.characters ?? "<nil>",
-              surface != nil ? "yes" : "NO")
-
-        guard let surface = surface else {
-            NSLog("[smux] no surface — falling back to interpretKeyEvents")
+        guard surface != nil else {
             interpretKeyEvents([event])
             return
         }
@@ -369,7 +363,6 @@ extension GhosttyTerminalView: NSTextInputClient {
     }
 
     func insertText(_ string: Any, replacementRange: NSRange) {
-        NSLog("[smux] insertText: '%@'", String(describing: string))
         guard NSApp.currentEvent != nil else { return }
 
         var chars = ""
