@@ -81,8 +81,8 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         terminalContainer.translatesAutoresizingMaskIntoConstraints = false
         centerView.addSubview(terminalContainer)
 
-        // Terminal — constraint-based to fill container. 800x600 safe init frame.
-        let termView = GhosttyTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), app: ghosttyApp)
+        // Terminal — constraint-based to fill container. HOST_MANAGED mode (smux owns PTY).
+        let termView = GhosttyTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), app: ghosttyApp, managed: true)
         termView.translatesAutoresizingMaskIntoConstraints = false
         terminalContainer.addSubview(termView)
         terminalViews.append(termView)
@@ -274,7 +274,7 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         newWindow.title = "smux"
         newWindow.backgroundColor = .black
 
-        let termView = GhosttyTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), app: ghosttyApp)
+        let termView = GhosttyTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), app: ghosttyApp, managed: true)
         termView.autoresizingMask = [.width, .height]
         newWindow.contentView = termView
         terminalViews.append(termView)
@@ -357,7 +357,7 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         termView.autoresizingMask = [.width, .height]
         splitView.addSubview(termView)
 
-        let newTerm = GhosttyTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), app: ghosttyApp)
+        let newTerm = GhosttyTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), app: ghosttyApp, managed: true)
         newTerm.translatesAutoresizingMaskIntoConstraints = true
         newTerm.autoresizingMask = [.width, .height]
         splitView.addSubview(newTerm)
