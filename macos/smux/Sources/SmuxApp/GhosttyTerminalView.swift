@@ -262,6 +262,36 @@ class GhosttyTerminalView: NSView {
         }
     }
 
+    /// Timer-driven polling of terminal viewport text.
+    private var captureTimer: Timer?
+    private var lastCapturedText: String = ""
+
+    /// Start polling the terminal viewport at ~4 Hz. Calls onChange with ANSI-stripped text
+    /// whenever the visible content changes (delta > 4 chars to filter cursor blink noise).
+    /// MUST be called on the main thread.
+    func startCapturing(onChange: @escaping (String) -> Void) {
+        stopCapturing()
+        lastCapturedText = ""
+        captureTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            guard let raw = self.captureViewportText() else { return }
+            let clean = ANSIStripper.strip(raw)
+            // Filter noise: cursor blink / spinner causes tiny changes that are not meaningful
+            if clean != self.lastCapturedText,
+               abs(clean.count - self.lastCapturedText.count) > 4 || self.lastCapturedText.isEmpty {
+                self.lastCapturedText = clean
+                onChange(clean)
+            }
+        }
+    }
+
+    /// Stop the polling timer and clear captured state.
+    func stopCapturing() {
+        captureTimer?.invalidate()
+        captureTimer = nil
+        lastCapturedText = ""
+    }
+
     // MARK: - Mouse
 
     override func mouseDown(with event: NSEvent) {
