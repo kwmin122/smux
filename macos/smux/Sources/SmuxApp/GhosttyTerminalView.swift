@@ -1,16 +1,13 @@
 import AppKit
 import libghostty
 
-/// NSView hosting a ghostty terminal surface — tmux-grade keyboard/mouse/IME.
-/// Follows the exact same keyDown → interpretKeyEvents → insertText → ghostty_surface_key
-/// pattern that Ghostty's own SurfaceView_AppKit.swift uses.
+/// NSView hosting a ghostty terminal surface — EXEC mode (ghostty manages PTY).
 class GhosttyTerminalView: NSView {
     private var surface: ghostty_surface_t?
     private var ghosttyApp: ghostty_app_t?
     private var surfaceCreated = false
 
     /// Accumulates text from insertText during a keyDown cycle.
-    /// Non-nil means we are inside a keyDown → interpretKeyEvents call.
     private var keyTextAccumulator: [String]? = nil
 
     /// Marked text for IME preedit (Korean composition etc.)
@@ -18,14 +15,29 @@ class GhosttyTerminalView: NSView {
 
     init(frame: NSRect, app: ghostty_app_t) {
         self.ghosttyApp = app
-        super.init(frame: frame)
+        let safeFrame = (frame.width > 1 && frame.height > 1)
+            ? frame
+            : NSRect(x: 0, y: 0, width: 800, height: 600)
+        super.init(frame: safeFrame)
         wantsLayer = true
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Explicitly free the ghostty surface. Must call before ghostty_app_free.
+    func destroySurface() {
+        guard let s = surface else { return }
+        surface = nil
+        // Free surface asynchronously on MainActor — Ghostty's pattern.
+        // Metal is not thread-safe; synchronous free while CALayer is
+        // still in the view hierarchy causes zombie Metal layers.
+        Task.detached { @MainActor in
+            ghostty_surface_free(s)
+        }
+    }
+
     deinit {
-        if let s = surface { ghostty_surface_free(s) }
+        destroySurface()
     }
 
     // MARK: - Metal layer
@@ -41,7 +53,7 @@ class GhosttyTerminalView: NSView {
         ghostty_surface_draw(s)
     }
 
-    // MARK: - Surface (created after window attachment)
+    // MARK: - Surface creation (when view enters window hierarchy)
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -64,7 +76,10 @@ class GhosttyTerminalView: NSView {
             NSLog("[smux] ✅ surface created: %@", String(describing: s))
             let scale = window?.backingScaleFactor ?? 2.0
             ghostty_surface_set_content_scale(s, Double(scale), Double(scale))
-            ghostty_surface_set_size(s, UInt32(bounds.width * scale), UInt32(bounds.height * scale))
+            // Only set size if non-zero (ghostty internal default is 800x600)
+            if bounds.width > 0 && bounds.height > 0 {
+                ghostty_surface_set_size(s, UInt32(bounds.width * scale), UInt32(bounds.height * scale))
+            }
         }
     }
 
@@ -72,7 +87,7 @@ class GhosttyTerminalView: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        guard let s = surface else { return }
+        guard let s = surface, newSize.width > 0, newSize.height > 0 else { return }
         let scale = window?.backingScaleFactor ?? 2.0
         ghostty_surface_set_content_scale(s, Double(scale), Double(scale))
         ghostty_surface_set_size(s, UInt32(newSize.width * scale), UInt32(newSize.height * scale))
@@ -134,10 +149,16 @@ class GhosttyTerminalView: NSView {
         sendKey(GHOSTTY_ACTION_RELEASE, event: event, text: nil, composing: false)
     }
 
+    private var previousModifierFlags: NSEvent.ModifierFlags = []
+
     override func flagsChanged(with event: NSEvent) {
         guard let surface = surface else { return }
+        let action: ghostty_input_action_e =
+            event.modifierFlags.rawValue > previousModifierFlags.rawValue
+                ? GHOSTTY_ACTION_PRESS : GHOSTTY_ACTION_RELEASE
+        previousModifierFlags = event.modifierFlags
         var key = ghostty_input_key_s()
-        key.action = GHOSTTY_ACTION_PRESS
+        key.action = action
         key.mods = Self.ghosttyMods(event.modifierFlags)
         key.keycode = UInt32(event.keyCode)
         key.text = nil
@@ -197,6 +218,16 @@ class GhosttyTerminalView: NSView {
         }
     }
 
+    // MARK: - Direct text input (for AppleScript / programmatic use)
+
+    /// Send text directly to the ghostty surface.
+    func sendText(_ text: String) {
+        guard let surface = surface else { return }
+        text.withCString { ptr in
+            ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+        }
+    }
+
     // MARK: - Mouse
 
     override func mouseDown(with event: NSEvent) {
@@ -226,7 +257,8 @@ class GhosttyTerminalView: NSView {
 
     override func scrollWheel(with event: NSEvent) {
         guard let surface = surface else { return }
-        ghostty_surface_mouse_scroll(surface, Double(event.scrollingDeltaX), Double(event.scrollingDeltaY), 0)
+        ghostty_surface_mouse_scroll(surface, Double(event.scrollingDeltaX), Double(event.scrollingDeltaY),
+                                      Int32(Self.ghosttyMods(event.modifierFlags).rawValue))
     }
 
     override func updateTrackingAreas() {
