@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v0.8
+milestone_name: milestone
+status: verifying
+stopped_at: Completed 01-surface-lifecycle-fix-01-01-PLAN.md
+last_updated: "2026-03-26T02:26:15.450Z"
+last_activity: 2026-03-26
+progress:
+  total_phases: 4
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 0
+---
+
 # Project State
 
 ## Project Reference
@@ -5,20 +21,21 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Two AI agents ping-pong in real visible PTYs — user sleeps, wakes up to idea→plan→impl→review all done.
-**Current focus:** v0.8 — Ping-Pong Core
+**Current focus:** Phase 01 — surface-lifecycle-fix
 
 ## Current Position
 
-Phase: 1 of 4 (Surface Lifecycle Fix)
-Plan: 0 of 1 in current phase
-Status: Ready to plan
-Last activity: 2026-03-26 — Roadmap created for v0.8 Ping-Pong Core
+Phase: 01 (surface-lifecycle-fix) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-03-26
 
 Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: —
 - Total execution time: —
@@ -30,10 +47,12 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: —
 - Trend: —
 
 *Updated after each plan completion*
+| Phase 01-surface-lifecycle-fix P01 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -45,6 +64,8 @@ Recent decisions affecting current work:
 - EXEC mode chosen over HOST_MANAGED (better rendering; capture workaround via ghostty_surface_read_text required)
 - Real visible PTY is non-negotiable product identity (headless approach rejected)
 - ghostty_surface_read_text polling chosen as PTY capture strategy (pending verification)
+- [Phase 01-surface-lifecycle-fix]: Task.detached { @MainActor } for ghostty_surface_free matches Ghostty own pattern; contentView=nil BEFORE surface_free is critical ordering
+- [Phase 01-surface-lifecycle-fix]: NSWindowDelegate.windowWillClose added to WorkspaceWindowController as primary Cmd+W teardown hook
 
 ### Pending Todos
 
@@ -58,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: Roadmap created — ready to plan Phase 1
+Last session: 2026-03-26T02:26:15.447Z
+Stopped at: Completed 01-surface-lifecycle-fix-01-01-PLAN.md
 Resume file: None

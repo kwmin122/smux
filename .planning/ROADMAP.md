@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Fix ghostty surface teardown order (contentView=nil FIRST, Task.detached surface_free, windowWillClose delegate)
+- [x] 01-01-PLAN.md — Fix ghostty surface teardown order (contentView=nil FIRST, Task.detached surface_free, windowWillClose delegate)
 
 ### Phase 2: PTY Output Capture
 **Goal**: smux can read and clean terminal output from agents running in ghostty EXEC mode in real-time

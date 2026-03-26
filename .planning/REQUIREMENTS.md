@@ -8,8 +8,8 @@
 
 ### Stability
 
-- [ ] **STAB-01**: User can close the app window with ⌘W without Metal layer zombie or crash
-- [ ] **STAB-02**: Ghostty surface is freed in correct order: window.contentView=nil → Task.detached ghostty_surface_free → ghostty_app_free
+- [x] **STAB-01**: User can close the app window with ⌘W without Metal layer zombie or crash
+- [x] **STAB-02**: Ghostty surface is freed in correct order: window.contentView=nil → Task.detached ghostty_surface_free → ghostty_app_free
 
 ### PTY Output Capture
 
@@ -65,8 +65,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STAB-01 | Phase 1 | Pending |
-| STAB-02 | Phase 1 | Pending |
+| STAB-01 | Phase 1 | Complete |
+| STAB-02 | Phase 1 | Complete |
 | PTY-CAP-01 | Phase 2 | Pending |
 | PTY-CAP-02 | Phase 2 | Pending |
 | PTY-CAP-03 | Phase 2 | Pending |
