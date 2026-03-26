@@ -1,11 +1,20 @@
 import AppKit
 import libghostty
 
-/// NSView hosting a ghostty terminal surface — EXEC mode (ghostty manages PTY).
+/// NSView hosting a ghostty terminal surface.
+/// Supports EXEC mode (ghostty owns PTY) and HOST_MANAGED mode (smux owns PTY).
 class GhosttyTerminalView: NSView {
     private var surface: ghostty_surface_t?
     private var ghosttyApp: ghostty_app_t?
     private var surfaceCreated = false
+
+    /// HOST_MANAGED mode: smux owns the PTY.
+    private(set) var isHostManaged: Bool = false
+    private(set) var ptyManager: PTYManager?
+
+    /// Called with raw PTY output bytes (only in HOST_MANAGED mode).
+    /// Consumers (PingPongRouter) attach here to capture the stream.
+    var onPTYOutput: ((Data) -> Void)?
 
     /// Accumulates text from insertText during a keyDown cycle.
     private var keyTextAccumulator: [String]? = nil
@@ -13,8 +22,9 @@ class GhosttyTerminalView: NSView {
     /// Marked text for IME preedit (Korean composition etc.)
     private var markedText = NSMutableAttributedString()
 
-    init(frame: NSRect, app: ghostty_app_t) {
+    init(frame: NSRect, app: ghostty_app_t, managed: Bool = false) {
         self.ghosttyApp = app
+        self.isHostManaged = managed
         let safeFrame = (frame.width > 1 && frame.height > 1)
             ? frame
             : NSRect(x: 0, y: 0, width: 800, height: 600)
@@ -26,6 +36,10 @@ class GhosttyTerminalView: NSView {
 
     /// Explicitly free the ghostty surface. Must call before ghostty_app_free.
     func destroySurface() {
+        // Stop PTY before freeing surface (HOST_MANAGED mode)
+        ptyManager?.stop()
+        ptyManager = nil
+
         guard let s = surface else { return }
         surface = nil
         // Free surface asynchronously on MainActor — Ghostty's pattern.
@@ -70,16 +84,79 @@ class GhosttyTerminalView: NSView {
         plat.nsview = Unmanaged.passUnretained(self).toOpaque()
         cfg.platform.macos = plat
 
-        NSLog("[smux] creating surface...")
+        // HOST_MANAGED mode: smux owns PTY, ghostty renders only
+        if isHostManaged {
+            cfg.backend = GHOSTTY_SURFACE_IO_BACKEND_HOST_MANAGED
+
+            // Store self pointer for @convention(c) callbacks
+            let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+            cfg.receive_userdata = selfPtr
+
+            // receive_buffer: ghostty sends keyboard input bytes → we write to PTY master fd
+            cfg.receive_buffer = { (userdata, bytes, len) in
+                guard let userdata = userdata, let bytes = bytes else { return }
+                let view = Unmanaged<GhosttyTerminalView>.fromOpaque(userdata).takeUnretainedValue()
+                view.ptyManager?.writeToPTY(bytes, length: Int(len))
+            }
+
+            // receive_resize: ghostty notifies terminal resize → we resize PTY
+            cfg.receive_resize = { (userdata, cols, rows, widthPx, heightPx) in
+                guard let userdata = userdata else { return }
+                let view = Unmanaged<GhosttyTerminalView>.fromOpaque(userdata).takeUnretainedValue()
+                view.ptyManager?.resize(rows: rows, cols: cols)
+            }
+        }
+
+        NSLog("[smux] creating surface (mode=%@)...", isHostManaged ? "HOST_MANAGED" : "EXEC")
         if let s = ghostty_surface_new(app, &cfg) {
             self.surface = s
-            NSLog("[smux] ✅ surface created: %@", String(describing: s))
+            NSLog("[smux] surface created: %@", String(describing: s))
             let scale = window?.backingScaleFactor ?? 2.0
             ghostty_surface_set_content_scale(s, Double(scale), Double(scale))
-            // Only set size if non-zero (ghostty internal default is 800x600)
             if bounds.width > 0 && bounds.height > 0 {
                 ghostty_surface_set_size(s, UInt32(bounds.width * scale), UInt32(bounds.height * scale))
             }
+
+            // HOST_MANAGED: start PTY and pipe output to ghostty
+            if isHostManaged {
+                startHostManagedPTY()
+            }
+        }
+    }
+
+    /// Start HOST_MANAGED PTY: fork child, read master fd, pipe to ghostty.
+    private func startHostManagedPTY() {
+        guard surface != nil else { return }
+
+        let mgr = PTYManager()
+        self.ptyManager = mgr
+
+        // PTY output → ghostty render + capture callback
+        mgr.onOutput = { [weak self] (bytes: UnsafePointer<UInt8>, len: Int) in
+            guard let self = self, let surface = self.surface else { return }
+            // Feed raw bytes to ghostty for rendering (must be main thread)
+            ghostty_surface_write_buffer(surface, bytes, UInt(len))
+
+            // Also deliver to capture consumers (PingPongRouter)
+            let data = Data(bytes: bytes, count: len)
+            self.onPTYOutput?(data)
+        }
+
+        mgr.onExit = { [weak self] status in
+            NSLog("[pty] child exited with status %d", status)
+            self?.ptyManager = nil
+        }
+
+        // Get terminal size in cells (approximate from pixel size)
+        let scale = window?.backingScaleFactor ?? 2.0
+        let charWidth: CGFloat = 8.0 * scale   // approximate
+        let charHeight: CGFloat = 16.0 * scale  // approximate
+        let cols = max(80, UInt16(bounds.width * scale / charWidth))
+        let rows = max(24, UInt16(bounds.height * scale / charHeight))
+
+        if !mgr.start(rows: rows, cols: cols) {
+            NSLog("[pty] failed to start HOST_MANAGED PTY")
+            ptyManager = nil
         }
     }
 
@@ -214,11 +291,17 @@ class GhosttyTerminalView: NSView {
 
     // MARK: - Direct text input (for AppleScript / programmatic use)
 
-    /// Send text directly to the ghostty surface.
+    /// Send text directly to the terminal.
+    /// In EXEC mode: uses ghostty_surface_text (ghostty writes to PTY).
+    /// In HOST_MANAGED mode: writes directly to PTY master fd.
     func sendText(_ text: String) {
-        guard let surface = surface else { return }
-        text.withCString { ptr in
-            ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+        if isHostManaged, let mgr = ptyManager {
+            mgr.writeString(text)
+        } else {
+            guard let surface = surface else { return }
+            text.withCString { ptr in
+                ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
+            }
         }
     }
 

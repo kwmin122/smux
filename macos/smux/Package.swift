@@ -11,6 +11,7 @@ let package = Package(
             name: "SmuxApp",
             dependencies: [
                 "GhosttyKit",
+                "CPtyHelper",
             ],
             path: "Sources/SmuxApp",
             linkerSettings: [
@@ -22,6 +23,11 @@ let package = Package(
                 .linkedFramework("WebKit"),
                 .linkedLibrary("c++"),
             ]
+        ),
+        .target(
+            name: "CPtyHelper",
+            path: "Sources/CPtyHelper",
+            publicHeadersPath: "include"
         ),
         .binaryTarget(
             name: "GhosttyKit",
