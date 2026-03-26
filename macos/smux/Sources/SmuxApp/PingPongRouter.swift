@@ -1,7 +1,11 @@
 import AppKit
 
-/// Ping-pong router — captures terminal output from EXEC mode ghostty panes,
-/// detects turn-complete boundaries, and delivers cleaned text for relay injection.
+/// Ping-pong router — captures raw PTY output stream from HOST_MANAGED panes,
+/// detects turn-complete via silence timeout, and relays cleaned text between panes.
+///
+/// KEY DIFFERENCE from v0.8: no viewport polling. Uses onPTYOutput callback
+/// which receives raw bytes from the PTY master fd output. Injection writes
+/// to PTY stdin (master fd write) — completely separate path, NO feedback loop.
 class PingPongRouter {
 
     enum State: String {
@@ -12,7 +16,7 @@ class PingPongRouter {
         case paused = "Paused"
     }
 
-    // MARK: - Public state (read by WorkspaceWindowController)
+    // MARK: - Public state
 
     private(set) var state: State = .idle
     private(set) var round: Int = 0
@@ -25,31 +29,27 @@ class PingPongRouter {
     var paneALabel: String = "A"
     var paneBLabel: String = "B"
 
-    // MARK: - Callbacks (wired by WorkspaceWindowController.togglePingPong)
+    // MARK: - Callbacks
 
     var onStateChanged: ((State, Int) -> Void)?
     var onTurnComplete: ((String, String) -> Void)?  // (speakerLabel, cleanedOutput)
     var onSessionComplete: ((Int) -> Void)?
 
-    // MARK: - Capture state
+    // MARK: - Stream capture state
 
-    /// Which pane is currently being captured (alternates A/B each turn)
     private var currentSpeaker: String = "A"
 
-    /// Accumulated text from the current turn's polling deltas
-    private var currentTurnText: String = ""
+    /// Raw PTY output accumulated during the current turn
+    private var outputBuffer = Data()
 
-    /// Viewport snapshot taken at the start of a turn (used to compute delta output)
-    private var baselineText: String = ""
+    /// Silence timeout: if no PTY output for this duration, treat as turn-complete
+    private let silenceThreshold: TimeInterval = 3.0
 
-    /// Silence timeout: if no text change for this duration, treat as turn-complete
-    private let silenceThreshold: TimeInterval = 2.0
-
-    /// Cancellable work item for silence timeout
+    /// Cancellable silence timeout
     private var silenceWorkItem: DispatchWorkItem?
 
-    /// NotificationCenter observer token for COMMAND_FINISHED
-    private var commandFinishedObserver: NSObjectProtocol?
+    /// Flag to ignore output briefly after injection (prevent echo noise)
+    private var ignoreOutputUntil: Date = .distantPast
 
     // MARK: - Init
 
@@ -59,9 +59,7 @@ class PingPongRouter {
         self.maxRounds = maxRounds
     }
 
-    deinit {
-        stop()
-    }
+    deinit { stop() }
 
     // MARK: - Lifecycle
 
@@ -69,50 +67,34 @@ class PingPongRouter {
         isActive = true
         round = 0
         currentSpeaker = "A"
-        currentTurnText = ""
+        outputBuffer = Data()
         updateState(.waitingForOutput)
 
-        NSLog("[pingpong] started — polling paneA at 4 Hz, listening for COMMAND_FINISHED")
+        NSLog("[pingpong] started — listening to PTY output stream (silence=%.0fs)", silenceThreshold)
 
-        // Subscribe to OSC 133 COMMAND_FINISHED (primary turn-complete signal)
-        commandFinishedObserver = NotificationCenter.default.addObserver(
-            forName: .ghosttyCommandFinished,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.handleCommandFinished(notification)
-        }
-
-        // Start polling the active pane
-        startCapturingCurrentPane()
+        // Subscribe to PTY output from the active speaker pane
+        startListeningToCurrentPane()
     }
 
     func stop() {
         isActive = false
-        currentTurnText = ""
+        outputBuffer = Data()
 
-        // Stop polling
-        paneA?.stopCapturing()
-        paneB?.stopCapturing()
+        // Detach stream listeners
+        paneA?.onPTYOutput = nil
+        paneB?.onPTYOutput = nil
 
-        // Cancel silence timeout
         silenceWorkItem?.cancel()
         silenceWorkItem = nil
 
-        // Remove notification observer
-        if let obs = commandFinishedObserver {
-            NotificationCenter.default.removeObserver(obs)
-            commandFinishedObserver = nil
-        }
-
         updateState(.idle)
-        NSLog("[pingpong] stopped — cleanup complete")
+        NSLog("[pingpong] stopped")
     }
 
     func pause() {
         guard isActive else { return }
-        paneA?.stopCapturing()
-        paneB?.stopCapturing()
+        paneA?.onPTYOutput = nil
+        paneB?.onPTYOutput = nil
         silenceWorkItem?.cancel()
         updateState(.paused)
         NSLog("[pingpong] paused")
@@ -121,59 +103,53 @@ class PingPongRouter {
     func resume() {
         guard isActive, state == .paused else { return }
         updateState(.waitingForOutput)
-        startCapturingCurrentPane()
+        startListeningToCurrentPane()
         NSLog("[pingpong] resumed")
     }
 
-    // MARK: - Capture
+    // MARK: - PTY Stream Capture
 
-    /// Start polling the current speaker's pane.
-    private func startCapturingCurrentPane() {
+    /// Attach onPTYOutput callback to the current speaker's pane.
+    private func startListeningToCurrentPane() {
         let pane = (currentSpeaker == "A") ? paneA : paneB
         let speakerState: State = (currentSpeaker == "A") ? .paneASpeaking : .paneBSpeaking
         updateState(speakerState)
+        outputBuffer = Data()
 
-        // Snapshot baseline before polling starts — delta = final - baseline
-        baselineText = pane?.captureViewportText().flatMap { ANSIStripper.strip($0) } ?? ""
+        // Detach previous listeners
+        paneA?.onPTYOutput = nil
+        paneB?.onPTYOutput = nil
 
-        pane?.startCapturing { [weak self] newText in
-            self?.handleNewOutput(newText)
+        // Attach to current speaker's PTY output stream
+        pane?.onPTYOutput = { [weak self] data in
+            self?.handlePTYOutput(data)
         }
     }
 
-    /// Called by the polling timer when new (ANSI-stripped) text arrives.
-    private func handleNewOutput(_ newText: String) {
+    /// Called when raw bytes arrive from the speaker's PTY output.
+    /// This is the stdout/stderr of the child process — NOT our injected text.
+    private func handlePTYOutput(_ data: Data) {
         guard isActive, state != .paused else { return }
 
-        // Store the latest snapshot as current turn text
-        currentTurnText = newText
+        // Ignore brief echo after injection
+        if Date() < ignoreOutputUntil { return }
 
-        // Reset silence timer — text is still changing
+        // Filter: only count printable content as "activity"
+        let hasPrintable = data.contains(where: { $0 >= 0x20 && $0 < 0x7F || $0 >= 0x80 })
+        guard hasPrintable else { return }
+
+        outputBuffer.append(data)
+
+        // Reset silence timer — output is still flowing
         resetSilenceTimer()
     }
 
     // MARK: - Turn-Complete Detection
 
-    /// OSC 133 COMMAND_FINISHED — primary (authoritative) turn-complete signal.
-    private func handleCommandFinished(_ notification: Notification) {
-        guard isActive, state != .paused else { return }
-
-        let exitCode = notification.userInfo?["exit_code"] as? Int ?? -1
-        NSLog("[pingpong] COMMAND_FINISHED received — exit=%d, processing turn-complete", exitCode)
-
-        // Cancel silence timeout to prevent double-fire
-        silenceWorkItem?.cancel()
-        silenceWorkItem = nil
-
-        processTurnComplete()
-    }
-
-    /// Silence timeout — fallback turn-complete signal when OSC 133 is unavailable.
     private func resetSilenceTimer() {
         silenceWorkItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self = self, self.isActive, self.state != .paused else { return }
-            NSLog("[pingpong] silence timeout (%.1fs) — treating as turn-complete", self.silenceThreshold)
             DispatchQueue.main.async {
                 self.processTurnComplete()
             }
@@ -182,40 +158,38 @@ class PingPongRouter {
         DispatchQueue.global().asyncAfter(deadline: .now() + silenceThreshold, execute: item)
     }
 
-    /// Process a completed turn: deliver output, inject into target pane, advance round, switch panes.
+    /// Turn complete: extract text from buffer, relay to other pane.
     private func processTurnComplete() {
         guard isActive else { return }
 
         let speaker = currentSpeaker
         let label = (speaker == "A") ? paneALabel : paneBLabel
 
-        // Stop capturing the current pane
-        if speaker == "A" {
-            paneA?.stopCapturing()
-        } else {
-            paneB?.stopCapturing()
-        }
+        // Detach stream listener from current pane
+        let currentPane = (speaker == "A") ? paneA : paneB
+        currentPane?.onPTYOutput = nil
 
-        // Extract delta: new output only (strip baseline prefix)
-        let delta = extractDelta(full: currentTurnText, baseline: baselineText)
+        // Convert raw bytes to string, strip ANSI
+        let rawText = String(data: outputBuffer, encoding: .utf8) ?? ""
+        let cleanText = ANSIStripper.strip(rawText).trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Deliver the turn output + inject into the OTHER pane (relay)
-        if !delta.isEmpty {
-            onTurnComplete?(label, delta)
+        if !cleanText.isEmpty {
+            onTurnComplete?(label, cleanText)
 
-            // RELAY INJECTION: send captured output to the target pane's stdin
+            // RELAY: inject into OTHER pane's PTY stdin
             let targetPane = (speaker == "A") ? paneB : paneA
-            targetPane?.sendText(delta + "\n")
-            NSLog("[pingpong] turn complete — speaker=%@ delta=%d chars, injected into %@",
-                  label, delta.count, speaker == "A" ? paneBLabel : paneALabel)
+            // Brief ignore window to skip echo of our injection
+            ignoreOutputUntil = Date().addingTimeInterval(0.5)
+            targetPane?.sendText(cleanText + "\n")
+
+            NSLog("[pingpong] turn complete — speaker=%@ output=%d chars → %@",
+                  label, cleanText.count, speaker == "A" ? paneBLabel : paneALabel)
         } else {
-            NSLog("[pingpong] turn complete — speaker=%@ (empty delta, skipping relay)", label)
+            NSLog("[pingpong] turn complete — speaker=%@ (empty, skipping relay)", label)
         }
 
         // Advance round
         round += 1
-
-        // Check if session is complete
         if round >= maxRounds {
             isActive = false
             onSessionComplete?(round)
@@ -224,25 +198,12 @@ class PingPongRouter {
             return
         }
 
-        // Switch to the other pane
+        // Switch speaker
         currentSpeaker = (speaker == "A") ? "B" : "A"
-        currentTurnText = ""
+        outputBuffer = Data()
 
-        // Start capturing the next pane
-        startCapturingCurrentPane()
-    }
-
-    /// Extract delta between baseline and final viewport snapshot.
-    /// If baseline is a prefix of full, returns only the new portion.
-    /// Otherwise returns full text (conservative fallback).
-    private func extractDelta(full: String, baseline: String) -> String {
-        guard !baseline.isEmpty else { return full }
-        if full.hasPrefix(baseline) {
-            let delta = String(full.dropFirst(baseline.count))
-            return delta.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        // Baseline may have scrolled off — return full text trimmed
-        return full.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Start listening to the other pane
+        startListeningToCurrentPane()
     }
 
     // MARK: - State
