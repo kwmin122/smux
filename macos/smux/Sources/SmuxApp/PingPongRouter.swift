@@ -7,8 +7,8 @@ class PingPongRouter {
     enum State: String {
         case idle = "Idle"
         case waitingForOutput = "Waiting..."
-        case paneASpeaking = "A speaking..."
-        case paneBSpeaking = "B speaking..."
+        case paneASpeaking = "A → B"
+        case paneBSpeaking = "B → A"
         case paused = "Paused"
     }
 
@@ -38,6 +38,9 @@ class PingPongRouter {
 
     /// Accumulated text from the current turn's polling deltas
     private var currentTurnText: String = ""
+
+    /// Viewport snapshot taken at the start of a turn (used to compute delta output)
+    private var baselineText: String = ""
 
     /// Silence timeout: if no text change for this duration, treat as turn-complete
     private let silenceThreshold: TimeInterval = 2.0
@@ -130,6 +133,9 @@ class PingPongRouter {
         let speakerState: State = (currentSpeaker == "A") ? .paneASpeaking : .paneBSpeaking
         updateState(speakerState)
 
+        // Snapshot baseline before polling starts — delta = final - baseline
+        baselineText = pane?.captureViewportText().flatMap { ANSIStripper.strip($0) } ?? ""
+
         pane?.startCapturing { [weak self] newText in
             self?.handleNewOutput(newText)
         }
@@ -176,11 +182,10 @@ class PingPongRouter {
         DispatchQueue.global().asyncAfter(deadline: .now() + silenceThreshold, execute: item)
     }
 
-    /// Process a completed turn: deliver output, advance round, switch panes.
+    /// Process a completed turn: deliver output, inject into target pane, advance round, switch panes.
     private func processTurnComplete() {
         guard isActive else { return }
 
-        let output = currentTurnText
         let speaker = currentSpeaker
         let label = (speaker == "A") ? paneALabel : paneBLabel
 
@@ -191,10 +196,20 @@ class PingPongRouter {
             paneB?.stopCapturing()
         }
 
-        // Deliver the turn output
-        if !output.isEmpty {
-            onTurnComplete?(label, output)
-            NSLog("[pingpong] turn complete — speaker=%@ output=%d chars", label, output.count)
+        // Extract delta: new output only (strip baseline prefix)
+        let delta = extractDelta(full: currentTurnText, baseline: baselineText)
+
+        // Deliver the turn output + inject into the OTHER pane (relay)
+        if !delta.isEmpty {
+            onTurnComplete?(label, delta)
+
+            // RELAY INJECTION: send captured output to the target pane's stdin
+            let targetPane = (speaker == "A") ? paneB : paneA
+            targetPane?.sendText(delta + "\n")
+            NSLog("[pingpong] turn complete — speaker=%@ delta=%d chars, injected into %@",
+                  label, delta.count, speaker == "A" ? paneBLabel : paneALabel)
+        } else {
+            NSLog("[pingpong] turn complete — speaker=%@ (empty delta, skipping relay)", label)
         }
 
         // Advance round
@@ -215,6 +230,19 @@ class PingPongRouter {
 
         // Start capturing the next pane
         startCapturingCurrentPane()
+    }
+
+    /// Extract delta between baseline and final viewport snapshot.
+    /// If baseline is a prefix of full, returns only the new portion.
+    /// Otherwise returns full text (conservative fallback).
+    private func extractDelta(full: String, baseline: String) -> String {
+        guard !baseline.isEmpty else { return full }
+        if full.hasPrefix(baseline) {
+            let delta = String(full.dropFirst(baseline.count))
+            return delta.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Baseline may have scrolled off — return full text trimmed
+        return full.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - State

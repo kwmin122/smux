@@ -385,6 +385,7 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
     /// Toggle ping-pong mode between the two visible terminal panes.
     /// Requires at least 2 terminal views (split first with ⌘D).
     func togglePingPong() {
+        NSLog("[pingpong] togglePingPong — terminalViews.count=%d, router=%@", terminalViews.count, pingPongRouter != nil ? "exists" : "nil")
         if let router = pingPongRouter, router.isActive {
             // Stop ping-pong
             router.stop()
@@ -422,8 +423,9 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             }
 
             router.onTurnComplete = { [weak self] speaker, output in
-                let preview = String(output.prefix(100))
-                self?.inspector.transcript += "\n[\(speaker)] \(preview)..."
+                let target = (speaker == "Left") ? "Right" : "Left"
+                let preview = String(output.prefix(200))
+                self?.inspector.transcript += "\n[\(speaker) → \(target)] \(preview)"
             }
 
             router.onSessionComplete = { [weak self] totalRounds in
@@ -612,7 +614,8 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
         )
         sidebar.notifications.append(notif)
 
-        // Also send macOS system notification via UNUserNotificationCenter
+        // Also send macOS system notification (only when running as a proper .app bundle)
+        guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
