@@ -13,17 +13,21 @@ guard initResult == GHOSTTY_SUCCESS else { fatalError("ghostty_init: \(initResul
 
 private let wakeupCb: @convention(c) (UnsafeMutableRawPointer?) -> Void = { _ in
     DispatchQueue.main.async {
-        for w in NSApplication.shared.windows {
+        // Only redraw the main window (not panels/dialogs)
+        if let w = NSApplication.shared.mainWindow {
             w.contentView?.setNeedsDisplay(w.contentView?.bounds ?? .zero)
         }
     }
 }
-private let actionCb: @convention(c) (ghostty_app_t?, ghostty_target_s, ghostty_action_s) -> Bool = { _, _, _ in false }
+private let actionCb: @convention(c) (ghostty_app_t?, ghostty_target_s, ghostty_action_s) -> Bool = { _, target, action in
+    NSLog("[ghostty-action] tag=%d", action.tag.rawValue)
+    return false
+}
 private let readCb: @convention(c) (UnsafeMutableRawPointer?, ghostty_clipboard_e, UnsafeMutableRawPointer?) -> Bool = { _, _, _ in false }
 private let confirmCb: @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<CChar>?, UnsafeMutableRawPointer?, ghostty_clipboard_request_e) -> Void = { _, _, _, _ in }
 private let writeCb: @convention(c) (UnsafeMutableRawPointer?, ghostty_clipboard_e, UnsafePointer<ghostty_clipboard_content_s>?, Int, Bool) -> Void = { _, _, _, _, _ in }
 private let closeCb: @convention(c) (UnsafeMutableRawPointer?, Bool) -> Void = { _, _ in
-    NSApplication.shared.terminate(nil)
+    // Do nothing — app closes via ⌘W menu action, not ghostty surface close
 }
 
 // MARK: - App Delegate
@@ -31,6 +35,8 @@ private let closeCb: @convention(c) (UnsafeMutableRawPointer?, Bool) -> Void = {
 class AppDelegate: NSObject, NSApplicationDelegate {
     var ghosttyApp: ghostty_app_t?
     var workspaceController: WorkspaceWindowController?
+    var appleScriptSupport: AppleScriptSupport?
+    var sessionManager: SessionDetachReattach?
     var tickTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -66,17 +72,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         workspaceController?.restoreState()
         workspaceController?.showWindow(nil)
 
-        // Daemon status
-        let ipc = SmuxIpcClient()
-        if ipc.isDaemonRunning {
-            workspaceController?.window?.title = "smux — daemon ●"
+        // Daemon status (async — never block main thread)
+        SmuxIpcClient().checkDaemonAsync { [weak self] running in
+            if running {
+                self?.workspaceController?.window?.title = "smux — daemon ●"
+            }
+        }
+
+        // Session detach/reattach — tmux-style
+        sessionManager = SessionDetachReattach()
+        let reattached = sessionManager?.reattachAll() ?? []
+        if !reattached.isEmpty {
+            NSLog("[smux] reattached %d sessions from previous run", reattached.count)
+        }
+
+        // AppleScript support
+        if let wc = workspaceController {
+            appleScriptSupport = AppleScriptSupport(controller: wc)
+            appleScriptSupport?.registerHandlers()
         }
 
         // Setup menu bar
         setupMenuBar()
 
         // Tick timer
-        tickTimer = Timer.scheduledTimer(withTimeInterval: 1.0/120.0, repeats: true) { [weak self] _ in
+        tickTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
             guard let a = self?.ghosttyApp else { return }
             ghostty_app_tick(a)
         }
@@ -94,8 +114,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // File menu
         let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(NSMenuItem(title: "New Relay Session...", action: #selector(newSession), keyEquivalent: "n"))
         fileMenu.addItem(NSMenuItem(title: "New Tab", action: #selector(newTab), keyEquivalent: "t"))
         fileMenu.addItem(NSMenuItem(title: "Close", action: #selector(closeTab), keyEquivalent: "w"))
+
+        let detachItem = NSMenuItem(title: "Detach Session", action: #selector(detachSession), keyEquivalent: "d")
+        detachItem.keyEquivalentModifierMask = [.command, .shift, .control]
+        fileMenu.addItem(detachItem)
+
+        fileMenu.addItem(NSMenuItem(title: "Reattach Sessions", action: #selector(reattachSessions), keyEquivalent: ""))
         let fileItem = NSMenuItem()
         fileItem.submenu = fileMenu
         mainMenu.addItem(fileItem)
@@ -104,14 +131,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let viewMenu = NSMenu(title: "View")
         viewMenu.addItem(NSMenuItem(title: "Split Vertical", action: #selector(splitV), keyEquivalent: "d"))
 
-        fileMenu.addItem(NSMenuItem(title: "Find", action: #selector(findInTerminal), keyEquivalent: "f"))
-
         let splitHItem = NSMenuItem(title: "Split Horizontal", action: #selector(splitH), keyEquivalent: "d")
         splitHItem.keyEquivalentModifierMask = [.command, .shift]
         viewMenu.addItem(splitHItem)
 
+        let closePaneItem = NSMenuItem(title: "Close Pane", action: #selector(closePane), keyEquivalent: "w")
+        closePaneItem.keyEquivalentModifierMask = [.command, .shift]
+        viewMenu.addItem(closePaneItem)
+
+        viewMenu.addItem(NSMenuItem(title: "Find", action: #selector(findInTerminal), keyEquivalent: "f"))
         viewMenu.addItem(NSMenuItem(title: "Toggle Inspector", action: #selector(toggleInspector), keyEquivalent: "i"))
+
+        let browserItem = NSMenuItem(title: "Toggle Browser", action: #selector(toggleBrowser), keyEquivalent: "b")
+        browserItem.keyEquivalentModifierMask = [.command, .shift]
+        viewMenu.addItem(browserItem)
+
+        let pingpongItem = NSMenuItem(title: "Ping-pong Mode", action: #selector(togglePingPong), keyEquivalent: "p")
+        pingpongItem.keyEquivalentModifierMask = [.command, .shift]
+        viewMenu.addItem(pingpongItem)
+
         viewMenu.addItem(NSMenuItem(title: "Command Palette", action: #selector(showPalette), keyEquivalent: "p"))
+
+        let guideItem = NSMenuItem(title: "Guide", action: #selector(showGuide), keyEquivalent: "/")
+        guideItem.keyEquivalentModifierMask = [.command]
+        viewMenu.addItem(guideItem)
 
         let viewItem = NSMenuItem()
         viewItem.submenu = viewMenu
@@ -121,19 +164,62 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func findInTerminal() { workspaceController?.toggleSearch() }
+    @objc func newSession() { workspaceController?.startNewSession() }
     @objc func newTab() { workspaceController?.newTab() }
-    @objc func closeTab() { workspaceController?.window?.close() }
+    @objc func closeTab() {
+        if let window = workspaceController?.window,
+           let tabs = window.tabbedWindows, tabs.count > 1 {
+            window.close()
+        } else {
+            performCleanShutdown()
+        }
+    }
+
+    private func performCleanShutdown() {
+        tickTimer?.invalidate()
+        tickTimer = nil
+        appleScriptSupport?.unregisterHandlers()
+        workspaceController?.saveState()
+
+        // destroyAllSurfaces detaches contentView (Metal) THEN frees surfaces async.
+        // This order is critical — see Ghostty's BaseTerminalController.windowWillClose.
+        workspaceController?.destroyAllSurfaces()
+        workspaceController = nil
+        if let a = ghosttyApp { ghostty_app_free(a); ghosttyApp = nil }
+        NSApp.terminate(nil)
+    }
+    @objc func detachSession() {
+        // Detach the current (focused) session — keeps running in daemon
+        let targetId = sessionManager?.currentSessionId
+            ?? sessionManager?.attachedSessions.sorted().first
+        guard let id = targetId else {
+            NSLog("[smux] no session to detach")
+            return
+        }
+        _ = sessionManager?.detach(sessionId: id)
+        NSLog("[smux] detached session: %@", id)
+    }
+    @objc func reattachSessions() {
+        let ids = sessionManager?.reattachAll() ?? []
+        NSLog("[smux] reattached %d sessions", ids.count)
+    }
+    @objc func closePane() { workspaceController?.closePane() }
     @objc func splitV() { workspaceController?.splitVertical() }
     @objc func splitH() { workspaceController?.splitHorizontal() }
     @objc func toggleInspector() { workspaceController?.toggleInspector() }
+    @objc func toggleBrowser() { workspaceController?.toggleBrowser() }
+    @objc func togglePingPong() { workspaceController?.togglePingPong() }
     @objc func showPalette() { workspaceController?.showCommandPalette() }
+    @objc func showGuide() { GuidePanel.toggle(relativeTo: workspaceController?.window) }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ notification: Notification) {
-        workspaceController?.saveState()
+        // Safety net — performCleanShutdown or windowWillClose may have already cleaned up.
         tickTimer?.invalidate()
         tickTimer = nil
+        appleScriptSupport?.unregisterHandlers()
+        workspaceController?.destroyAllSurfaces()
         workspaceController = nil
         if let a = ghosttyApp { ghostty_app_free(a); ghosttyApp = nil }
     }
