@@ -19,10 +19,10 @@
 
 ### Ping-Pong Relay
 
-- [ ] **PING-01**: User can activate ping-pong mode via ⌘⇧P or mission control Ping-pong button (requires two split panes)
-- [ ] **PING-02**: When ping-pong is active, smux automatically injects Pane A's completed output into Pane B's stdin
-- [ ] **PING-03**: Relay continues in a loop (A→B→A→B…) until user pauses or stops
-- [ ] **PING-04**: Mission control bar shows relay status: active pane indicator, turn count, running/paused state
+- [x] **PING-01**: User can activate ping-pong mode via ⌘⇧P or mission control Ping-pong button (requires two split panes)
+- [x] **PING-02**: When ping-pong is active, smux automatically injects Pane A's completed output into Pane B's stdin
+- [x] **PING-03**: Relay continues in a loop (A→B→A→B…) until user pauses or stops
+- [x] **PING-04**: Mission control bar shows relay status: active pane indicator, turn count, running/paused state
 
 ### E2E Verification
 
@@ -70,10 +70,10 @@
 | PTY-CAP-01 | Phase 2 | Complete |
 | PTY-CAP-02 | Phase 2 | Complete |
 | PTY-CAP-03 | Phase 2 | Complete |
-| PING-01 | Phase 3 | Pending |
-| PING-02 | Phase 3 | Pending |
-| PING-03 | Phase 3 | Pending |
-| PING-04 | Phase 3 | Pending |
+| PING-01 | Phase 3 | Complete |
+| PING-02 | Phase 3 | Complete |
+| PING-03 | Phase 3 | Complete |
+| PING-04 | Phase 3 | Complete |
 | E2E-01 | Phase 4 | Pending |
 | E2E-02 | Phase 4 | Pending |
 | E2E-03 | Phase 4 | Pending |

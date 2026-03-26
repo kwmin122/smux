@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Surface Lifecycle Fix** - Fix ⌘W Metal zombie and ghostty surface teardown order
 - [x] **Phase 2: PTY Output Capture** - Capture terminal output from ghostty EXEC mode; detect turn boundaries; strip ANSI (completed 2026-03-26)
-- [ ] **Phase 3: Ping-Pong Relay** - Wire captured output into live relay loop with mission control status
+- [x] **Phase 3: Ping-Pong Relay** - Wire captured output into live relay loop with mission control status
 - [ ] **Phase 4: E2E Feature Verification** - Verify browser panel, browser automation, detach/reattach, and AppleScript hooks end-to-end
 
 ## Phase Details
@@ -55,13 +55,10 @@ Plans:
   2. After Pane A's agent finishes a turn, smux injects the cleaned output into Pane B's stdin automatically without user intervention
   3. The relay continues A→B→A→B in a self-sustaining loop until user presses Pause or Stop
   4. Mission control bar displays which pane is currently active, the running turn count, and whether the relay is running or paused
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 Plans:
-- [ ] 03-01: Wire PingPongRouter to EXEC mode capture output (replace receive_buffer pattern)
-- [ ] 03-02: Implement relay injection (sendText to target pane stdin on turn-complete)
-- [ ] 03-03: Implement loop state machine (running/paused/stopped) with ⌘⇧P toggle
-- [ ] 03-04: Update mission control bar to show pane indicator, turn count, relay state
+- [x] 03-01-PLAN.md — Relay injection + delta extraction + pane indicator (consolidated — capture wiring, loop, and UI already existed from Phase 2)
 **UI hint**: yes
 
 ### Phase 4: E2E Feature Verification
@@ -91,5 +88,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Surface Lifecycle Fix | 1/1 | Complete | 2026-03-26 |
 | 2. PTY Output Capture | 2/2 | Complete   | 2026-03-26 |
-| 3. Ping-Pong Relay | 0/4 | Not started | - |
+| 3. Ping-Pong Relay | 1/1 | Complete | 2026-03-26 |
 | 4. E2E Feature Verification | 0/4 | Not started | - |
