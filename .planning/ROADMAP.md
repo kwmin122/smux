@@ -13,7 +13,7 @@ v0.8 ships smux's core differentiator: real PTY ping-pong between two AI agent C
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Surface Lifecycle Fix** - Fix ⌘W Metal zombie and ghostty surface teardown order
-- [ ] **Phase 2: PTY Output Capture** - Capture terminal output from ghostty EXEC mode; detect turn boundaries; strip ANSI
+- [x] **Phase 2: PTY Output Capture** - Capture terminal output from ghostty EXEC mode; detect turn boundaries; strip ANSI (completed 2026-03-26)
 - [ ] **Phase 3: Ping-Pong Relay** - Wire captured output into live relay loop with mission control status
 - [ ] **Phase 4: E2E Feature Verification** - Verify browser panel, browser automation, detach/reattach, and AppleScript hooks end-to-end
 
@@ -40,11 +40,11 @@ Plans:
   1. When an agent CLI (e.g., `claude`) prints output in a ghostty pane, smux captures the text within one second
   2. smux correctly identifies when the agent's turn is complete (prompt reappears, OSC 133 boundary fires, or configurable silence timeout expires)
   3. Text delivered to the relay layer contains no ANSI escape sequences — only plain readable content
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 02-01-PLAN.md — Create capture primitives: ANSIStripper, captureViewportText(), actionCb COMMAND_FINISHED dispatch
-- [ ] 02-02-PLAN.md — Wire PingPongRouter to real capture: polling, OSC 133 turn-complete, silence timeout fallback
+- [x] 02-01-PLAN.md — Create capture primitives: ANSIStripper, captureViewportText(), actionCb COMMAND_FINISHED dispatch
+- [x] 02-02-PLAN.md — Wire PingPongRouter to real capture: polling, OSC 133 turn-complete, silence timeout fallback
 
 ### Phase 3: Ping-Pong Relay
 **Goal**: Two AI agents relay responses between each other automatically in a live visible loop until the user stops it
@@ -90,6 +90,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Surface Lifecycle Fix | 1/1 | Complete | 2026-03-26 |
-| 2. PTY Output Capture | 0/2 | Not started | - |
+| 2. PTY Output Capture | 2/2 | Complete   | 2026-03-26 |
 | 3. Ping-Pong Relay | 0/4 | Not started | - |
 | 4. E2E Feature Verification | 0/4 | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-pty-output-capture-02-01-PLAN.md
-last_updated: "2026-03-26T03:58:09.294Z"
+stopped_at: "Completed 02-pty-output-capture-02-02-PLAN.md (checkpoint:human-verify pending)"
+last_updated: "2026-03-26T04:09:00.363Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 02 (pty-output-capture) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 02
-Last activity: 2026-03-26 -- Phase 02 execution started
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-03-26
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01-surface-lifecycle-fix P01 | 3 | 2 tasks | 3 files |
 | Phase 02-pty-output-capture P01 | 6 | 2 tasks | 3 files |
+| Phase 02-pty-output-capture P02 | 9 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 01-surface-lifecycle-fix]: NSWindowDelegate.windowWillClose added to WorkspaceWindowController as primary Cmd+W teardown hook
 - [Phase 02-pty-output-capture]: Use GHOSTTY_POINT_VIEWPORT with large coords (9999,9999) for full visible viewport reads; ghostty clamps to actual content
 - [Phase 02-pty-output-capture]: UInt(bitPattern: surface) as opaque key in @convention(c) actionCb — pointer never dereferenced async
+- [Phase 02-pty-output-capture]: Timer.scheduledTimer on main RunLoop required for ghostty_surface_read_text Metal thread safety
+- [Phase 02-pty-output-capture]: Dual turn-complete detection: OSC 133 COMMAND_FINISHED (primary) + 2s silence timeout (fallback) with double-fire prevention via DispatchWorkItem.cancel()
 
 ### Pending Todos
 
@@ -82,6 +85,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T03:58:09.289Z
-Stopped at: Completed 02-pty-output-capture-02-01-PLAN.md
+Last session: 2026-03-26T04:09:00.360Z
+Stopped at: Completed 02-pty-output-capture-02-02-PLAN.md (checkpoint:human-verify pending)
 Resume file: None
