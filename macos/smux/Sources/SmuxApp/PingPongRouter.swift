@@ -39,8 +39,11 @@ class PingPongRouter {
 
     private var currentSpeaker: String = "A"
 
-    /// Raw PTY output accumulated during the current turn
+    /// Raw PTY output accumulated during the current turn (for activity detection only)
     private var outputBuffer = Data()
+
+    /// Viewport snapshot at turn start (for delta extraction at turn end)
+    private var baselineText: String = ""
 
     /// Silence timeout: if no PTY output for this duration, treat as turn-complete
     private let silenceThreshold: TimeInterval = 3.0
@@ -116,6 +119,9 @@ class PingPongRouter {
         updateState(speakerState)
         outputBuffer = Data()
 
+        // Snapshot viewport baseline for delta extraction at turn-complete
+        baselineText = ANSIStripper.strip(pane?.captureViewportText() ?? "")
+
         // Detach previous listeners
         paneA?.onPTYOutput = nil
         paneB?.onPTYOutput = nil
@@ -158,7 +164,9 @@ class PingPongRouter {
         DispatchQueue.global().asyncAfter(deadline: .now() + silenceThreshold, execute: item)
     }
 
-    /// Turn complete: extract text from buffer, relay to other pane.
+    /// Turn complete: read rendered viewport (not raw bytes), relay to other pane.
+    /// HYBRID APPROACH: PTY stream for turn DETECTION, viewport for text EXTRACTION.
+    /// This gives clean rendered text without TUI artifacts (spinner, cursor repositioning).
     private func processTurnComplete() {
         guard isActive else { return }
 
@@ -169,18 +177,23 @@ class PingPongRouter {
         let currentPane = (speaker == "A") ? paneA : paneB
         currentPane?.onPTYOutput = nil
 
-        // Convert raw bytes to string, strip ANSI
-        let rawText = String(data: outputBuffer, encoding: .utf8) ?? ""
-        let cleanText = ANSIStripper.strip(rawText).trimmingCharacters(in: .whitespacesAndNewlines)
+        // Read the RENDERED viewport (clean, no TUI artifacts) instead of raw PTY bytes.
+        // This is a single read at turn-complete — NOT polling. No feedback loop because
+        // turn detection is PTY-stream-based, not viewport-change-based.
+        let viewportText = currentPane?.captureViewportText() ?? ""
+        let cleanText = ANSIStripper.strip(viewportText).trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if !cleanText.isEmpty {
-            onTurnComplete?(label, cleanText)
+        // Extract delta from baseline
+        let delta = extractDelta(full: cleanText, baseline: baselineText)
+
+        if !delta.isEmpty {
+            onTurnComplete?(label, delta)
 
             // RELAY: inject into OTHER pane's PTY stdin
             let targetPane = (speaker == "A") ? paneB : paneA
             // Brief ignore window to skip echo of our injection
-            ignoreOutputUntil = Date().addingTimeInterval(0.5)
-            targetPane?.sendText(cleanText + "\n")
+            ignoreOutputUntil = Date().addingTimeInterval(1.0)
+            targetPane?.sendText(delta + "\n")
 
             NSLog("[pingpong] turn complete — speaker=%@ output=%d chars → %@",
                   label, cleanText.count, speaker == "A" ? paneBLabel : paneALabel)
@@ -204,6 +217,22 @@ class PingPongRouter {
 
         // Start listening to the other pane
         startListeningToCurrentPane()
+    }
+
+    // MARK: - Text Extraction
+
+    /// Extract new content by comparing viewport at turn-end vs turn-start.
+    private func extractDelta(full: String, baseline: String) -> String {
+        guard !baseline.isEmpty else { return full }
+        // For TUI apps, the viewport is fully redrawn each time.
+        // Find the longest common prefix and return what's new.
+        if full.hasPrefix(baseline) {
+            let delta = String(full.dropFirst(baseline.count))
+            let trimmed = delta.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? full.trimmingCharacters(in: .whitespacesAndNewlines) : trimmed
+        }
+        // TUI redrew entirely — return full viewport
+        return full.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - State
