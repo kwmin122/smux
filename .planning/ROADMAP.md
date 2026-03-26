@@ -1,89 +1,80 @@
-# Roadmap: smux — v0.8 Ping-Pong Core
+# Roadmap: smux — v0.9 PTY Stream Relay
 
 ## Overview
 
-v0.8 ships smux's core differentiator: real PTY ping-pong between two AI agent CLIs running in visible ghostty panes. The path runs through four natural delivery boundaries — fix the crash that blocks stable testing, solve the hard capture problem (ghostty EXEC mode), wire the relay loop end-to-end, then verify the surrounding features (browser panel, AppleScript, detach/reattach) that complete the product story.
+v0.9 replaces the broken viewport-polling relay with a PTY-stream-based architecture. The v0.8 approach (ghostty_surface_read_text viewport capture at 4Hz) was fundamentally incompatible with TUI agents — it captured full-screen UI chrome and created infinite feedback loops. The fix is architectural: switch from EXEC mode (ghostty owns PTY) to HOST_MANAGED mode (smux owns PTY), giving direct access to the raw PTY byte stream for capture and injection.
+
+## Architecture Change
+
+```
+v0.8 (BROKEN):
+  ghostty EXEC → viewport poll → baseline diff → sendText inject
+  Problem: TUI redraws entire screen, diff always returns full viewport, inject triggers re-capture
+
+v0.9 (NEW):
+  smux_forkpty() → master fd → tee reader → ghostty_surface_write_buffer (render)
+                                           → capture buffer (relay router)
+  Inject: write to master fd stdin → completely separate from capture path
+```
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: Surface Lifecycle Fix** - Fix ⌘W Metal zombie and ghostty surface teardown order
-- [x] **Phase 2: PTY Output Capture** - Capture terminal output from ghostty EXEC mode; detect turn boundaries; strip ANSI (completed 2026-03-26)
-- [x] **Phase 3: Ping-Pong Relay** - Wire captured output into live relay loop with mission control status
-- [x] **Phase 4: E2E Feature Verification** - Verify browser panel, browser automation, detach/reattach, and AppleScript hooks end-to-end
+- [ ] **Phase 1: HOST_MANAGED PTY** — Switch from EXEC to HOST_MANAGED mode; smux owns PTY via forkpty, tees raw bytes to ghostty renderer
+- [ ] **Phase 2: Stream Turn Detection** — Detect turn-complete on raw PTY output stream; silence timeout + prompt regex
+- [ ] **Phase 3: Stream Relay + UI** — Wire relay injection via master fd write; update mission control for stream-based state
 
 ## Phase Details
 
-### Phase 1: Surface Lifecycle Fix
-**Goal**: Users can close the app window cleanly without Metal layer artifacts or crashes
-**Depends on**: Nothing (first phase)
-**Requirements**: STAB-01, STAB-02
+### Phase 1: HOST_MANAGED PTY
+**Goal**: GhosttyTerminalView creates terminals in HOST_MANAGED mode where smux owns the PTY, reads raw output, and pipes it to ghostty for rendering
+**Depends on**: Nothing (foundation phase)
+**Requirements**: HPTY-01, HPTY-02, HPTY-03, HPTY-04, STAB-01, STAB-02
 **Success Criteria** (what must be TRUE):
-  1. User presses ⌘W and the window closes immediately with no visible Metal layer artifact left on screen
-  2. User can open a new window after closing the previous one without any crash or error
-  3. App can be quit and relaunched repeatedly without accumulating zombie surfaces or memory errors in the console
-**Plans:** 1 plan
+  1. Terminal renders and accepts keyboard input in HOST_MANAGED mode (shell prompt visible, commands execute)
+  2. Korean IME works — preedit composition and commit in both Korean and English
+  3. Raw PTY output bytes are accessible to smux (logged or buffered) before ghostty renders them
+  4. `receive_buffer` callback fires when ghostty processes keyboard input, and bytes reach the child process
+  5. Window close cleanly frees PTY fd + child process + ghostty surface
+**Plans**: TBD (research → plan → execute)
+**Risk**: HIGH — HOST_MANAGED mode behavior needs empirical verification with current ghostty xcframework
+**Verification gate**: Must pass Korean IME test before proceeding to Phase 2
 
-Plans:
-- [x] 01-01-PLAN.md — Fix ghostty surface teardown order (contentView=nil FIRST, Task.detached surface_free, windowWillClose delegate)
-
-### Phase 2: PTY Output Capture
-**Goal**: smux can read and clean terminal output from agents running in ghostty EXEC mode in real-time
-**Depends on**: Phase 1
-**Requirements**: PTY-CAP-01, PTY-CAP-02, PTY-CAP-03
+### Phase 2: Stream Turn Detection
+**Goal**: smux detects when an AI agent's turn is complete by monitoring the raw PTY output stream
+**Depends on**: Phase 1 (raw stream access)
+**Requirements**: TURN-01, TURN-02, TURN-03
 **Success Criteria** (what must be TRUE):
-  1. When an agent CLI (e.g., `claude`) prints output in a ghostty pane, smux captures the text within one second
-  2. smux correctly identifies when the agent's turn is complete (prompt reappears, OSC 133 boundary fires, or configurable silence timeout expires)
-  3. Text delivered to the relay layer contains no ANSI escape sequences — only plain readable content
-**Plans:** 2/2 plans complete
+  1. Silence timeout (3s default) fires correctly when PTY output stops after agent response
+  2. Prompt pattern regex detects Claude Code ❯ prompt in raw stream (optional, secondary signal)
+  3. ANSI escape sequences and cursor movement do not trigger false "activity" signals
+  4. Turn detection does NOT fire during text injection (stdin write doesn't appear on capture path)
+**Plans**: TBD
+**Risk**: MEDIUM — silence threshold tuning needed per agent
 
-Plans:
-- [x] 02-01-PLAN.md — Create capture primitives: ANSIStripper, captureViewportText(), actionCb COMMAND_FINISHED dispatch
-- [x] 02-02-PLAN.md — Wire PingPongRouter to real capture: polling, OSC 133 turn-complete, silence timeout fallback
-
-### Phase 3: Ping-Pong Relay
-**Goal**: Two AI agents relay responses between each other automatically in a live visible loop until the user stops it
-**Depends on**: Phase 2
-**Requirements**: PING-01, PING-02, PING-03, PING-04
+### Phase 3: Stream Relay + UI
+**Goal**: Two AI agents relay responses between each other via PTY stream capture and master fd injection
+**Depends on**: Phase 2 (turn detection)
+**Requirements**: RELAY-01, RELAY-02, RELAY-03, RELAY-04, UI-01, UI-02, UI-03
 **Success Criteria** (what must be TRUE):
-  1. User activates ping-pong mode via ⌘⇧P or the mission control Ping-pong button and sees the mode become active (requires two split panes to be open)
-  2. After Pane A's agent finishes a turn, smux injects the cleaned output into Pane B's stdin automatically without user intervention
-  3. The relay continues A→B→A→B in a self-sustaining loop until user presses Pause or Stop
-  4. Mission control bar displays which pane is currently active, the running turn count, and whether the relay is running or paused
-**Plans**: 1/1 plan complete
-
-Plans:
-- [x] 03-01-PLAN.md — Relay injection + delta extraction + pane indicator (consolidated — capture wiring, loop, and UI already existed from Phase 2)
-**UI hint**: yes
-
-### Phase 4: E2E Feature Verification
-**Goal**: Browser panel, browser automation, session detach/reattach, and AppleScript hooks all work end-to-end
-**Depends on**: Phase 3
-**Requirements**: E2E-01, E2E-02, E2E-03, E2E-04
-**Success Criteria** (what must be TRUE):
-  1. User presses ⌘⇧B and a browser panel opens alongside the terminal pane and renders a localhost URL correctly
-  2. Browser automation DOM snapshot call returns actual page content (non-empty, structurally valid HTML/text)
-  3. User detaches a session, relaunches the app, reattaches, and sees the same pane layout restored
-  4. An external AppleScript targeting smux executes successfully and receives a confirmed response
-**Plans**: 1/1 plan complete
-
-Plans:
-- [x] 04-01-PLAN.md — Split layout persistence + E2E verification (consolidated — browser/automation/AppleScript already functional)
-**UI hint**: yes
+  1. When Pane A's agent finishes, ONLY the response text (not TUI chrome) is injected into Pane B
+  2. Relay runs A→B→A→B without feedback loop or duplication
+  3. Mission control shows correct relay direction and turn count
+  4. User can pause/resume/stop relay with ⌘⇧P
+**Plans**: TBD
+**Risk**: LOW — straightforward once Phase 1+2 work
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+**Execution Order:** 1 → 2 → 3 (strictly sequential — each phase depends on previous)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Surface Lifecycle Fix | 1/1 | Complete | 2026-03-26 |
-| 2. PTY Output Capture | 2/2 | Complete   | 2026-03-26 |
-| 3. Ping-Pong Relay | 1/1 | Complete | 2026-03-26 |
-| 4. E2E Feature Verification | 1/1 | Complete | 2026-03-26 |
+| 1. HOST_MANAGED PTY | 0/TBD | Not started | - |
+| 2. Stream Turn Detection | 0/TBD | Not started | - |
+| 3. Stream Relay + UI | 0/TBD | Not started | - |
+
+## Research References
+
+- `.planning/debug/relay-viewport-capture-architecture.md` — Root cause analysis of v0.8 bugs
+- `.planning/research/SUMMARY.md` — Architecture research (HOST_MANAGED, tmux pipe-pane, turn detection)
+- `.planning/codebase/ARCHITECTURE.md` — Full ghostty API inventory and integration points

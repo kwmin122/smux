@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.8
-milestone_name: milestone
-status: executing
-stopped_at: "ALL PHASES COMPLETE — v0.8 milestone 13/13 requirements done"
-last_updated: "2026-03-26T04:09:00.363Z"
+milestone: v0.9
+milestone_name: PTY Stream Relay
+status: planning
+stopped_at: "v0.9 planning docs created — ready for Phase 1 discuss/plan"
+last_updated: "2026-03-26T07:00:00Z"
 last_activity: 2026-03-26
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 0
 ---
 
@@ -21,70 +21,51 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Two AI agents ping-pong in real visible PTYs — user sleeps, wakes up to idea→plan→impl→review all done.
-**Current focus:** v0.8 COMPLETE — all 4 phases verified
+**Current focus:** v0.9 Phase 1 — HOST_MANAGED PTY foundation
 
 ## Current Position
 
-Phase: 04 (e2e-feature-verification) — VERIFIED ✅
-Plan: 1 of 1 (complete)
-Status: ALL PHASES COMPLETE — v0.8 milestone done (13/13 requirements)
+Phase: 01 (host-managed-pty) — NOT STARTED
+Plan: 0 of TBD
+Status: Planning docs complete, ready for Phase 1 research → plan → execute
 Last activity: 2026-03-26
 
 Progress: [░░░░░░░░░░] 0%
 
-## Performance Metrics
+## v0.8 Completion
 
-**Velocity:**
+All 4 phases of v0.8 completed (13/13 requirements), but Phase 3 relay proved architecturally broken for TUI agents. Two critical bugs:
+1. Viewport capture includes full TUI chrome (not just response)
+2. Self-injection feedback loop (silence timeout fires on own injected text)
 
-- Total plans completed: 0
-- Average duration: —
-- Total execution time: —
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| - | - | - | - |
-
-**Recent Trend:**
-
-- Last 5 plans: —
-- Trend: —
-
-*Updated after each plan completion*
-| Phase 01-surface-lifecycle-fix P01 | 3 | 2 tasks | 3 files |
-| Phase 02-pty-output-capture P01 | 6 | 2 tasks | 3 files |
-| Phase 02-pty-output-capture P02 | 9 | 2 tasks | 2 files |
+v0.9 replaces the entire capture/relay architecture: EXEC → HOST_MANAGED, viewport polling → raw PTY stream.
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- EXEC mode chosen over HOST_MANAGED (better rendering; capture workaround via ghostty_surface_read_text required)
-- Real visible PTY is non-negotiable product identity (headless approach rejected)
-- ghostty_surface_read_text polling chosen as PTY capture strategy (pending verification)
-- [Phase 01-surface-lifecycle-fix]: Task.detached { @MainActor } for ghostty_surface_free matches Ghostty own pattern; contentView=nil BEFORE surface_free is critical ordering
-- [Phase 01-surface-lifecycle-fix]: NSWindowDelegate.windowWillClose added to WorkspaceWindowController as primary Cmd+W teardown hook
-- [Phase 02-pty-output-capture]: Use GHOSTTY_POINT_VIEWPORT with large coords (9999,9999) for full visible viewport reads; ghostty clamps to actual content
-- [Phase 02-pty-output-capture]: UInt(bitPattern: surface) as opaque key in @convention(c) actionCb — pointer never dereferenced async
-- [Phase 02-pty-output-capture]: Timer.scheduledTimer on main RunLoop required for ghostty_surface_read_text Metal thread safety
-- [Phase 02-pty-output-capture]: Dual turn-complete detection: OSC 133 COMMAND_FINISHED (primary) + 2s silence timeout (fallback) with double-fire prevention via DispatchWorkItem.cancel()
+- v0.8: EXEC mode chosen — FAILED (viewport capture broken for TUI)
+- v0.9: HOST_MANAGED mode chosen — smux owns PTY, ghostty renders only
+- Silence timeout (3s) as primary turn signal — OSC 133 doesn't fire in TUI agents
+- CPtyHelper (smux_forkpty) already exists but not wired to Package.swift
+- receive_buffer callback: ghostty calls this when it wants to write keyboard input to PTY child
+- ghostty_surface_write_buffer(): host sends raw PTY output bytes to ghostty for rendering
 
 ### Pending Todos
 
-None yet.
+- Wire CPtyHelper into Package.swift as target dependency
+- Empirically verify HOST_MANAGED mode with current ghostty 1.3.1 xcframework
+- Verify Korean IME works in HOST_MANAGED mode
+- Test ghostty_surface_write_buffer() thread safety
 
 ### Blockers/Concerns
 
-- Phase 1: Metal layer zombie on ⌘W — fix is known (contentView=nil → Task.detached surface_free order)
-- Phase 2: receive_buffer NOT called in EXEC mode — ghostty_surface_read_text polling is the workaround path
-- Phase 4: BrowserPanelView, BrowserAutomation, SessionDetachReattach, AppleScriptSupport code exists but is unverified end-to-end
+- HOST_MANAGED mode is UNTESTED with current ghostty version — Phase 1 starts with PoC verification
+- ghostty_surface_write_buffer() likely must dispatch to main thread (Metal constraint)
+- receive_buffer semantics may differ from expected — needs empirical testing
 
 ## Session Continuity
 
-Last session: 2026-03-26T04:09:00.360Z
-Stopped at: Completed 02-pty-output-capture-02-02-PLAN.md (checkpoint:human-verify pending)
-Resume file: None
+Last session: 2026-03-26
+Stopped at: v0.9 planning docs created (PROJECT.md, REQUIREMENTS.md, ROADMAP.md, STATE.md)
+Resume: Start Phase 1 with /gsd:discuss-phase or /gsd:plan-phase

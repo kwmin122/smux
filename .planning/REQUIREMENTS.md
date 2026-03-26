@@ -1,89 +1,71 @@
 # Requirements: smux
 
 **Defined:** 2026-03-26
-**Milestone:** v0.8 — Ping-Pong Core
+**Milestone:** v0.9 — PTY Stream Relay
 **Core Value:** Two AI agents ping-pong in real visible PTYs — user sleeps, wakes up to idea→plan→impl→review all done.
 
-## v0.8 Requirements
+## v0.9 Requirements
+
+### HOST_MANAGED PTY Foundation
+
+- [ ] **HPTY-01**: GhosttyTerminalView creates surfaces in HOST_MANAGED mode with smux-owned PTY via `smux_forkpty()`
+- [ ] **HPTY-02**: Raw PTY output bytes from master fd are captured in real-time and teed to ghostty renderer via `ghostty_surface_write_buffer()`
+- [ ] **HPTY-03**: Korean IME (NSTextInputClient) works correctly in HOST_MANAGED mode — preedit, composition, commit all functional
+- [ ] **HPTY-04**: `receive_buffer` callback correctly forwards ghostty's keyboard/input bytes to PTY slave via master fd write
+
+### Turn Detection (Raw Stream)
+
+- [ ] **TURN-01**: Turn-complete detected by silence timeout (configurable, default 3s) on raw PTY output stream — no viewport polling
+- [ ] **TURN-02**: Optional prompt pattern regex on raw PTY stream as secondary signal (Claude Code ❯, shell $, etc.)
+- [ ] **TURN-03**: Turn detection ignores ANSI escape sequences and cursor movement — only counts printable content as "activity"
+
+### Relay Injection
+
+- [ ] **RELAY-01**: On turn-complete, captured output (ANSI-stripped) is injected into target pane's PTY stdin via master fd write
+- [ ] **RELAY-02**: Relay injection does NOT create feedback loop — stdin write path is separate from stdout capture path
+- [ ] **RELAY-03**: Relay continues A→B→A→B until user pauses or stops (max rounds configurable)
+- [ ] **RELAY-04**: Empty or whitespace-only turns are skipped (no injection)
+
+### UI & Control
+
+- [ ] **UI-01**: ⌘⇧P toggles ping-pong mode (existing, verify still works with HOST_MANAGED)
+- [ ] **UI-02**: Mission control bar shows relay direction (A→B / B→A), turn count, running/paused state
+- [ ] **UI-03**: Inspector transcript logs each relay turn with speaker label and output preview
 
 ### Stability
 
-- [x] **STAB-01**: User can close the app window with ⌘W without Metal layer zombie or crash
-- [x] **STAB-02**: Ghostty surface is freed in correct order: window.contentView=nil → Task.detached ghostty_surface_free → ghostty_app_free
+- [ ] **STAB-01**: PTY cleanup on window close — master fd closed, child process terminated, ghostty surface freed
+- [ ] **STAB-02**: Thread-safe PTY reader — dispatch raw bytes to main thread for ghostty_surface_write_buffer
 
-### PTY Output Capture
+## v0.8 Requirements (Completed)
 
-- [x] **PTY-CAP-01**: Terminal output from an agent running in ghostty EXEC mode is captured by smux in real-time
-- [x] **PTY-CAP-02**: smux detects when an agent's turn is complete (prompt ready / OSC 133 boundary / configurable silence timeout)
-- [x] **PTY-CAP-03**: Captured terminal output has ANSI escape sequences stripped before relay injection
-
-### Ping-Pong Relay
-
-- [x] **PING-01**: User can activate ping-pong mode via ⌘⇧P or mission control Ping-pong button (requires two split panes)
-- [x] **PING-02**: When ping-pong is active, smux automatically injects Pane A's completed output into Pane B's stdin
-- [x] **PING-03**: Relay continues in a loop (A→B→A→B…) until user pauses or stops
-- [x] **PING-04**: Mission control bar shows relay status: active pane indicator, turn count, running/paused state
-
-### E2E Verification
-
-- [x] **E2E-01**: Browser panel (⌘⇧B) opens alongside terminal pane and renders a localhost URL
-- [x] **E2E-02**: Browser automation DOM snapshot returns actual page content (not empty)
-- [x] **E2E-03**: Session detach saves state; reattach restores the session with same pane layout
-- [x] **E2E-04**: AppleScript hook executes a test script that targets smux and confirms response
-
-## v2 Requirements (Deferred)
-
-### Multi-Agent Pipeline
-
-- **PIPE-01**: User can configure a 3-agent pipeline (planner + 2 verifiers) via session template
-- **PIPE-02**: Verifier consensus (majority/unanimous) gates stage advancement
-- **PIPE-03**: Ownership lanes prevent two workers from touching same file glob
-
-### Team Controls
-
-- **TEAM-01**: Session audit log exports to .jsonl
-- **TEAM-02**: Command allow/deny policy per session
-- **TEAM-03**: Secret/token redaction in stored transcripts
-
-### Platform
-
-- **PLAT-01**: Windows native shell (separate project, shares Rust IPC core)
-
-## Out of Scope
-
-| Feature | Reason |
-|---------|--------|
-| Headless daemon agent execution | Contradicts core product identity (real visible PTY) |
-| Fixed planner/verifier roles | Any two agents should work — no naming enforced |
-| Web/Electron shell | Rejected in architecture review — Swift+libghostty chosen |
-| OAuth/SSO login | Individual user first, team controls in future milestone |
-| Mobile app | macOS desktop only for now |
-| Windows shell (v0.8) | Deferred — macOS-native first, Rust IPC is Windows-ready |
-| AI provider integration (built-in) | Agents run as external CLI processes in PTY — provider-agnostic |
+All 13 v0.8 requirements (STAB-01/02, PTY-CAP-01/02/03, PING-01/02/03/04, E2E-01/02/03/04) were implemented but PING-02/03 proved architecturally broken for TUI agents. v0.9 replaces the capture/relay architecture entirely.
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STAB-01 | Phase 1 | Complete |
-| STAB-02 | Phase 1 | Complete |
-| PTY-CAP-01 | Phase 2 | Complete |
-| PTY-CAP-02 | Phase 2 | Complete |
-| PTY-CAP-03 | Phase 2 | Complete |
-| PING-01 | Phase 3 | Complete |
-| PING-02 | Phase 3 | Complete |
-| PING-03 | Phase 3 | Complete |
-| PING-04 | Phase 3 | Complete |
-| E2E-01 | Phase 4 | Complete |
-| E2E-02 | Phase 4 | Complete |
-| E2E-03 | Phase 4 | Complete |
-| E2E-04 | Phase 4 | Complete |
+| HPTY-01 | Phase 1 | Pending |
+| HPTY-02 | Phase 1 | Pending |
+| HPTY-03 | Phase 1 | Pending |
+| HPTY-04 | Phase 1 | Pending |
+| TURN-01 | Phase 2 | Pending |
+| TURN-02 | Phase 2 | Pending |
+| TURN-03 | Phase 2 | Pending |
+| RELAY-01 | Phase 3 | Pending |
+| RELAY-02 | Phase 3 | Pending |
+| RELAY-03 | Phase 3 | Pending |
+| RELAY-04 | Phase 3 | Pending |
+| UI-01 | Phase 3 | Pending |
+| UI-02 | Phase 3 | Pending |
+| UI-03 | Phase 3 | Pending |
+| STAB-01 | Phase 1 | Pending |
+| STAB-02 | Phase 1 | Pending |
 
 **Coverage:**
-- v0.8 requirements: 13 total
-- Mapped to phases: 13
-- Unmapped: 0 ✓
+- v0.9 requirements: 16 total
+- Mapped to phases: 16
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 — Phase mappings added after roadmap creation*
