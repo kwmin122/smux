@@ -192,7 +192,7 @@ class PingPongRouter {
     /// HYBRID APPROACH: PTY stream for turn DETECTION, viewport for text EXTRACTION.
     /// This gives clean rendered text without TUI artifacts (spinner, cursor repositioning).
     private func processTurnComplete() {
-        guard isActive else { return }
+        guard isActive, state != .idle, state != .paused else { return }
 
         let speaker = currentSpeaker
         let label = (speaker == "A") ? paneALabel : paneBLabel
@@ -223,7 +223,8 @@ class PingPongRouter {
             // they show "[Pasted text +N lines]" and wait for Enter.
             // Sending CR separately after the paste is processed submits it.
             targetPane?.sendText(delta)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self = self, self.isActive else { return }
                 targetPane?.sendText("\r")
             }
 

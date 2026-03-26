@@ -403,7 +403,7 @@ class WorkspaceWindowController: NSWindowController, NSWindowDelegate {
             let paneA = terminalViews[terminalViews.count - 2]
             let paneB = terminalViews[terminalViews.count - 1]
 
-            let router = PingPongRouter(paneA: paneA, paneB: paneB, maxRounds: 20)
+            let router = PingPongRouter(paneA: paneA, paneB: paneB, maxRounds: 5)
             router.paneALabel = "Left"
             router.paneBLabel = "Right"
 
