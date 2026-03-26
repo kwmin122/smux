@@ -54,6 +54,9 @@ class PingPongRouter {
     /// Flag to ignore output briefly after injection (prevent echo noise)
     private var ignoreOutputUntil: Date = .distantPast
 
+    /// Debug counter for bytes this turn
+    private var bytesThisTurn: Int = 0
+
     // MARK: - Init
 
     init(paneA: GhosttyTerminalView, paneB: GhosttyTerminalView, maxRounds: Int = 20) {
@@ -118,6 +121,7 @@ class PingPongRouter {
         let speakerState: State = (currentSpeaker == "A") ? .paneASpeaking : .paneBSpeaking
         updateState(speakerState)
         outputBuffer = Data()
+        bytesThisTurn = 0
 
         // Snapshot viewport baseline for delta extraction at turn-complete
         baselineText = ANSIStripper.strip(pane?.captureViewportText() ?? "")
@@ -140,14 +144,23 @@ class PingPongRouter {
         // Ignore brief echo after injection
         if Date() < ignoreOutputUntil { return }
 
-        // Filter: only count printable content as "activity"
-        let hasPrintable = data.contains(where: { $0 >= 0x20 && $0 < 0x7F || $0 >= 0x80 })
-        guard hasPrintable else { return }
+        // Strip ANSI escape sequences first, then check for real content.
+        // TUI apps send constant cursor movement, status bar updates, etc.
+        // that are 100% ANSI sequences with no meaningful text — filter those out.
+        let raw = String(data: data, encoding: .utf8) ?? ""
+        let stripped = ANSIStripper.strip(raw)
+        let meaningful = stripped.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Only count as activity if there's real printable content after ANSI strip
+        guard !meaningful.isEmpty else { return }
 
         outputBuffer.append(data)
+        bytesThisTurn += meaningful.count
 
-        // Reset silence timer — output is still flowing
+        // Reset silence timer — real content is still flowing
         resetSilenceTimer()
+
+        NSLog("[pingpong] activity: +%d chars (total %d)", meaningful.count, bytesThisTurn)
     }
 
     // MARK: - Turn-Complete Detection
@@ -156,6 +169,7 @@ class PingPongRouter {
         silenceWorkItem?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self = self, self.isActive, self.state != .paused else { return }
+            NSLog("[pingpong] silence timeout (%.0fs) — turn complete", self.silenceThreshold)
             DispatchQueue.main.async {
                 self.processTurnComplete()
             }
@@ -164,7 +178,7 @@ class PingPongRouter {
         DispatchQueue.global().asyncAfter(deadline: .now() + silenceThreshold, execute: item)
     }
 
-    /// Turn complete: read rendered viewport (not raw bytes), relay to other pane.
+    /// Turn complete: read rendered viewport for clean text, relay to other pane.
     /// HYBRID APPROACH: PTY stream for turn DETECTION, viewport for text EXTRACTION.
     /// This gives clean rendered text without TUI artifacts (spinner, cursor repositioning).
     private func processTurnComplete() {
