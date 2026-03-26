@@ -193,7 +193,15 @@ class PingPongRouter {
             let targetPane = (speaker == "A") ? paneB : paneA
             // Brief ignore window to skip echo of our injection
             ignoreOutputUntil = Date().addingTimeInterval(1.0)
-            targetPane?.sendText(delta + "\r")
+
+            // Send text first, then CR separately after delay.
+            // TUI apps treat multi-line paste differently from typed input —
+            // they show "[Pasted text +N lines]" and wait for Enter.
+            // Sending CR separately after the paste is processed submits it.
+            targetPane?.sendText(delta)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                targetPane?.sendText("\r")
+            }
 
             NSLog("[pingpong] turn complete — speaker=%@ output=%d chars → %@",
                   label, cleanText.count, speaker == "A" ? paneBLabel : paneALabel)
