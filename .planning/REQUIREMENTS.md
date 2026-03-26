@@ -14,7 +14,7 @@
 ### PTY Output Capture
 
 - [x] **PTY-CAP-01**: Terminal output from an agent running in ghostty EXEC mode is captured by smux in real-time
-- [ ] **PTY-CAP-02**: smux detects when an agent's turn is complete (prompt ready / OSC 133 boundary / configurable silence timeout)
+- [x] **PTY-CAP-02**: smux detects when an agent's turn is complete (prompt ready / OSC 133 boundary / configurable silence timeout)
 - [x] **PTY-CAP-03**: Captured terminal output has ANSI escape sequences stripped before relay injection
 
 ### Ping-Pong Relay
@@ -68,7 +68,7 @@
 | STAB-01 | Phase 1 | Complete |
 | STAB-02 | Phase 1 | Complete |
 | PTY-CAP-01 | Phase 2 | Complete |
-| PTY-CAP-02 | Phase 2 | Pending |
+| PTY-CAP-02 | Phase 2 | Complete |
 | PTY-CAP-03 | Phase 2 | Complete |
 | PING-01 | Phase 3 | Pending |
 | PING-02 | Phase 3 | Pending |

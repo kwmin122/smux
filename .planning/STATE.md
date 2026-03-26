@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-pty-output-capture-02-02-PLAN.md (checkpoint:human-verify pending)"
+stopped_at: "Phase 02 VERIFIED (3/3 pass) — ready for Phase 03 relay injection"
 last_updated: "2026-03-26T04:09:00.363Z"
 last_activity: 2026-03-26
 progress:
@@ -21,13 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Two AI agents ping-pong in real visible PTYs — user sleeps, wakes up to idea→plan→impl→review all done.
-**Current focus:** Phase 02 — pty-output-capture
+**Current focus:** Phase 03 — ping-pong-relay (Phase 02 verified)
 
 ## Current Position
 
-Phase: 02 (pty-output-capture) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
+Phase: 02 (pty-output-capture) — VERIFIED ✅
+Plan: 2 of 2 (all complete + checkpoint approved)
+Status: Phase complete — 3/3 success criteria passed
+Next: Phase 03 (ping-pong-relay)
 Last activity: 2026-03-26
 
 Progress: [░░░░░░░░░░] 0%

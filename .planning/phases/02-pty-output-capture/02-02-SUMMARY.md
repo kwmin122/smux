@@ -58,7 +58,7 @@ completed: 2026-03-26
 - **Duration:** 9 min
 - **Started:** 2026-03-26T03:58:09Z
 - **Completed:** 2026-03-26T04:07:13Z
-- **Tasks:** 2 auto (Task 3 is checkpoint:human-verify)
+- **Tasks:** 2 auto + 1 checkpoint:human-verify (APPROVED 2026-03-26)
 - **Files modified:** 2
 
 ## Accomplishments
@@ -76,7 +76,7 @@ Each task was committed atomically:
 1. **Task 1: Add startCapturing/stopCapturing polling wrapper to GhosttyTerminalView** - `c7547cd` (feat)
 2. **Task 2: Rewrite PingPongRouter with real capture integration, OSC 133 subscription, and silence timeout** - `85b3211` (feat)
 
-Task 3 is a `checkpoint:human-verify` — awaiting user verification.
+Task 3 `checkpoint:human-verify` — **APPROVED** (2026-03-26). Build succeeds, sendNotification crash fixed (Bundle.main.bundleIdentifier guard), Cmd+Shift+P toggle wiring verified.
 
 ## Files Created/Modified
 
@@ -111,7 +111,7 @@ None - startCapturing and processTurnComplete wire to real captureViewportText()
 - PTY capture pipeline is complete: polling → ANSI strip → turn detection → onTurnComplete callback
 - PingPongRouter is ready to receive Phase 3 relay injection (write captured output to the other pane's stdin)
 - WorkspaceWindowController.togglePingPong() wires onTurnComplete — Phase 3 adds the sendText call there
-- Pending: Human verification (Task 3 checkpoint) to confirm polling and turn-complete fire correctly at runtime
+- Human verification (Task 3 checkpoint) APPROVED — build compiles, sendNotification crash fixed, toggle wiring confirmed
 
 ---
 *Phase: 02-pty-output-capture*

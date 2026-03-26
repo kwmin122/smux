@@ -12,7 +12,7 @@ v0.8 ships smux's core differentiator: real PTY ping-pong between two AI agent C
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Surface Lifecycle Fix** - Fix ⌘W Metal zombie and ghostty surface teardown order
+- [x] **Phase 1: Surface Lifecycle Fix** - Fix ⌘W Metal zombie and ghostty surface teardown order
 - [x] **Phase 2: PTY Output Capture** - Capture terminal output from ghostty EXEC mode; detect turn boundaries; strip ANSI (completed 2026-03-26)
 - [ ] **Phase 3: Ping-Pong Relay** - Wire captured output into live relay loop with mission control status
 - [ ] **Phase 4: E2E Feature Verification** - Verify browser panel, browser automation, detach/reattach, and AppleScript hooks end-to-end
