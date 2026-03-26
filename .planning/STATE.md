@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.8
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 01-surface-lifecycle-fix-01-01-PLAN.md
-last_updated: "2026-03-26T02:26:15.450Z"
+stopped_at: Completed 02-pty-output-capture-02-01-PLAN.md
+last_updated: "2026-03-26T03:58:09.294Z"
 last_activity: 2026-03-26
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 1
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-surface-lifecycle-fix P01 | 3 | 2 tasks | 3 files |
+| Phase 02-pty-output-capture P01 | 6 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Recent decisions affecting current work:
 - ghostty_surface_read_text polling chosen as PTY capture strategy (pending verification)
 - [Phase 01-surface-lifecycle-fix]: Task.detached { @MainActor } for ghostty_surface_free matches Ghostty own pattern; contentView=nil BEFORE surface_free is critical ordering
 - [Phase 01-surface-lifecycle-fix]: NSWindowDelegate.windowWillClose added to WorkspaceWindowController as primary Cmd+W teardown hook
+- [Phase 02-pty-output-capture]: Use GHOSTTY_POINT_VIEWPORT with large coords (9999,9999) for full visible viewport reads; ghostty clamps to actual content
+- [Phase 02-pty-output-capture]: UInt(bitPattern: surface) as opaque key in @convention(c) actionCb — pointer never dereferenced async
 
 ### Pending Todos
 
@@ -79,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T02:26:15.447Z
-Stopped at: Completed 01-surface-lifecycle-fix-01-01-PLAN.md
+Last session: 2026-03-26T03:58:09.289Z
+Stopped at: Completed 02-pty-output-capture-02-01-PLAN.md
 Resume file: None
