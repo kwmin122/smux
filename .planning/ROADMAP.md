@@ -40,12 +40,11 @@ Plans:
   1. When an agent CLI (e.g., `claude`) prints output in a ghostty pane, smux captures the text within one second
   2. smux correctly identifies when the agent's turn is complete (prompt reappears, OSC 133 boundary fires, or configurable silence timeout expires)
   3. Text delivered to the relay layer contains no ANSI escape sequences — only plain readable content
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 02-01: Implement ghostty_surface_read_text polling for EXEC mode output capture
-- [ ] 02-02: Implement turn-complete detection (OSC 133 action_cb + silence timeout fallback)
-- [ ] 02-03: ANSI stripping pipeline for captured text before relay injection
+- [ ] 02-01-PLAN.md — Create capture primitives: ANSIStripper, captureViewportText(), actionCb COMMAND_FINISHED dispatch
+- [ ] 02-02-PLAN.md — Wire PingPongRouter to real capture: polling, OSC 133 turn-complete, silence timeout fallback
 
 ### Phase 3: Ping-Pong Relay
 **Goal**: Two AI agents relay responses between each other automatically in a live visible loop until the user stops it
@@ -90,7 +89,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Surface Lifecycle Fix | 0/1 | Not started | - |
-| 2. PTY Output Capture | 0/3 | Not started | - |
+| 1. Surface Lifecycle Fix | 1/1 | Complete | 2026-03-26 |
+| 2. PTY Output Capture | 0/2 | Not started | - |
 | 3. Ping-Pong Relay | 0/4 | Not started | - |
 | 4. E2E Feature Verification | 0/4 | Not started | - |
